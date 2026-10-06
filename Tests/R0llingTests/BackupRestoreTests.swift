@@ -62,7 +62,7 @@ final class BackupRestoreTests: XCTestCase {
         let result = try await cleanBackupEngine.restoreFromBackupBundle(bundleURL: bundleURL)
         XCTAssertEqual(result.restoredEntries, 2)
 
-        let restoredEntries = try await cleanStorage.getAllEntries()
+        let restoredEntries = await cleanStorage.getAllEntries()
         XCTAssertEqual(restoredEntries.count, 2)
         XCTAssertEqual(Set(restoredEntries.map(\.id)), Set([entry1.id, entry2.id]))
     }
@@ -108,7 +108,7 @@ final class BackupRestoreTests: XCTestCase {
         XCTAssertEqual(result.restoredEntries, 1)
         XCTAssertEqual(result.restoredMedia, 1)
 
-        let restored = try await cleanStorage.getEntry(id: entry.id)
+        let restored = await cleanStorage.getEntry(id: entry.id)
         XCTAssertEqual(restored?.id, entry.id)
         XCTAssertEqual(restored?.attachments.first?.relativePath, attachment.relativePath)
 
@@ -128,7 +128,7 @@ final class BackupRestoreTests: XCTestCase {
         let first = try await backupEngine.restoreFromBackupBundle(bundleURL: bundleURL)
         XCTAssertEqual(first.restoredEntries, 0, "Source sandbox ήδη έχει το ID")
 
-        let all = try await storage.getAllEntries()
+        let all = await storage.getAllEntries()
         XCTAssertEqual(all.count, 1)
     }
 

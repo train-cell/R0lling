@@ -192,7 +192,8 @@ final class JournalStorageTests: XCTestCase {
 
         let retrieved = await storage.getEntry(id: entry.id)
         XCTAssertEqual(retrieved?.dateKey, "2026-10-06")
-        XCTAssertEqual(await storage.getAllEntries().filter { $0.id == entry.id }.count, 1)
+        let allEntries = await storage.getAllEntries()
+        XCTAssertEqual(allEntries.filter { $0.id == entry.id }.count, 1)
 
         let onOct6 = await storage.getEntriesForDate(
             oct6,

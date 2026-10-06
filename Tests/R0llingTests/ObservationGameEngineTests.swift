@@ -53,9 +53,12 @@ final class ObservationGameEngineTests: XCTestCase {
 
     func testSessionLifecycleStartActive() async {
         let engine = ObservationGameEngine(aiRouter: AIRouter(settings: AISettings()))
-        XCTAssertEqual(await engine.getSessionState(), .idle)
+        let state1 = await engine.getSessionState()
+        XCTAssertEqual(state1, .idle)
         _ = await engine.startNewMission()
-        XCTAssertEqual(await engine.getSessionState(), .active)
-        XCTAssertNotNil(await engine.getCurrentMission())
+        let state2 = await engine.getSessionState()
+        XCTAssertEqual(state2, .active)
+        let mission = await engine.getCurrentMission()
+        XCTAssertNotNil(mission)
     }
 }

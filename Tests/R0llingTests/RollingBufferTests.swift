@@ -90,12 +90,14 @@ final class RollingBufferTests: XCTestCase {
                 streamGeneration: gen1
             ))
         }
-        XCTAssertGreaterThan(await bufferService.availableDuration, 0.5)
+        let durationBeforeInterrupt = await bufferService.availableDuration
+        XCTAssertGreaterThan(durationBeforeInterrupt, 0.5)
 
         await bufferService.markStreamInterrupted(reason: "disconnect")
         let gen2 = await bufferService.streamGeneration
         XCTAssertNotEqual(gen1, gen2)
-        XCTAssertEqual(await bufferService.availableDuration, 0.0)
+        let durationAfterInterrupt = await bufferService.availableDuration
+        XCTAssertEqual(durationAfterInterrupt, 0.0)
 
         // Παλιά generation samples δεν μπαίνουν στο νέο session
         await bufferService.startBuffering(targetSeconds: 10.0)
@@ -107,7 +109,8 @@ final class RollingBufferTests: XCTestCase {
             data: Data([0x02]),
             streamGeneration: gen1
         ))
-        XCTAssertEqual(await bufferService.availableDuration, 0.0, "Παλιά generation πρέπει να αγνοείται")
+        let durationOldGen = await bufferService.availableDuration
+        XCTAssertEqual(durationOldGen, 0.0, "Παλιά generation πρέπει να αγνοείται")
 
         await bufferService.appendSample(sample: BufferedSample(
             timestampSeconds: 0.0,
@@ -123,7 +126,8 @@ final class RollingBufferTests: XCTestCase {
             data: Data([0x04]),
             streamGeneration: gen3
         ))
-        XCTAssertGreaterThan(await bufferService.availableDuration, 0.5)
+        let durationNewGen = await bufferService.availableDuration
+        XCTAssertGreaterThan(durationNewGen, 0.5)
     }
 
     /// A07: pause σταματά append · resume συνεχίζει ίδια session χωρίς fake gap join από interrupt.
@@ -145,13 +149,15 @@ final class RollingBufferTests: XCTestCase {
         await bufferService.appendSample(sample: BufferedSample(
             timestampSeconds: 2.0, isKeyframe: false, isAudio: false, data: Data([0x03]), streamGeneration: gen
         ))
-        XCTAssertEqual(await bufferService.availableDuration, 1.0, "Κατά pause δεν προστίθενται samples")
+        let durationPaused = await bufferService.availableDuration
+        XCTAssertEqual(durationPaused, 1.0, "Κατά pause δεν προστίθενται samples")
 
         await bufferService.resumeBuffering()
         await bufferService.appendSample(sample: BufferedSample(
             timestampSeconds: 2.0, isKeyframe: false, isAudio: false, data: Data([0x04]), streamGeneration: gen
         ))
-        XCTAssertGreaterThan(await bufferService.availableDuration, 1.5)
+        let durationResumed = await bufferService.availableDuration
+        XCTAssertGreaterThan(durationResumed, 1.5)
     }
 
     /// A07 policy math: background κατά streaming → PAUSED message χωρίς continuous promise.
