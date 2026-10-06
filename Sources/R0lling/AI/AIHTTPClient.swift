@@ -112,8 +112,8 @@ public enum AIHTTPClient {
             }
         }
 
-        if let lastError as NSError, lastError.domain == config.errorDomain {
-            throw lastError
+        if let nsError = lastError as? NSError, nsError.domain == config.errorDomain {
+            throw nsError
         }
 
         throw AIErrorTaxonomy.makeError(
