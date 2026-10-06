@@ -1,6 +1,8 @@
 import SwiftUI
 
+#if !SWIFT_PACKAGE
 @main
+#endif
 public struct R0llingApp: App {
     @StateObject private var appState = AppState()
 

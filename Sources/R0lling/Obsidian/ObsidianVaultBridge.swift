@@ -345,7 +345,7 @@ public actor ObsidianVaultBridge {
 
     // MARK: - Scoped access
 
-    private func me_prosbasi_vault<T>(
+    private func me_prosbasi_vault<T: Sendable>(
         _ body: () async throws -> T
     ) async throws -> T {
         guard let vaultURL = vaultDirectoryURL else {
