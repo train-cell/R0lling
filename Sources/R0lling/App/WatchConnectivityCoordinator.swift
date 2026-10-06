@@ -50,11 +50,13 @@ extension WatchConnectivityCoordinator: WCSessionDelegate {
         // Activation handler
     }
 
+#if os(iOS)
     public func sessionDidBecomeInactive(_ session: WCSession) {}
 
     public func sessionDidDeactivate(_ session: WCSession) {
         WCSession.default.activate()
     }
+#endif
 
     public func session(_ session: WCSession, didReceiveMessage message: [String : Any], replyHandler: @escaping ([String : Any]) -> Void) {
         // SEC-003: schema version + allowlist actions + max note length.
