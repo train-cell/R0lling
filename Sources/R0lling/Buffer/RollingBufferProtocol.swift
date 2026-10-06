@@ -74,7 +74,7 @@ public struct BufferedSample: Sendable {
     }
 }
 
-public protocol RollingBufferServiceProtocol: Sendable {
+public protocol RollingBufferServiceProtocol: AnyObject, Sendable {
     var currentState: BufferState { get async }
     var availableDuration: Double { get async }
     /// Μοναδικό ID session ροής — αυξάνεται σε disconnect / gap (A06).

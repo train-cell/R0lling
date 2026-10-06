@@ -263,7 +263,8 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
                 guard let self = self else { break }
 
                 let currentBattery = await self.currentBatteryLevel()
-                let isLowBattery = (currentBattery ?? 100) < 20 && self.isAdaptiveBatterySaverEnabled
+                let batterySaver = await self.isAdaptiveBatterySaverEnabled
+                let isLowBattery = (currentBattery ?? 100) < 20 && batterySaver
                 let frameInterval: UInt64 = isLowBattery ? 66_666_666 : 33_333_333
                 let step = isLowBattery ? 0.0666 : 0.0333
                 let generation = await self.bufferService?.streamGeneration ?? 0
@@ -296,7 +297,7 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
                 }
 
                 // Feed API end-to-end: synthetic acoustic + IMU (triggers gated στο AppState).
-                self.steileSensorFeeds(frameIndex: frameIndex, timestamp: timestamp)
+                await self.steileSensorFeeds(frameIndex: frameIndex, timestamp: timestamp)
 
                 frameIndex += 1
                 try? await Task.sleep(nanoseconds: frameInterval)
@@ -336,10 +337,10 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
                         // Approximate RMS από amplitude proxy αν δεν υπάρχει float PCM ακόμα
                         let proxyLevel = Float(audio.data.first ?? 0) / 255.0
                         let approxDb = proxyLevel > 0 ? 20.0 * log10f(proxyLevel) : -100.0
-                        self.sensorFeedSink?.receiveAcousticLevel(decibels: approxDb)
+                        await self.steileDATOralAcoustic(approxDb: approxDb)
                     }
                     if let imu = try await MetaDATStreamBridge.diavaseEpomenoIMU() {
-                        self.sensorFeedSink?.receiveIMUSample(imu)
+                        await self.steileDATIMU(imu)
                     }
                 } catch {
                     // Σε DAT frame error: προσπάθεια reconnect κατά policy, αλλιώς paused/error.
@@ -367,6 +368,14 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
     private func auxSetError(_ message: String) {
         state = .error(message)
         itanStreamingPrinPause = false
+    }
+
+    private func steileDATOralAcoustic(approxDb: Float) {
+        sensorFeedSink?.receiveAcousticLevel(decibels: approxDb)
+    }
+
+    private func steileDATIMU(_ imu: HeadGestureDetector.IMUSample) {
+        sensorFeedSink?.receiveIMUSample(imu)
     }
 
     private func steileSensorFeeds(frameIndex: Int, timestamp: Double) {
