@@ -88,12 +88,13 @@ public struct AssistantView: View {
                         Image(systemName: "eye.fill")
                         Text("Τι βλέπω;")
                     }
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .background(R0llingTheme.accentPurple)
+                    .background(R0llingTheme.stravaButtonGradient)
                     .clipShape(Capsule())
+                    .shadow(color: R0llingTheme.stravaOrange.opacity(0.3), radius: 6, x: 0, y: 2)
                 }
 
                 Button(action: {
@@ -118,9 +119,10 @@ public struct AssistantView: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "list.clipboard.fill")
+                            .foregroundColor(R0llingTheme.bevelCyan)
                         Text("Σύνοψη ημέρας")
                     }
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -135,9 +137,10 @@ public struct AssistantView: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "film.fill")
+                            .foregroundColor(R0llingTheme.stravaOrange)
                         Text("🎬 Highlight Reel")
                     }
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -152,9 +155,10 @@ public struct AssistantView: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "mic.fill")
+                            .foregroundColor(R0llingTheme.bevelEmerald)
                         Text("🎙️ Podcast")
                     }
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -169,9 +173,10 @@ public struct AssistantView: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "square.grid.3x3.fill")
+                            .foregroundColor(R0llingTheme.bevelCyan)
                         Text("🎨 Canvas")
                     }
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -186,9 +191,10 @@ public struct AssistantView: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "point.3.connected.trianglepath.dotted")
+                            .foregroundColor(R0llingTheme.stravaFlame)
                         Text("🧠 Graph")
                     }
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -203,8 +209,8 @@ public struct AssistantView: View {
                         Image(systemName: appState.isMirrorStreaming ? "airplayvideo.fill" : "airplayvideo")
                         Text(appState.isMirrorStreaming ? "🪞 On (\(appState.activeMirrorClientsCount))" : "🪞 Mirror")
                     }
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(appState.isMirrorStreaming ? .green : R0llingTheme.textPrimary)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(appState.isMirrorStreaming ? R0llingTheme.bevelEmerald : R0llingTheme.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(R0llingTheme.bgElevated)
@@ -214,9 +220,10 @@ public struct AssistantView: View {
                 Button(action: { isShowingGameSheet = true }) {
                     HStack(spacing: 4) {
                         Image(systemName: "gamecontroller.fill")
-                        Text("Παιχνίδι Παρατήρησης")
+                            .foregroundColor(R0llingTheme.bevelAmber)
+                        Text("Παιχνίδι")
                     }
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -251,8 +258,18 @@ public struct AssistantView: View {
                     .font(.system(size: 16))
                     .foregroundColor(.white)
                     .frame(width: 44, height: 44)
-                    .background(inputPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? R0llingTheme.bgElevated : R0llingTheme.accentPurple)
+                    .background(
+                        inputPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            ? LinearGradient(colors: [R0llingTheme.bgElevated, R0llingTheme.bgElevated], startPoint: .top, endPoint: .bottom)
+                            : R0llingTheme.stravaButtonGradient
+                    )
                     .clipShape(Circle())
+                    .shadow(
+                        color: inputPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            ? Color.clear
+                            : R0llingTheme.stravaOrange.opacity(0.35),
+                        radius: 6, x: 0, y: 2
+                    )
             }
             .disabled(inputPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
@@ -276,7 +293,7 @@ public struct ChatMessageBubble: View {
                     .font(.system(size: 15))
                     .foregroundColor(.white)
                     .padding(12)
-                    .background(isUser ? R0llingTheme.accentPurple : R0llingTheme.bgSurface)
+                    .background(isUser ? R0llingTheme.stravaOrange : R0llingTheme.bgSurface)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -407,9 +424,12 @@ public struct ObservationGameSheet: View {
                             // G5-002: streak μόνο σε επιτυχή αξιολόγηση — όχι σε fail/error.
                             let epityxia = await appState.evaluateGameCapture()
                             guard epityxia else { return }
-                            appState.streakManager.recordMissionCompleted()
+                            let apotelesma = appState.streakManager.recordMissionCompleted()
                             appState.scavengerStreak = appState.streakManager.currentStreak
                             appState.scavengerBadges = appState.streakManager.badges
+                            if !apotelesma.didPersist {
+                                appState.showToast("Το streak ενημερώθηκε στη μνήμη αλλά απέτυχε η αποθήκευση.")
+                            }
                         }
                     }) {
                         HStack {
@@ -428,9 +448,12 @@ public struct ObservationGameSheet: View {
                         Task {
                             await appState.gameEngine.confirmManually()
                             appState.gameScore = await appState.gameEngine.getScore()
-                            appState.streakManager.recordMissionCompleted()
+                            let apotelesma = appState.streakManager.recordMissionCompleted()
                             appState.scavengerStreak = appState.streakManager.currentStreak
                             appState.scavengerBadges = appState.streakManager.badges
+                            if !apotelesma.didPersist {
+                                appState.showToast("Το streak ενημερώθηκε στη μνήμη αλλά απέτυχε η αποθήκευση.")
+                            }
                             await appState.playNextMission()
                         }
                     }) {

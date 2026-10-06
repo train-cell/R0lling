@@ -48,9 +48,15 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
 
         for entry in entries {
             for attachment in entry.attachments {
-                let sourceURL = await mediaStorage.getMediaFileURL(relativePath: attachment.relativePath)
+                // SEC-002: skip traversal paths — fail-closed ανά attachment.
+                guard let sourceURL = try? await mediaStorage.getMediaFileURL(relativePath: attachment.relativePath),
+                      let destURL = try? PathAsfaleia.asfalhs_resolved_url(
+                        relativePath: attachment.relativePath,
+                        baseDirectory: mediaBundleDir
+                      ) else {
+                    continue
+                }
                 if FileManager.default.fileExists(atPath: sourceURL.path) {
-                    let destURL = mediaBundleDir.appendingPathComponent(attachment.relativePath)
                     try? FileManager.default.createDirectory(at: destURL.deletingLastPathComponent(), withIntermediateDirectories: true)
                     try? FileManager.default.copyItem(at: sourceURL, to: destURL)
                 }
@@ -84,10 +90,15 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
                 restoredEntriesCount += 1
             }
 
-            // Επαναφορά πολυμέσων
+            // Επαναφορά πολυμέσων (SEC-002: canonicalize + reject ..)
             for attachment in entry.attachments {
-                let backupMediaURL = mediaBundleDir.appendingPathComponent(attachment.relativePath)
-                let targetMediaURL = await mediaStorage.getMediaFileURL(relativePath: attachment.relativePath)
+                guard let backupMediaURL = try? PathAsfaleia.asfalhs_resolved_url(
+                        relativePath: attachment.relativePath,
+                        baseDirectory: mediaBundleDir
+                      ),
+                      let targetMediaURL = try? await mediaStorage.getMediaFileURL(relativePath: attachment.relativePath) else {
+                    continue
+                }
 
                 if FileManager.default.fileExists(atPath: backupMediaURL.path) && !FileManager.default.fileExists(atPath: targetMediaURL.path) {
                     try? FileManager.default.createDirectory(at: targetMediaURL.deletingLastPathComponent(), withIntermediateDirectories: true)

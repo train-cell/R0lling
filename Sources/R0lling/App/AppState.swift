@@ -429,6 +429,10 @@ public final class AppState: ObservableObject {
             showToast("Η απομακρυσμένη ροή (See-What-I-See) τερματίστηκε.")
         } else {
             do {
+                // SEC-001: ephemeral pairing token πριν listener — AUTH υποχρεωτικό πριν frames.
+                if mirrorStreamServer.pairingToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    mirrorStreamServer.pairingToken = UUID().uuidString
+                }
                 try mirrorStreamServer.startServer()
                 isMirrorStreaming = true
                 mirrorStreamServer.onClientConnected = { [weak self] count in
@@ -436,7 +440,8 @@ public final class AppState: ObservableObject {
                         self?.activeMirrorClientsCount = count
                     }
                 }
-                showToast("Mirror server ακούει (Bonjour) — χωρίς frame pipeline από glasses.")
+                let pinHint = String(mirrorStreamServer.pairingToken.prefix(8))
+                showToast("Mirror ακούει (Bonjour+AUTH \(pinHint)…) — χωρίς frame pipeline από glasses.")
             } catch {
                 showToast("Σφάλμα Mirror Server: \(error.localizedDescription)")
             }

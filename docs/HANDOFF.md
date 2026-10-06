@@ -1,46 +1,60 @@
 # R0lling — HANDOFF
 
+```yaml
+Last_Modified: 2026-10-06T18:25:00+03:00
+tags: [audit, handoff, r0lling, surgical-sec-fix]
+```
+
 ```text
 Στάδιο / μοντέλο / ακριβής ετικέτα reasoning:
-  Continuity steward post-audit (μετά Full Gemini audit)
-  Gemini Swift: **IDLE** μετά wave-C (~17:40) · μόνο Batch-7 MD + verify mirrors μετά
+  Catalog skills review + surgical SEC/honesty fixes (Cursor subagent)
+  Gemini Swift: IDLE · Stage 6: ΜΗΝ · Theme.swift: ΜΗΝ αγγίχτηκε
 
-Project root / checkpoint ή commit:
+Project root / checkpoint:
   C:\Users\skyd3\antigarvity\R0lling
-  Χωρίς git commits στο R0lling (όπως ζητήθηκε).
-  Checkpoint = Stage 4/5 κλειστά + Gemini wave-B/C scaffolding + steward/CQ honesty P0s + audit rollup.
+  Nested git · origin https://github.com/train-cell/R0lling.git · main
 
-Multi-agent audit rollup (2026-10-06 ~18:00) — **canonical executive:**
-  docs/AUDIT_ROLLUP.md (deduped P0/P1/P2 · next actions · όλα τα lanes READY)
-  Lanes: AUDIT_ARCHITECTURE · AUDIT_SECURITY · AUDIT_VERIFICATION · AUDIT_CODE_QUALITY · GEMINI_AUDIT
+═══════════════════════════════════════════════════════════════
+SURGICAL FIX PASS (2026-10-06 ~18:25 EEST)
+═══════════════════════════════════════════════════════════════
+Skills applied:
+  code_reviewer · mp_code-review (smell baseline) · ponytail_ponytail-audit
+  ponytail_ponytail-review · security_reviewer · cv_surgical-patch
+  cv_safe-refactor (boundary only) · verification_loop · cv_verify-and-stop
+  deep_code_analysis (scoped) · andrej_karpathy_skills
+  webapp_reviewer: SKIP (Swift/SPM, όχι web)
 
-Audit snapshot (2026-10-06 ~17:40):
-  Πλήρες scorecard → docs/GEMINI_AUDIT.md (§1–8) + post-audit §9
+CLOSED this pass (βλ. FIX_LOG):
+  SEC-002 PathAsfaleia + Media/Backup/Obsidian
+  SEC-001 Mirror AUTH stub (pairingToken · authenticatedConnections)
+  SEC-003 WCSession schemaVersion + max note 2KB
+  SEC-005 AI error body scrub
+  CQ-P2-020 podcast completion-at-end
+  Streak persist honesty · Documents `.first!` guards
 
-Code quality lane (~17:50):
-  docs/AUDIT_CODE_QUALITY.md · 6 surgical P0 applied (CQ-P0-001…006) · χωρίς git commit
+Verification (fresh):
+  diagnose_stage3 → stage4 PASS
+  diagnose_stage4 PASS
+  diagnose_stage5 PASS (incl. new [SEC] suite)
+  verify_all 7/7 · 27 modules PASS
+  swift test: UNAVAILABLE (Windows)
 
-Verification / ECC honesty lane (2026-10-06):
-  Πλήρες PASS/FAIL + docs-vs-diagnostics → docs/AUDIT_VERIFICATION.md
-  Python: 4/4 verification/*.py PASS (verify=7 φάσεις/27 modules · stage3→4 · stage4 · stage5)
-  Windows: swift/xcodebuild UNAVAILABLE · χωρίς device proof
+Προηγούμενα ακόμα ΚΛΕΙΣΤΑ:
+  R3-001..012 · G5-001..005 · CQ-P0-001…007 · CQ-P1-012
 
-Post-audit delta (~17:41→):
-  ΝΕΟ: docs/IMPLEMENTED_NEXTGEN_BATCH_7.md (overclaim → honesty override steward)
-  ΝΕΟ: verify_all_subsystems.py φάση [7] math mirrors
-  ΟΧΙ νέο Swift μετά 17:40:37
-  Steward: mirror toast server-only honesty
+Ακόμα ΑΝΟΙΧΤΑ:
+  P0: Mac swift test · DAT/sim decision · freeze wave-D · app target · Stage 6
+  SEC-001 residual: TLS / NWProtocolTLS (μόνο AUTH stub)
+  SEC-004/007 Hermes cleartext + URL allowlist
+  P1-04 orphan AppState holds · P1-09 MobileCLIP rename · P1-10 DRY OpenAI builder
+  P1-05 AppState split (ΜΗΝ rewrite χωρίς απόφαση)
 
-Γνωστά software defects με IDs:
-  ΚΛΕΙΣΤΑ (κώδικας): R3-001..R3-012, G5-001..G5-005
-  ΑΝΟΙΧΤΑ (εξωτερικά): DAT remux, device proof, live AI
-  ΑΝΟΙΧΤΑ (Gemini drift): mirror χωρίς frame broadcast · pseudo-CLIP · Whisper stub ·
-    Watch χωρίς watch target · wire mic/IMU (flags false στο AppState)
-  ΚΛΕΙΣΤΑ (rectification): CQ-P0-001…007 · CQ-P1-012 · docs/RECTIFICATION_REPORT.md
+NEXT_STEP_TO_EXECUTE (ένα μόνο):
+  Mac host → `swift test` στο package R0lling.
+  Αν fail: πρώτο failing XCTest + traceback στο επόμενο handoff.
 
-Ακριβές επόμενο βήμα:
-  1) Mac: swift test + AVAsset.isPlayable smoke.
-  2) Set `SUPER_FEATURE_ACOUSTIC_MIC_FEED_WIRED` / `IMU` + feed από buffer/adapter.
-  3) Stage 6 ΜΟΝΟ με πραγματικό device failure report (prompt 06).
-  4) Μην θεωρείς wave-B/C «shipped» χωρίς device proof.
+PENDING:
+  [ ] Commit όταν ζητηθεί (dirty: SEC/honesty Sources + docs + Theme.swift παράλληλο)
+  [ ] TLS για Mirror πριν live glasses broadcastFrame
+  [ ] P0-02 DAT ή DECISIONS sim-only
 ```

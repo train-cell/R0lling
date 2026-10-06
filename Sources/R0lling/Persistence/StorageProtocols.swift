@@ -12,7 +12,8 @@ public protocol JournalStorageProtocol: Sendable {
 
 public protocol MediaStorageProtocol: Sendable {
     func saveMediaFile(data: Data, originalFilename: String, mediaType: MediaType) async throws -> MediaAttachment
-    func getMediaFileURL(relativePath: String) -> URL
+    /// SEC-002: throws αν το relativePath επιχειρεί path traversal εκτός Media root.
+    func getMediaFileURL(relativePath: String) throws -> URL
     func deleteMediaFile(relativePath: String) async throws
     func availableFreeDiskSpace() -> Int64
     func cleanupOrphanedFiles(activeRelativePaths: Set<String>) async throws -> Int

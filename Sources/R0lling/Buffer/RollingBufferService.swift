@@ -138,7 +138,7 @@ public actor RollingBufferService: RollingBufferServiceProtocol {
             mediaType: .clip
         )
 
-        let fileURL = await mediaStorage.getMediaFileURL(relativePath: attachment.relativePath)
+        let fileURL = try await mediaStorage.getMediaFileURL(relativePath: attachment.relativePath)
         let isSimulationPlaceholder = !exeiPragmatikoNAL
 
         return ClipExportResult(

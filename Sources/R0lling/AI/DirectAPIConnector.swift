@@ -78,8 +78,13 @@ public final class DirectAPIConnector: AIConnectorProtocol, @unchecked Sendable 
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-            let errorText = String(data: data, encoding: .utf8) ?? "Άγνωστο σφάλμα HTTP"
-            throw NSError(domain: "R0lling.AI", code: 7002, userInfo: [NSLocalizedDescriptionKey: "Direct AI API Σφάλμα: \(errorText)"])
+            // SEC-005: generic user-facing μήνυμα — όχι raw response body.
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw NSError(
+                domain: "R0lling.AI",
+                code: 7002,
+                userInfo: [NSLocalizedDescriptionKey: "Direct AI API Σφάλμα (HTTP \(status))."]
+            )
         }
 
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]

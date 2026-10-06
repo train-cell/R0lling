@@ -33,9 +33,11 @@ public actor ObsidianVaultBridge {
     public init(vaultURL: URL? = nil) {
         if let url = vaultURL {
             self.vaultDirectoryURL = url
-        } else {
-            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        } else if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             self.vaultDirectoryURL = docs.appendingPathComponent("R0lling/ObsidianVault", isDirectory: true)
+        } else {
+            self.vaultDirectoryURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("R0lling/ObsidianVault", isDirectory: true)
         }
     }
 
@@ -105,9 +107,15 @@ public actor ObsidianVaultBridge {
         try FileManager.default.createDirectory(at: attachmentsDir, withIntermediateDirectories: true)
 
         for attachment in entry.attachments {
-            let sourceURL = await mediaStorage.getMediaFileURL(relativePath: attachment.relativePath)
+            // SEC-002: reject `..` / absolute — silent skip ανά attachment (vault export συνεχίζει).
+            guard let sourceURL = try? await mediaStorage.getMediaFileURL(relativePath: attachment.relativePath),
+                  let destURL = try? PathAsfaleia.asfalhs_resolved_url(
+                    relativePath: attachment.relativePath,
+                    baseDirectory: attachmentsDir
+                  ) else {
+                continue
+            }
             if FileManager.default.fileExists(atPath: sourceURL.path) {
-                let destURL = attachmentsDir.appendingPathComponent(attachment.relativePath)
                 try? FileManager.default.createDirectory(at: destURL.deletingLastPathComponent(), withIntermediateDirectories: true)
                 if !FileManager.default.fileExists(atPath: destURL.path) {
                     try? FileManager.default.copyItem(at: sourceURL, to: destURL)

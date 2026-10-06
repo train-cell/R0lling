@@ -31,7 +31,7 @@ public struct SettingsView: View {
                         }
                     }) {
                         Text(appState.glassesState == .disconnected ? "Σύνδεση Γυαλιών" : "Αποσύνδεση")
-                            .foregroundColor(R0llingTheme.accentPurple)
+                            .foregroundColor(R0llingTheme.stravaOrange)
                     }
 
                     Toggle("Simulation Mode (Δοκιμή χωρίς γυαλιά)", isOn: $simulationMode)
@@ -66,7 +66,7 @@ public struct SettingsView: View {
                         Text("Τρέχων Buffer:")
                         Spacer()
                         Text(String(format: "%.1fs διαθέσιμα", appState.bufferDuration))
-                            .foregroundColor(R0llingTheme.accentLavender)
+                            .foregroundColor(R0llingTheme.bevelCyan)
                     }
                 }
 
@@ -118,7 +118,7 @@ public struct SettingsView: View {
                             }
                         }
                     }
-                    .foregroundColor(R0llingTheme.accentPurple)
+                    .foregroundColor(R0llingTheme.stravaOrange)
                 }
 
                 // Section 4: Obsidian Vault
@@ -147,7 +147,7 @@ public struct SettingsView: View {
                             }
                         }
                     }
-                    .foregroundColor(R0llingTheme.accentPurple)
+                    .foregroundColor(R0llingTheme.stravaOrange)
                 }
 
                 // Section 5: Backup & Restore

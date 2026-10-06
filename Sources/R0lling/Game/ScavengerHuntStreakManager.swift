@@ -41,7 +41,8 @@ public final class ScavengerHuntStreakManager: @unchecked Sendable {
     }
 
     /// Καταγραφή ολοκλήρωσης σημερινής αποστολής (ημερολογιακά κλειδιά σε ρητό TimeZone).
-    public func recordMissionCompleted(date: Date = Date(), timeZone: TimeZone = .current) -> (newStreak: Int, newlyUnlockedBadge: String?) {
+    /// `didPersist` = false αν το UserDefaults encode απέτυχε (όχι silent data loss).
+    public func recordMissionCompleted(date: Date = Date(), timeZone: TimeZone = .current) -> (newStreak: Int, newlyUnlockedBadge: String?, didPersist: Bool) {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -50,7 +51,7 @@ public final class ScavengerHuntStreakManager: @unchecked Sendable {
         let todayKey = formatter.string(from: date)
 
         guard streakData.lastCompletedDateKey != todayKey else {
-            return (streakData.currentStreak, nil) // Ήδη ολοκληρώθηκε σήμερα
+            return (streakData.currentStreak, nil, true) // Ήδη ολοκληρώθηκε σήμερα
         }
 
         var calendar = Calendar(identifier: .gregorian)
@@ -82,13 +83,19 @@ public final class ScavengerHuntStreakManager: @unchecked Sendable {
             streakData.unlockedBadges.append(badge)
         }
 
-        save()
-        return (streakData.currentStreak, newBadge)
+        let didPersist = save()
+        return (streakData.currentStreak, newBadge, didPersist)
     }
 
-    private func save() {
-        if let encoded = try? JSONEncoder().encode(streakData) {
+    @discardableResult
+    private func save() -> Bool {
+        do {
+            let encoded = try JSONEncoder().encode(streakData)
             UserDefaults.standard.set(encoded, forKey: userDefaultsKey)
+            return true
+        } catch {
+            print("[ScavengerHunt] Persist failed: \(error.localizedDescription)")
+            return false
         }
     }
 }

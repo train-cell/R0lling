@@ -7,9 +7,11 @@ public actor AgentFolderManager {
     public init(vaultURL: URL? = nil) {
         if let url = vaultURL {
             self.baseVaultURL = url
-        } else {
-            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        } else if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             self.baseVaultURL = docs.appendingPathComponent("R0lling/ObsidianVault", isDirectory: true)
+        } else {
+            self.baseVaultURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("R0lling/ObsidianVault", isDirectory: true)
         }
     }
 

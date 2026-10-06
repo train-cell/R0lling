@@ -7,6 +7,11 @@ import WatchConnectivity
 public final class WatchConnectivityCoordinator: NSObject, @unchecked Sendable {
     public static let shared = WatchConnectivityCoordinator()
 
+    /// SEC-003: μέγιστο μήκος note από Watch (2KB).
+    public static let maxMikosNoteApoWatch = 2048
+    /// SEC-003: επιτρεπόμενο schema version στα εισερχόμενα μηνύματα.
+    public static let schemaVersionApaitoumenos = 1
+
     public var onRemoteClipTriggerRequested: (@Sendable () -> Void)?
     public var onRemoteNoteReceived: (@Sendable (String) -> Void)?
 
@@ -26,6 +31,7 @@ public final class WatchConnectivityCoordinator: NSObject, @unchecked Sendable {
         #if canImport(WatchConnectivity)
         guard WCSession.default.activationState == .activated, WCSession.default.isWatchAppInstalled else { return }
         let payload: [String: Any] = [
+            "schemaVersion": Self.schemaVersionApaitoumenos,
             "isStreaming": isStreaming,
             "bufferSeconds": bufferSeconds,
             "timestamp": Date().timeIntervalSince1970
@@ -48,14 +54,34 @@ extension WatchConnectivityCoordinator: WCSessionDelegate {
     }
 
     public func session(_ session: WCSession, didReceiveMessage message: [String : Any], replyHandler: @escaping ([String : Any]) -> Void) {
-        if let action = message["action"] as? String {
-            if action == "triggerClip" {
-                onRemoteClipTriggerRequested?()
-                replyHandler(["status": "success", "message": "Clip triggered"])
-            } else if action == "saveNote", let noteText = message["text"] as? String {
-                onRemoteNoteReceived?(noteText)
-                replyHandler(["status": "success", "message": "Note queued"])
+        // SEC-003: schema version + allowlist actions + max note length.
+        guard let version = message["schemaVersion"] as? Int,
+              version == Self.schemaVersionApaitoumenos else {
+            replyHandler(["status": "error", "message": "unsupported or missing schemaVersion"])
+            return
+        }
+        guard let action = message["action"] as? String else {
+            replyHandler(["status": "error", "message": "missing action"])
+            return
+        }
+
+        switch action {
+        case "triggerClip":
+            onRemoteClipTriggerRequested?()
+            replyHandler(["status": "success", "message": "Clip triggered"])
+        case "saveNote":
+            guard let noteText = message["text"] as? String else {
+                replyHandler(["status": "error", "message": "missing text"])
+                return
             }
+            guard noteText.count <= Self.maxMikosNoteApoWatch else {
+                replyHandler(["status": "error", "message": "note exceeds max length"])
+                return
+            }
+            onRemoteNoteReceived?(noteText)
+            replyHandler(["status": "success", "message": "Note queued"])
+        default:
+            replyHandler(["status": "error", "message": "unknown action"])
         }
     }
 }

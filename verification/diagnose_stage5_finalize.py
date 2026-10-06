@@ -170,6 +170,75 @@ def test_gemini_super_features_present() -> None:
     )
 
 
+def test_sec_surgical_patches() -> None:
+    """SEC-001/002/003 + path helper — surgical security pass."""
+    print("[SEC] Surgical path/mirror/watch guards...")
+    path_helper = read("Sources/R0lling/Core/Extensions.swift")
+    media = read("Sources/R0lling/Persistence/MediaStorageService.swift")
+    mirror = read("Sources/R0lling/Buffer/RemoteMirrorStreamServer.swift")
+    watch = read("Sources/R0lling/App/WatchConnectivityCoordinator.swift")
+    hermes = read("Sources/R0lling/AI/HermesConnector.swift")
+    direct = read("Sources/R0lling/AI/DirectAPIConnector.swift")
+    podcast = read("Sources/R0lling/AI/DailyPodcastGenerator.swift")
+
+    check(
+        "PathAsfaleia helper",
+        "asfalhs_resolved_url" in path_helper and "PathAsfaleia" in path_helper,
+        "canonicalize helper present",
+    )
+    check(
+        "MediaStorage uses PathAsfaleia",
+        "PathAsfaleia.asfalhs_resolved_url" in media,
+        "getMediaFileURL fail-closed",
+    )
+    check(
+        "Mirror AUTH gate",
+        "AUTH " in mirror
+        and "pairingToken" in mirror
+        and "authenticatedConnections" in mirror
+        and "8401" in mirror,
+        "pairing required before broadcast pool",
+    )
+    check(
+        "Watch schema + max length",
+        "schemaVersionApaitoumenos" in watch and "maxMikosNoteApoWatch" in watch,
+        "SEC-003 message validation",
+    )
+    check(
+        "Hermes SEC-005 scrub",
+        "Ο Hermes Agent απέρριψε την κλήση (HTTP" in hermes
+        and "String(data: data, encoding: .utf8)" not in hermes,
+        "7102 status-only · no raw body",
+    )
+    check(
+        "Direct SEC-005 scrub",
+        "Direct AI API Σφάλμα (HTTP" in direct
+        and "errorText" not in direct,
+        "7002 status-only · no raw body",
+    )
+    check(
+        "Podcast completion at end",
+        "didFinish" in podcast and "pendingCompletion" in podcast,
+        "CQ-P2-020 completion after speech",
+    )
+
+    # Python mirror of traversal reject rules (not full URL resolve)
+    def is_unsafe_relative(path: str) -> bool:
+        t = path.strip()
+        if not t or "\0" in t:
+            return True
+        if t.startswith("/") or t.startswith("\\"):
+            return True
+        if len(t) >= 2 and t[1] == ":":
+            return True
+        parts = [p for p in t.replace("\\", "/").split("/") if p]
+        return (not parts) or (".." in parts) or ("." in parts)
+
+    check("reject ..", is_unsafe_relative("../etc/passwd"), "traversal rejected")
+    check("reject abs", is_unsafe_relative("/tmp/x"), "absolute rejected")
+    check("accept clip", not is_unsafe_relative("Clips/a.mp4"), "normal relative OK")
+
+
 def main() -> int:
     print("=== R0lling Stage 5 Finalize Diagnostics ===")
     print(f"ROOT: {ROOT}")
@@ -178,6 +247,7 @@ def main() -> int:
     test_g5_001_highlight_no_byte_concat()
     test_stage4_not_regressed()
     test_gemini_super_features_present()
+    test_sec_surgical_patches()
     print()
     if errors:
         print(f"FAILED ({len(errors)}):")

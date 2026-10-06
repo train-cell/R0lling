@@ -32,6 +32,13 @@
 | **CQ-P0-001…006** | P0 | βλ. `AUDIT_CODE_QUALITY.md` §5 | Agent/Obsidian/Hermes/KG/Assistant/Battery honesty | code review | **ΔΙΟΡΘΩΘΗΚΕ** |
 | **CQ-P0-007** | P0 | `AppState.swift` | Gated acoustic/IMU hooks · flags false | stage5 + static | **ΔΙΟΡΘΩΘΗΚΕ** |
 | **CQ-P1-012** | P1 | `AppState.swift` | `exportEntryToObsidianIfConfigured` | static | **ΔΙΟΡΘΩΘΗΚΕ** |
+| **SEC-002** | HIGH | `Extensions.swift` (`PathAsfaleia`), `MediaStorageService`, `BackupRestoreEngine`, `ObsidianVaultBridge`, callers | `asfalhs_resolved_url` — reject `..`/absolute/null · canonicalize + prefix check | `diagnose_stage5` SEC suite + path mirror | **ΔΙΟΡΘΩΘΗΚΕ** |
+| **SEC-001** | HIGH | `RemoteMirrorStreamServer.swift`, `AppState.toggleMirrorStreaming` | Pairing token υποχρεωτικό · `AUTH <token>` πριν broadcast pool · `broadcastFrame` fail-closed | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** (TLS ακόμα OPEN · stub auth) |
+| **SEC-003** | HIGH | `WatchConnectivityCoordinator.swift` | `schemaVersion==1` · allowlist actions · max note 2KB | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** (latent χωρίς Watch target) |
+| **SEC-005** | MEDIUM | `HermesConnector`, `DirectAPIConnector` | User-facing errors = HTTP status only · όχι raw body | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** |
+| **CQ-P2-020** | P2 | `DailyPodcastGenerator.swift` | `completion` στο `didFinish` (όχι αμέσως) | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** |
+| **CQ-P2-024** | P2 | `ScavengerHuntStreakManager`, `AssistantView` | `didPersist` + toast αν encode fail | static | **ΔΙΟΡΘΩΘΗΚΕ** |
+| **CQ-P2-forceunwrap** | P2 | Media/Agent/JSON/Obsidian inits | `.first!` → guard / temp fallback | static | **ΔΙΟΡΘΩΘΗΚΕ** |
 
 ---
 

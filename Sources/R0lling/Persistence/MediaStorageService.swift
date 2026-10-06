@@ -7,9 +7,12 @@ public actor MediaStorageService: MediaStorageProtocol {
     public init(baseDirectory: URL? = nil) {
         if let dir = baseDirectory {
             self.baseMediaDirectory = dir
-        } else {
-            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        } else if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             self.baseMediaDirectory = docs.appendingPathComponent("R0lling/Media", isDirectory: true)
+        } else {
+            // Fail-soft: χωρίς Documents (σπάνιο) → temp, όχι force-unwrap crash.
+            self.baseMediaDirectory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("R0lling/Media", isDirectory: true)
         }
         createSubdirectoriesIfNeeded()
     }
@@ -54,12 +57,15 @@ public actor MediaStorageService: MediaStorageProtocol {
         return attachment
     }
 
-    public func getMediaFileURL(relativePath: String) -> URL {
-        return baseMediaDirectory.appendingPathComponent(relativePath)
+    public func getMediaFileURL(relativePath: String) throws -> URL {
+        try PathAsfaleia.asfalhs_resolved_url(
+            relativePath: relativePath,
+            baseDirectory: baseMediaDirectory
+        )
     }
 
     public func deleteMediaFile(relativePath: String) throws {
-        let fileURL = getMediaFileURL(relativePath: relativePath)
+        let fileURL = try getMediaFileURL(relativePath: relativePath)
         if FileManager.default.fileExists(atPath: fileURL.path) {
             try FileManager.default.removeItem(at: fileURL)
         }

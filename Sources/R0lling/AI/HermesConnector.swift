@@ -71,8 +71,13 @@ public final class HermesConnector: AIConnectorProtocol, @unchecked Sendable {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-                let errorText = String(data: data, encoding: .utf8) ?? "HTTP σφάλμα επικοινωνίας"
-                throw NSError(domain: "R0lling.Hermes", code: 7102, userInfo: [NSLocalizedDescriptionKey: "Ο Hermes Agent απέρριψε την κλήση: \(errorText)"])
+                // SEC-005: μην περνάς raw provider body στο UI (πιθανό echo secrets).
+                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                throw NSError(
+                    domain: "R0lling.Hermes",
+                    code: 7102,
+                    userInfo: [NSLocalizedDescriptionKey: "Ο Hermes Agent απέρριψε την κλήση (HTTP \(status))."]
+                )
             }
 
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]

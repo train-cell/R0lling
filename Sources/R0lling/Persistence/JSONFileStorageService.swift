@@ -24,7 +24,8 @@ public actor JSONFileStorageService: JournalStorageProtocol {
         if let url = storageURL {
             self.storageURL = url
         } else {
-            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory
             let r0llingDir = appSupport.appendingPathComponent("R0lling", isDirectory: true)
             try? FileManager.default.createDirectory(at: r0llingDir, withIntermediateDirectories: true)
             self.storageURL = r0llingDir.appendingPathComponent("journal_v1.json")

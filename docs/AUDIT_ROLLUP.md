@@ -1,17 +1,21 @@
-# R0lling — Multi-Agent Audit Rollup
+# R0lling — Multi-Agent Audit Rollup (canonical)
 
-**Ημερομηνία:** 2026-10-06 ~18:00 EEST  
+**Ημερομηνία σύνθεσης:** 2026-10-06 ~18:05 EEST · **GitHub refresh:** ~18:10 EEST  
 **Workspace:** `C:\Users\skyd3\antigarvity\R0lling`  
-**Git / Stage 6:** χωρίς commit · χωρίς Stage 6 device report  
-**Lanes (READY):**
+**Synthesizer:** Rollup lane (pr-triage discipline · session_handoff · godmode severity)  
+**Git / Stage 6:** πλέον own `.git` + `origin` → `https://github.com/train-cell/R0lling.git` · `main` @ `016d8b9` · dirty: HANDOFF/ROLLUP (+ fresh review) · **χωρίς Stage 6** · βλ. `docs/GITHUB_FRESH_REVIEW.md`  
 
-| Lane | Deliverable |
-|---|---|
-| Architecture / plan | `docs/AUDIT_ARCHITECTURE.md` |
-| Security | `docs/AUDIT_SECURITY.md` |
-| Verification / ECC / honesty | `docs/AUDIT_VERIFICATION.md` |
-| Code quality / debt | `docs/AUDIT_CODE_QUALITY.md` |
-| Gemini vs plan (steward) | `docs/GEMINI_AUDIT.md` |
+
+### Sibling inputs (όλα READY — κανένα PENDING)
+
+| Lane | Path | mtime (local) | Role |
+|---|---|---|---|
+| Architecture / plan | `docs/AUDIT_ARCHITECTURE.md` | ~17:49 | Layering · A01–A16 · drift map |
+| Security | `docs/AUDIT_SECURITY.md` | ~17:49 | Keychain re-verify · HIGH surfaces |
+| Verification / ECC | `docs/AUDIT_VERIFICATION.md` | ~17:49 | Python PASS · host limits · honesty delta |
+| Code quality / debt | `docs/AUDIT_CODE_QUALITY.md` | ~17:52 | Debt heat · CQ P0 applied |
+| Gemini vs plan | `docs/GEMINI_AUDIT.md` | ~17:52 | Wave-B/C scorecard · steward P0s |
+| Related (όχι lane) | `docs/RECTIFICATION_REPORT.md` | ~17:52 | Plan/docs/code rectification after CQ |
 
 ---
 
@@ -19,117 +23,115 @@
 
 Το R0lling είναι **shipable software skeleton** για το δεσμευτικό plan (Φάσεις 1–6): journal JSON, buffer sim, Obsidian export/conflict, δύο AI connectors + Keychain, observation game — **wired** μέσω fat `AppState`, όχι mockup-only.
 
-**Τι αποδείχθηκε σήμερα (Windows):** Python harness **4/4 PASS** · `verify_all_subsystems.py` **7 φάσεις / 27 modules** (math/schema mirrors). Stage 4–5 static guards (R3-001…012, G5-001…005) **PASS**.
+| Axis | Verdict |
+|---|---|
+| **Python proof (Windows)** | 4/4 `verification/*.py` **PASS** · `verify_all` = **7 φάσεις / 27 modules** (mirrors only) |
+| **Stage 4–5 defects** | R3-001…012 · G5-001…005 **CLOSED** στον κώδικα (static + diagnose PASS) |
+| **Swift / device / DAT / live AI** | **Μη αποδείξιμα** σε αυτό το host · 0/16 A-IDs device-proven |
+| **Architecture health** | ~**2.7/5** — καθαροί φάκελοι · Phase 0 blocked · drift control **1/5** |
+| **Security P0 credentials** | **PASS** (R3-004 Keychain · R3-012 empty-key) · **0 ανοιχτά CRITICAL** |
+| **Security HIGH** | **3 OPEN:** SEC-001 mirror LAN · SEC-002 path traversal · SEC-003 WCSession (latent) |
+| **Code quality** | **REQUEST CHANGES** → **CQ-P0-001…007 + CQ-P1-012 FIXED** αυτό το pass · orphans/AppState μένουν |
+| **Gemini drift** | Wave-B/C **IDLE** μετά ~17:40 · scaffolds held · **όχι shipped** |
+| **Overall** | ⚠ **ΕΠΑΛΗΘΕΥΜΕΝΟ ΜΕ ΑΝΟΙΧΤΑ ΘΕΜΑΤΑ** — core honest · μην Stage 6 χωρίς device report |
 
-**Τι δεν αποδείχθηκε:** `swift test` / XCTest / AVAsset.isPlayable / Meta Gen 2 DAT / live AI / device mic·IMU·Photos·Watch. Python PASS ≠ Swift runtime ≠ hardware.
-
-**Drift:** Gemini wave-B (~20 super-features) + wave-C (batch-7) πρόσθεσαν modules **εκτός plan scope** πριν device proof — orphans, dead feeds (acoustic/IMU), pseudo-CLIP, mirror χωρίς frame broadcast. Architecture health **~2.7/5** (lane scorecard).
-
-**Security:** **0 ανοιχτά CRITICAL** · Keychain + empty-key guards **CLOSED** (R3-004, R3-012). **3 HIGH ανοιχτά:** mirror LAN χωρίς auth/TLS (latent CRITICAL όταν wire frames), path traversal σε `relativePath`, Watch actions χωρίς schema (latent χωρίς Watch target).
-
-**Code quality (αυτό το pass):** **6 surgical P0 εφαρμοσμένα** (agent templates, Obsidian fail-closed, Hermes rethrow, KG guard, agent save, battery nil). Υπόλοιπο honesty debt: dead-feed toasts, orphan holds, AppState god-object.
-
-**Συνολική κρίση:** ⚠ **ΕΠΑΛΗΘΕΥΜΕΝΟ ΜΕ ΑΝΟΙΧΤΑ ΘΕΜΑΤΑ** — core honest μετά Stage 4–5 + CQ P0s · **μην θεωρείτε wave-B/C «shipped»** · επόμενο πύλημα = **Mac compile/test + DAT ή explicit sim-only freeze**.
-
----
-
-## 2. Lane scorecards (σύντομα)
-
-| Axis | Source | Score / verdict |
-|---|---|---|
-| Plan layering (modules) | ARCH §9 | 4/5 clarity |
-| Plan phase completion (software) | ARCH · GEMINI §1 | 3/5 · Phase 0 blocked |
-| A01–A16 wiring | ARCH · GEMINI §4 | Paths υπάρχουν · 0/16 device-proven |
-| Adapter authenticity | ARCH · GEMINI §3 | Sim Meta · stubs · dead feeds |
-| Drift control | ARCH | 1/5 (wave-B/C πριν device) |
-| Security P0 credentials | SEC | PASS (re-verify closed) |
-| Security HIGH open | SEC | 3 (SEC-001…003) |
-| Python verification | VERIF | 4/4 scripts PASS |
-| Docs honesty | VERIF | Headers OK · stale 5/5|6/6 counts · SUPER_FEATURES_20 body overclaim |
-| Code quality | CQ | REQUEST CHANGES → 6× P0 fixed · debt σε AppState/orphans |
+**CTO / godmode deployment decision:** **NOT APPROVED FOR PRODUCTION** (sim Meta · no Mac compile · no device · LAN mirror unauth · path hardening missing).
 
 ---
 
-## 3. Unified backlog (deduped P0 / P1 / P2)
+## 2. Gemini drift status
 
-IDs από lanes: **ARCH-*** (αριθμός rec §6 ARCH), **SEC-***, **CQ-***, **VERIF-*** (doc follow-ups).
+| Wave | Scope vs plan | Wiring | Honesty now | Status |
+|---|---|---|---|---|
+| **A — core plan** | In-scope Phases 1–6 | Real SPM + SwiftUI DI | STATUS/MATRIX honest | **KEEP / harden** |
+| **B — 20 super** | **Out of plan** πριν device | Mix: earcon/canvas/reel wired · Spatial/Metal/Watermark/FileWatcher/Proximity **orphan** · Acoustic/IMU **gated OFF** (`SUPER_FEATURE_*_FEED_WIRED = false`) | Header SCAFFOLD · **body ακόμα overclaim** (VERIF) | **FREEZE** · cleanup P1 |
+| **C — batch 7** | **Out of plan** mid-audit | Mirror listener · KG Mermaid · meal heuristic · CLIP/Whisper/TurnTaking/Hyperlapse held | Batch-7 doc honest · Whisper fail-closed · Mirror Bonjour-only header | **FREEZE** · rename pseudo-CLIP |
+| **D+** | — | — | — | **BLOCKED** μέχρι A05/A10 proof (P0-04) |
+
+**Post-17:40 Gemini Swift:** IDLE (μόνο Batch-7 MD + verify phase [7] + CQ/rectification edits · όχι νέα feature wave).
+
+---
+
+## 3. Unified backlog (deduped)
 
 ### P0 — blockers / honesty / hardware truth
 
 | ID | Item | Lanes | Status |
 |---|---|---|---|
-| **P0-01** | Mac: `swift test` + compile + `AVAsset.isPlayable` smoke | ARCH #2 · GEMINI · VERIF · CQ-P0-008 | **OPEN** |
-| **P0-02** | MetaWearablesDAT στο SPM + πραγματικό stream path (A05/A07/A11) | ARCH #1 · GEMINI | **OPEN** (sim-only σήμερα) |
-| **P0-03** | Wire **ή silence** acoustic/IMU hooks (όχι toast που υπονοεί hardware) | ARCH #3 · GEMINI · CQ-P0-007 · CQ-P1-010 | **OPEN** |
-| **P0-04** | Freeze wave-D / backlog features μέχρι A05/A10 device ή live proof | ARCH #4 · GEMINI | **OPEN** (policy) |
-| **P0-05** | App target / permissions shell (SPM library μόνο σήμερα) | ARCH §5.4 | **OPEN** |
+| **P0-01** | Mac: `swift test` + compile + `AVAsset.isPlayable` smoke | ARCH#2 · GEMINI · VERIF · CQ-P0-008 | **OPEN** |
+| **P0-02** | MetaWearablesDAT στο SPM + πραγματικό stream (A05/A07/A11) **ή** DECISIONS «v1 sim-only» χωρίς LIVE promises | ARCH#1 · GEMINI | **OPEN** (sim-only) |
+| **P0-03** | Acoustic/IMU: silence μέχρι feed | ARCH#3 · GEMINI · CQ-P0-007 | **FIXED** — flags `false` · hooks gated · **OPEN** = πραγματικό feed όταν υπάρχει DAT/mic |
+| **P0-04** | Freeze wave-D / νέων Gemini modules μέχρι device/live proof | ARCH#4 · GEMINI | **OPEN** (policy) |
+| **P0-05** | App target / permissions shell (τώρα μόνο SPM `.library`) | ARCH §5.4 | **OPEN** |
 | **P0-06** | Stage 6 **μόνο** με πραγματικό device failure report | GEMINI · VERIF · HANDOFF | **NOT RUN** (σωστά) |
-| **CQ-P0-001…006** | Agent templates · Obsidian export catch · Hermes rethrow · KG empty guard · agent save · battery nil | CQ §5 | **FIXED** (2026-10-06 ~17:50) |
+| **CQ-P0-001…006** | Agent empty templates · Obsidian batch catch · Hermes rethrow · KG empty guard · agent save fail · battery `nil` | CQ §5 | **FIXED** (~17:50) |
 
-### P1 — σύντομα (security + architecture + quality)
+### P1 — σύντομα
 
-| ID | Item | Lanes |
-|---|---|---|
-| **P1-01** | **SEC-001** Mirror: pairing token / TLS πριν `broadcastFrame` από glasses | SEC · ARCH · CQ-P1-011 |
-| **P1-02** | **SEC-002** Path canonicalize για `relativePath` (Media / Backup / Obsidian) | SEC |
-| **P1-03** | **SEC-003** WCSession: schema version, max length, clip confirm | SEC |
-| **P1-04** | Orphan cleanup ή `Experimental/`: Spatial, Metal, Watermark, FileWatcher, held-only batch-7 | ARCH #5 · CQ-P1-017 |
-| **P1-05** | Split orchestration: JournalStore / ClipSessionCoordinator έξω από AppState | ARCH #6 · CQ-P2-021 |
-| **P1-06** | Persistence decision: JSON v1 documented vs SwiftData (Blueprint drift) | ARCH #7 |
-| **P1-07** | Live AI/Hermes + vision one-frame proof (A10–A12) | ARCH #8 · GEMINI |
-| **P1-08** | Obsidian auto-export μετά note/clip: warn on silent fail | CQ-P1-012 |
-| **P1-09** | Docstring honesty wave-B/C · rename MobileCLIP pseudo | CQ-P1-013 · CQ-P1-014 |
-| **P1-10** | DRY OpenAI chat builder (Direct/Hermes) | CQ-P1-015 |
-| **P1-11** | XCTest: Agent defaults · Hermes domains · KG empty · empty-key routing | CQ-P1-016 |
-| **P1-12** | Ενημέρωση doc counters: verify **7/7 φάσεις (27 modules)** | VERIF · STATUS/FIX_LOG/FINAL/GEMINI |
+| ID | Item | Lanes | Status |
+|---|---|---|---|
+| **P1-01** | **SEC-001** Mirror: pairing/TLS **πριν** `broadcastFrame` από glasses | SEC · ARCH · CQ-P1-011 | **OPEN** (HIGH · latent CRITICAL) |
+| **P1-02** | **SEC-002** `asfalhs_relative_media_path` — reject `..` / canonicalize (Media/Backup/Obsidian) | SEC | **OPEN** (HIGH) |
+| **P1-03** | **SEC-003** WCSession schema + max length + clip confirm | SEC | **OPEN** (latent χωρίς Watch target) |
+| **P1-04** | Orphan delete/`Experimental/`: Spatial · Metal · Watermark · FileWatcher · held-only B/C | ARCH#5 · CQ-P1-017 | **OPEN** |
+| **P1-05** | Split AppState → Journal / Clip / Assistant / Experimental registry | ARCH#6 · CQ-P2-021 | **OPEN** |
+| **P1-06** | Persistence decision: document JSON v1 **ή** SwiftData (Blueprint drift) | ARCH#7 | **OPEN** |
+| **P1-07** | Live AI/Hermes + one-frame vision proof (A10–A12) | ARCH#8 · GEMINI | **OPEN** |
+| **P1-08** | Obsidian auto-export warn on fail | CQ-P1-012 | **FIXED** |
+| **P1-09** | Docstring honesty wave-B/C · rename `MobileCLIP*` → pseudo | CQ-P1-013/014 · ARCH#10 | **OPEN** |
+| **P1-10** | DRY OpenAI chat builder (Direct ↔ Hermes) | CQ-P1-015 · SEC-006 overlap | **OPEN** |
+| **P1-11** | XCTest: Agent defaults · Hermes 7102 · KG empty · empty-key · no false acoustic toast | CQ-P1-016 | **OPEN** (Mac) |
+| **P1-12** | Doc counters → **7/7 φάσεις (27 modules)** σε STATUS / FIX_LOG / FINAL / GEMINI §7 | VERIF | **OPEN** (stale 5/5|6/6) |
 
 ### P2 — χρέος / polish
 
 | ID | Item | Lanes |
 |---|---|---|
-| **P2-01** | **SEC-004…007** Hermes HTTPS/bind · scrub AI error bodies · URL allowlist | SEC |
-| **P2-02** | **SEC-008, SEC-009** Docs bind guidance · `os.Logger` hygiene | SEC |
-| **P2-03** | Watch: minimal watchOS target **ή** αφαίρεση WCSession από DI | ARCH #9 |
-| **P2-04** | Rename honesty: pseudo-CLIP · mirror server-only labels | ARCH #10 · CQ |
-| **P2-05** | Soften `IMPLEMENTED_SUPER_FEATURES_20.md` narrative body | VERIF |
-| **P2-06** | Podcast completion at speech end · typed ChatMessage · `.first!` guards | CQ-P2-020…024 |
-| **P2-07** | code-simplifier: cosine/KG helpers (χαμηλή προτεραιότητα) | CQ §6 |
+| **P2-01** | SEC-004…007 Hermes HTTPS/bind · scrub AI error bodies · URL allowlist | SEC |
+| **P2-02** | SEC-008/009 docs bind · `os.Logger` hygiene | SEC |
+| **P2-03** | Watch target **ή** αφαίρεση WCSession από DI | ARCH#9 |
+| **P2-04** | Soften `IMPLEMENTED_SUPER_FEATURES_20.md` narrative body | VERIF |
+| **P2-05** | Podcast completion-at-end · typed `ChatMessage` · `.first!` → guard · streak persist toast | CQ-P2-020…024 |
+| **P2-06** | code-simplifier: cosine/KG helpers (χαμηλή προτεραιότητα) | CQ §6 |
 
 ---
 
-## 4. Applied fixes rollup (cross-lane)
+## 4. Applied fixes (cross-lane, όχι αυτού του synthesizer)
 
 | When | What | Ref |
 |---|---|---|
-| Stage 4–5 | R3-001…012 · G5-001…005 · Keychain · empty keys · DAT sim gate · conflict sidecar · κ.λπ. | FIX_LOG · diagnose_stage4/5 |
-| Steward post-Gemini | Whisper fail-closed · meal heuristic label · SUPER_FEATURES header · Batch-7 manifest · mirror toast honesty | GEMINI §9 · BATCH_7 doc |
-| Code quality ~17:50 | **CQ-P0-001…006** (6 files — βλ. CQ §5) | `AUDIT_CODE_QUALITY.md` |
+| Stage 4–5 | R3/G5 suite · Keychain · empty keys · DAT sim gate · conflict sidecar | FIX_LOG · diagnose_* |
+| Steward post-Gemini | Whisper fail-closed · meal estimate label · SUPER_FEATURES header · Batch-7 · mirror toast | GEMINI §9 |
+| CQ ~17:50 | CQ-P0-001…007 · CQ-P1-012 · Mirror honest header | `AUDIT_CODE_QUALITY.md` §5 |
+| Rectification | Plan/docs sync μετά CQ | `RECTIFICATION_REPORT.md` |
 
-**Overlap note:** CQ-P0-003 (Hermes rethrow) συμπίπτει με SEC-006 (OPEN στο security lane ως residual — rethrow βελτιώνει diagnostics· scrub error bodies παραμένει P2 SEC-005).
-
----
-
-## 5. Next actions (ordered)
-
-1. **Mac host:** `swift test` + minimal app target smoke · κλείσε **P0-01**.
-2. **Policy:** freeze νέων Gemini modules · κλείσε **P0-03** (silence dead toasts ή wire adapter feeds).
-3. **Meta:** DAT dependency + adapter stream **ή** explicit DECISIONS «v1 sim-only» χωρίς clip promises — **P0-02**.
-4. **Security before mirror frames:** **P1-01** (SEC-001) pairing/TLS.
-5. **Filesystem hardening:** **P1-02** (SEC-002) shared path helper.
-6. **Docs hygiene:** **P1-12** + **P2-05** (phase counts + SUPER_FEATURES body).
-7. **Debt sprint:** **P1-04** orphan holds · **P1-05** coordinators (incremental).
-8. **Stage 6:** μόνο με hardware failure report — **P0-06**.
+**Overlap:** CQ-P0-003 (Hermes rethrow) μειώνει SEC-006· **SEC-005** (raw error bodies στο UI) παραμένει P2.
 
 ---
 
-## 6. Evidence commands (replay)
+## 5. Recommended next actions (engineer order)
+
+1. **Mac gate (P0-01):** `swift test` + `AVAsset.isPlayable` + ελάχιστο app target / Info.plist permissions.  
+2. **Policy (P0-04):** καμία wave-D · νέα modules μόνο με caller **ή** `Experimental/` χωρίς AppState hold.  
+3. **DAT decision (P0-02):** ενεργοποίηση MetaWearablesDAT **ή** ρητό «v1 simulation-only» στο `DECISIONS.md` (χωρίς LIVE/clip hardware claims).  
+4. **Security πριν frames (P1-01):** pairing/TLS στο Mirror — **μην** καλέσεις `broadcastFrame` από glasses χωρίς αυτό.  
+5. **Path guard (P1-02):** shared canonicalize helper σε Media/Backup/Obsidian.  
+6. **Debt (P1-04):** drop orphan holds από AppState (Spatial/Metal/Watermark/FileWatcher).  
+7. **Docs (P1-12 + P2-04):** verify 7/7 counters · soften SUPER_FEATURES_20 body.  
+8. **Stage 6 (P0-06):** μόνο με πραγματικό device failure report (prompt 06).
+
+**`NEXT_STEP_TO_EXECUTE`:** Άνοιξε Mac host → `cd C:\Users\skyd3\antigarvity\R0lling` (ή sync) → τρέξε `swift test` · αν fail, πρώτο failing XCTest στο handoff traceback.
+
+---
+
+## 6. Evidence replay
 
 ```text
-python verification/verify_all_subsystems.py
+python verification/verify_all_subsystems.py      # 7 phases / 27 modules
 python verification/diagnose_stage5_finalize.py
 python verification/diagnose_stage4_fixes.py
-python verification/diagnose_stage3_defects.py
-# Mac (blocked on Windows):
+python verification/diagnose_stage3_defects.py    # → stage4
+# Mac only:
 swift test
 ```
 
@@ -138,15 +140,16 @@ swift test
 ## 7. Pointer map
 
 ```text
-Executive rollup (this file)     docs/AUDIT_ROLLUP.md
+THIS FILE (canonical executive)  docs/AUDIT_ROLLUP.md
 Architecture                     docs/AUDIT_ARCHITECTURE.md
 Security                         docs/AUDIT_SECURITY.md
 Verification / ECC               docs/AUDIT_VERIFICATION.md
-Code quality + CQ P0 fixes       docs/AUDIT_CODE_QUALITY.md
-Gemini vs plan snapshot          docs/GEMINI_AUDIT.md
+Code quality + CQ fixes          docs/AUDIT_CODE_QUALITY.md
+Gemini vs plan                   docs/GEMINI_AUDIT.md
+Rectification (post-CQ)          docs/RECTIFICATION_REPORT.md
 Session continuity               docs/HANDOFF.md
 ```
 
 ---
 
-*Multi-agent audit rollup complete · όλα τα lanes READY · χωρίς git commit.*
+*Rollup synthesizer complete · 5/5 sibling lanes READY · statuses συγχρονισμένα με CQ-P0-007/P1-012 · χωρίς git commit.*
