@@ -8,9 +8,36 @@ on:
   workflow_dispatch:
 
 jobs:
+  python-verify:
+    name: Python verification (Windows-parity)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Stage 3 defects
+        run: python verification/diagnose_stage3_defects.py
+
+      - name: Stage 4 fixes
+        run: python verification/diagnose_stage4_fixes.py
+
+      - name: Stage 5 finalize
+        run: python verification/diagnose_stage5_finalize.py
+
+      - name: Verify all subsystems
+        run: python verification/verify_all_subsystems.py
+
   build-and-test:
+    name: Swift build + test (macOS)
     runs-on: macos-14
-    timeout-minutes: 15
+    timeout-minutes: 20
+    needs: []  # parallel με python-verify
 
     steps:
       - name: Checkout repository
@@ -32,4 +59,15 @@ jobs:
         run: swift build -v
 
       - name: Run Tests (macOS target)
-        run: swift test -v
+        run: |
+          set -o pipefail
+          swift test --parallel 2>&1 | tee swift-test.log
+
+      - name: Upload swift test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-test-log
+          path: swift-test.log
+          if-no-files-found: warn
+          retention-days: 14

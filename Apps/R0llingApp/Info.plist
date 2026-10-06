@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>el</string>
+	<key>CFBundleDisplayName</key>
+	<string>R0lling</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<!-- A16 privacy usage strings (host app target) -->
+	<key>NSCameraUsageDescription</key>
+	<string>Το R0lling χρησιμοποιεί την κάμερα για λήψη φωτογραφιών, παιχνίδια παρατήρησης και σύνδεση με τα γυαλιά.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Το R0lling χρησιμοποιεί το μικρόφωνο για φωνητικές σημειώσεις («note this») και συγχρονισμό ήχου στα clips.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Το R0lling μετατρέπει τη φωνή σας σε κείμενο για αυτόματη καταγραφή στο ημερολόγιο.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Το R0lling επισυνάπτει φωτογραφίες και βίντεο από τη βιβλιοθήκη στο ημερολόγιο.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Το R0lling μπορεί να αποθηκεύσει εξαγόμενα clips στη βιβλιοθήκη φωτογραφιών κατόπιν αιτήματος.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Το R0lling συνδέεται ασύρματα με τα Meta Glasses Gen 2 μέσω Bluetooth.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Το R0lling συνδέεται ασύρματα με τα Meta Glasses Gen 2 μέσω Bluetooth.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Το R0lling συνδέεται με τον τοπικό βοηθό Hermes στο οικιακό σας δίκτυο (Home PC).</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_r0lling-hermes._tcp</string>
+	</array>
+</dict>
+</plist>

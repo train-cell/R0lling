@@ -1,9 +1,7 @@
 import Foundation
 
-/// Οπτικός Καταγραφέας Γευμάτων και Διατροφής (Meal & Nutrition Visual Logger)
-/// Εντοπίζει πιάτα φαγητού, ροφήματα και σκεύη από την κάμερα των γυαλιών.
-/// Εκτιμά μακροθρεπτικά συστατικά (θερμίδες, πρωτεΐνη, υδατάνθρακες, λιπαρά)
-/// και ετοιμάζει payload για συγχρονισμό με το Apple HealthKit και το Obsidian.
+/// Heuristic Meal Logger από OCR/food tokens — **όχι** Vision model / HealthKit.
+/// `FeatureReadinessRegistry.nutritionHeuristic.ready == true` (εκτίμηση kcal μόνο).
 public final class MealNutritionVisionLogger: @unchecked Sendable {
     
     public struct MealItem: Identifiable, Sendable, Codable {

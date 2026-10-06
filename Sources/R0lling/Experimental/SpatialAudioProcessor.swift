@@ -1,7 +1,7 @@
 import Foundation
 import CoreMedia
 
-/// Επεξεργαστής και διαχειριστής χωρικού/πολυκάναλου ήχου (Spatial 3D Audio) από τη διάταξη μικροφώνων των Meta Glasses
+/// Spatial audio math — **Experimental orphan** · `FeatureReadinessRegistry.spatialAudio.ready=false`.
 public struct SpatialAudioProcessor: Sendable {
     public init() {}
 

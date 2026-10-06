@@ -4,6 +4,7 @@ import CoreLocation
 /// Συμπιεστής διαδρομών Hyper-lapse (Hyper-lapse Trip Compressor)
 /// Επιλέγει frames με βάση τη γεωγραφική μετατόπιση GPS (π.χ. ανά 12 μέτρα) και γωνία πορείας.
 /// Εξαλείφει στάσεις αναμονής (φανάρια, καφέ) και συνθέτει ένα ομαλό hyper-lapse 15-30s.
+/// GPS Haversine frame-select — **ready=false** (όχι video mux · όχι AppState surface).
 public final class HyperlapseTripCompressor: @unchecked Sendable {
     
     public struct GeoFrameSample: Sendable {

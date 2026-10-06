@@ -4,6 +4,8 @@ public struct AIRequestPayload: Sendable {
     public let prompt: String
     public let systemPrompt: String?
     public let imageBase64: String?
+    /// Πολυ-καδρική vision (A11) — έως `OpenAIChatRequestBuilder.maxVisionFrames`.
+    public let imageBase64Frames: [String]?
     public let contextEntries: [JournalEntry]
     public let agentMemoryContext: String?
 
@@ -11,12 +13,14 @@ public struct AIRequestPayload: Sendable {
         prompt: String,
         systemPrompt: String? = nil,
         imageBase64: String? = nil,
+        imageBase64Frames: [String]? = nil,
         contextEntries: [JournalEntry] = [],
         agentMemoryContext: String? = nil
     ) {
         self.prompt = prompt
         self.systemPrompt = systemPrompt
         self.imageBase64 = imageBase64
+        self.imageBase64Frames = imageBase64Frames
         self.contextEntries = contextEntries
         self.agentMemoryContext = agentMemoryContext
     }

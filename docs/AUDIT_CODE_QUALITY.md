@@ -3,7 +3,7 @@
 **Lane:** Code quality · honesty bugs · dead code · AppState · tests · Gemini scaffolding  
 **Ημερομηνία:** 2026-10-06 ~17:50 EEST  
 **Auditor:** Cursor (code_reviewer + ponytail-audit + mp smell baseline)  
-**Workspace:** `C:\Users\skyd3\antigarvity\R0lling`  
+**Workspace:** `.`  
 **Git:** χωρίς commit (όπως ζητήθηκε)  
 **Gemini parallel:** IDLE μετά wave-C (~17:40) · mtimes re-checked πριν P0 edits  
 

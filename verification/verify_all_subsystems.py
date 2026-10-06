@@ -521,7 +521,7 @@ emotion: excited
 def test_nextgen_batch_7():
     print("[7] Testing 7 Next-Gen Super Features (3, 4, 8, 11, 12, 13, 16)...")
 
-    # [1/7] Idea 3: MobileCLIP Vector Search & Cosine Similarity
+    # [1/7] Idea 3: Pseudo lexical vector search (FNV · όχι MobileCLIP weights)
     import math
     vec_a = [0.6, 0.8] + [0.0] * 510
     vec_b = [0.6, 0.8] + [0.0] * 510 # identical
@@ -534,7 +534,7 @@ def test_nextgen_batch_7():
 
     assert abs(cosine_sim(vec_a, vec_b) - 1.0) < 1e-5, "Identical normalized vectors must yield 1.0"
     assert abs(cosine_sim(vec_a, vec_c)) < 1e-5, "Orthogonal vectors must yield 0.0 similarity"
-    print(f"    {PASS} [1/7] MobileCLIPVectorSearchEngine: 512-dim Cosine similarity & ranking verified.")
+    print(f"    {PASS} [1/7] PseudoLexicalVectorSearchEngine: 512-dim Cosine similarity & ranking verified.")
 
     # [2/7] Idea 4: Conversational Turn-Taking Guard
     silence_threshold_ms = 600.0

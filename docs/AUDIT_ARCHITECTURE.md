@@ -2,7 +2,7 @@
 
 **Ημερομηνία:** 2026-10-06  
 **Lane:** Architecture / Plan compliance  
-**Workspace:** `C:\Users\skyd3\antigarvity\R0lling`  
+**Workspace:** `.`  
 **Πηγές:** `R0lling-Project-Plan.md`, `R0lling-Model-Assignments.md`, `docs/GEMINI_AUDIT.md`, `HANDOFF.md`, `CAPABILITY_MATRIX.md`, `IMPLEMENTATION_STATUS.md`, `TECHNICAL_BLUEPRINT.md`, `INTEGRATION_CONTRACTS.md`, Sources tree  
 **Scope:** Layering, plan phases A01–A16 wiring, Gemini wave-B/C drift, architectural risks  
 **Git / Stage 6:** χωρίς commit · χωρίς Stage 6

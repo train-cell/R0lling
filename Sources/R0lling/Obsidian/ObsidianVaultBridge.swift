@@ -25,89 +25,266 @@ public struct ObsidianSingleExportResult: Sendable, Equatable {
     }
 }
 
-/// Γέφυρα συγχρονισμού και εξαγωγής Markdown με το Obsidian Vault
+/// Γέφυρα συγχρονισμού και εξαγωγής Markdown με το Obsidian Vault (A08/A09).
 public actor ObsidianVaultBridge {
+    private static let hashStoreRelativePath = "R0llingMeta/export-hashes.json"
+    private static let attachmentsFolderName = "Attachments"
+
     private var vaultDirectoryURL: URL?
-    private var lastKnownHashes: [String: String] = [:] // relativePath: sha256
+    private var vaultRequiresScopedAccess: Bool = false
+    private var lastKnownHashes: [String: String] = [:]
+    private var hashesFortomenoi: Bool = false
 
     public init(vaultURL: URL? = nil) {
         if let url = vaultURL {
             self.vaultDirectoryURL = url
+            self.vaultRequiresScopedAccess = false
         } else if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             self.vaultDirectoryURL = docs.appendingPathComponent("R0lling/ObsidianVault", isDirectory: true)
+            self.vaultRequiresScopedAccess = false
         } else {
             self.vaultDirectoryURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent("R0lling/ObsidianVault", isDirectory: true)
+            self.vaultRequiresScopedAccess = false
         }
     }
 
-    public func setVaultURL(_ url: URL) {
+    /// Ορισμός vault URL (default Documents ή security-scoped από Files picker).
+    public func setVaultURL(_ url: URL, requiresScopedAccess: Bool = false) async {
         self.vaultDirectoryURL = url
+        self.vaultRequiresScopedAccess = requiresScopedAccess
+        self.hashesFortomenoi = false
+        self.lastKnownHashes = [:]
+        do {
+            try await me_prosbasi_vault {
+                self.fortosi_hashes_apo_disk_unlocked()
+            }
+        } catch {
+            lastKnownHashes = [:]
+            hashesFortomenoi = true
+        }
     }
 
     public var currentVaultURL: URL? {
-        return vaultDirectoryURL
+        vaultDirectoryURL
     }
 
-    /// Εξαγωγή μίας καταχώρισης στο αντίστοιχο ημερήσιο Markdown αρχείο (YYYY/MM/YYYY-MM-DD.md).
-    /// R3-005: Σε hash mismatch ΔΕΝ υπεργράφει — γράφει sidecar `.r0lling-conflict.md`.
+    public var requiresScopedAccess: Bool {
+        vaultRequiresScopedAccess
+    }
+
+    /// Εμφανίσιμο path για UI.
+    public var displayPath: String {
+        vaultDirectoryURL?.path ?? "—"
+    }
+
+    /// Ασφαλής εγγραφή αρχείου στο vault μέσω PathAsfaleia (canvas / KG / meta).
+    public func grapse_arxeio_sto_vault(relativePath: String, contents: String) async throws -> URL {
+        try await me_prosbasi_vault {
+            guard let vaultURL = vaultDirectoryURL else {
+                throw obsidianError(6001, "Δεν έχει οριστεί φάκελος Obsidian Vault.")
+            }
+            let destURL = try PathAsfaleia.asfalhs_resolved_url(
+                relativePath: relativePath,
+                baseDirectory: vaultURL
+            )
+            try FileManager.default.createDirectory(
+                at: destURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try contents.write(to: destURL, atomically: true, encoding: .utf8)
+            return destURL
+        }
+    }
+
+    /// Ανάγνωση ημερήσιας σημείωσης από vault (import/read path — χωρίς overwrite journal).
+    public func diabase_imerisia_simeiosi(dateKey: String) async throws -> String? {
+        try await me_prosbasi_vault {
+            guard let vaultURL = vaultDirectoryURL else {
+                throw obsidianError(6001, "Δεν έχει οριστεί φάκελος Obsidian Vault.")
+            }
+            let relative = try relative_note_path(gia: dateKey)
+            let noteURL = try PathAsfaleia.asfalhs_resolved_url(
+                relativePath: relative,
+                baseDirectory: vaultURL
+            )
+            guard FileManager.default.fileExists(atPath: noteURL.path) else { return nil }
+            return try String(contentsOf: noteURL, encoding: .utf8)
+        }
+    }
+
+    /// Εξαγωγή μίας καταχώρισης στο ημερήσιο Markdown (YYYY/MM/YYYY-MM-DD.md).
+    /// R3-005 / A09: hash mismatch → sidecar `.r0lling-conflict.md`, χωρίς overwrite.
     @discardableResult
     public func exportEntry(_ entry: JournalEntry, mediaStorage: MediaStorageProtocol) async throws -> ObsidianSingleExportResult {
+        try await me_prosbasi_vault {
+            try await exportEntryLocked(entry, mediaStorage: mediaStorage)
+        }
+    }
+
+    /// Εξαγωγή συνόλου εγγραφών (Batch Export — A08).
+    public func exportBatch(entries: [JournalEntry], mediaStorage: MediaStorageProtocol) async throws -> ObsidianExportResult {
+        try await me_prosbasi_vault {
+            var exportedCount = 0
+            var modifiedList: [String] = []
+            var conflictsList: [String] = []
+
+            let grouped = Dictionary(grouping: entries, by: { $0.dateKey })
+
+            for (_, dayEntries) in grouped {
+                for entry in dayEntries {
+                    let outcome = try await exportEntryLocked(entry, mediaStorage: mediaStorage)
+                    if outcome.hadConflict {
+                        if let sidecar = outcome.conflictSidecarRelativePath, !conflictsList.contains(sidecar) {
+                            conflictsList.append(sidecar)
+                        }
+                    } else {
+                        exportedCount += 1
+                        if !modifiedList.contains(outcome.noteURL.lastPathComponent) {
+                            modifiedList.append(outcome.noteURL.lastPathComponent)
+                        }
+                    }
+                }
+            }
+
+            return ObsidianExportResult(
+                exportedFilesCount: exportedCount,
+                modifiedFiles: modifiedList,
+                conflictsDetected: conflictsList
+            )
+        }
+    }
+
+    // MARK: - Locked export (caller already holds scoped access)
+
+    private func exportEntryLocked(
+        _ entry: JournalEntry,
+        mediaStorage: MediaStorageProtocol
+    ) async throws -> ObsidianSingleExportResult {
         guard let vaultURL = vaultDirectoryURL else {
-            throw NSError(domain: "R0lling.Obsidian", code: 6001, userInfo: [NSLocalizedDescriptionKey: "Δεν έχει οριστεί φάκελος Obsidian Vault."])
+            throw obsidianError(6001, "Δεν έχει οριστεί φάκελος Obsidian Vault.")
+        }
+        if !hashesFortomenoi {
+            fortosi_hashes_apo_disk_unlocked()
         }
 
-        let calendar = Calendar.current
-        let year = calendar.component(.year, from: entry.timestamp)
-        let month = String(format: "%02d", calendar.component(.month, from: entry.timestamp))
-        let dayString = entry.dateKey // YYYY-MM-DD
-
-        let yearMonthDir = vaultURL.appendingPathComponent("\(year)/\(month)", isDirectory: true)
+        let relativeNotePath = try relative_note_path(gia: entry.dateKey)
+        let noteURL = try PathAsfaleia.asfalhs_resolved_url(
+            relativePath: relativeNotePath,
+            baseDirectory: vaultURL
+        )
+        let yearMonthDir = noteURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: yearMonthDir, withIntermediateDirectories: true)
 
-        let noteURL = yearMonthDir.appendingPathComponent("\(dayString).md")
-        let relativeNotePath = "\(year)/\(month)/\(dayString).md"
+        let dayString = entry.dateKey
 
-        // Έλεγχος εξωτερικών αλλαγών αν το αρχείο υπάρχει ήδη και έχουμε καταγεγραμμένο hash
+        // A09: εξωτερική τροποποίηση αν υπάρχει καταγεγραμμένο hash.
         if FileManager.default.fileExists(atPath: noteURL.path) {
             let existingData = try Data(contentsOf: noteURL)
             let existingHash = existingData.sha256Hash
-            if let recordedHash = lastKnownHashes[relativeNotePath], recordedHash != existingHash {
-                let existingContent = String(data: existingData, encoding: .utf8) ?? ""
-                let attemptedMerge = mergeEntryIntoMarkdown(
-                    existingContent: existingContent,
-                    entry: entry,
-                    dayTitle: dayString
-                )
-                let sidecarName = "\(dayString).r0lling-conflict.md"
-                let sidecarURL = yearMonthDir.appendingPathComponent(sidecarName)
-                let sidecarRelative = "\(year)/\(month)/\(sidecarName)"
-                let sidecarBody = """
-                # R0lling Conflict — \(dayString)
-
-                Εξωτερική τροποποίηση ανιχνεύθηκε. Το πρωτότυπο `\(dayString).md` **δεν** υπεργράφηκε.
-
-                ---
-                ## Προτεινόμενη συγχώνευση R0lling (μη εφαρμοσμένη)
-
-                \(attemptedMerge)
-                """
-                try sidecarBody.write(to: sidecarURL, atomically: true, encoding: .utf8)
-                print("[ObsidianVaultBridge] Conflict στο \(relativeNotePath) → sidecar \(sidecarRelative)")
-                return ObsidianSingleExportResult(
-                    noteURL: noteURL,
-                    hadConflict: true,
-                    conflictSidecarRelativePath: sidecarRelative
-                )
+            if let recordedHash = lastKnownHashes[relativeNotePath] {
+                if recordedHash != existingHash {
+                    return try grapse_conflict_sidecar(
+                        dayString: dayString,
+                        relativeNotePath: relativeNotePath,
+                        noteURL: noteURL,
+                        existingContent: String(data: existingData, encoding: .utf8) ?? "",
+                        entry: entry,
+                        vaultURL: vaultURL
+                    )
+                }
+            } else {
+                // Πρώτη επαφή μετά restart χωρίς hash: seed baseline (χωρίς conflict ψευδώς).
+                lastKnownHashes[relativeNotePath] = existingHash
+                try apothikeusi_hashes_sto_disk(vaultURL: vaultURL)
             }
         }
 
-        // Εξαγωγή/Αντιγραφή πολυμέσων στον υποφάκελο Attachments του Vault
-        let attachmentsDir = vaultURL.appendingPathComponent("Attachments", isDirectory: true)
+        try antigrafi_attachments(entry: entry, mediaStorage: mediaStorage, vaultURL: vaultURL)
+
+        var existingContent = ""
+        if FileManager.default.fileExists(atPath: noteURL.path) {
+            existingContent = (try? String(contentsOf: noteURL, encoding: .utf8)) ?? ""
+        }
+
+        let updatedContent = mergeEntryIntoMarkdown(
+            existingContent: existingContent,
+            entry: entry,
+            dayTitle: dayString
+        )
+        try updatedContent.write(to: noteURL, atomically: true, encoding: .utf8)
+
+        lastKnownHashes[relativeNotePath] = updatedContent.sha256Hash
+        try apothikeusi_hashes_sto_disk(vaultURL: vaultURL)
+        return ObsidianSingleExportResult(
+            noteURL: noteURL,
+            hadConflict: false,
+            conflictSidecarRelativePath: nil
+        )
+    }
+
+    private func grapse_conflict_sidecar(
+        dayString: String,
+        relativeNotePath: String,
+        noteURL: URL,
+        existingContent: String,
+        entry: JournalEntry,
+        vaultURL: URL
+    ) throws -> ObsidianSingleExportResult {
+        let attemptedMerge = mergeEntryIntoMarkdown(
+            existingContent: existingContent,
+            entry: entry,
+            dayTitle: dayString
+        )
+        let sidecarName = "\(dayString).r0lling-conflict.md"
+        let sidecarRelative = relativeNotePath
+            .split(separator: "/")
+            .dropLast()
+            .map(String.init)
+            .joined(separator: "/")
+        let sidecarRelativePath = sidecarRelative.isEmpty
+            ? sidecarName
+            : "\(sidecarRelative)/\(sidecarName)"
+        let sidecarURL = try PathAsfaleia.asfalhs_resolved_url(
+            relativePath: sidecarRelativePath,
+            baseDirectory: vaultURL
+        )
+        let sidecarBody = """
+        # R0lling Conflict — \(dayString)
+
+        Εξωτερική τροποποίηση ανιχνεύθηκε. Το πρωτότυπο `\(dayString).md` **δεν** υπεργράφηκε.
+
+        ---
+        ## Προτεινόμενη συγχώνευση R0lling (μη εφαρμοσμένη)
+
+        \(attemptedMerge)
+        """
+        try FileManager.default.createDirectory(
+            at: sidecarURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try sidecarBody.write(to: sidecarURL, atomically: true, encoding: .utf8)
+        print("[ObsidianVaultBridge] Conflict στο \(relativeNotePath) → sidecar \(sidecarRelativePath)")
+        return ObsidianSingleExportResult(
+            noteURL: noteURL,
+            hadConflict: true,
+            conflictSidecarRelativePath: sidecarRelativePath
+        )
+    }
+
+    private func antigrafi_attachments(
+        entry: JournalEntry,
+        mediaStorage: MediaStorageProtocol,
+        vaultURL: URL
+    ) async throws {
+        let attachmentsDir = try PathAsfaleia.asfalhs_resolved_url(
+            relativePath: Self.attachmentsFolderName,
+            baseDirectory: vaultURL
+        )
         try FileManager.default.createDirectory(at: attachmentsDir, withIntermediateDirectories: true)
 
         for attachment in entry.attachments {
-            // SEC-002: reject `..` / absolute — silent skip ανά attachment (vault export συνεχίζει).
+            // SEC-002: reject `..` / absolute — silent skip ανά attachment.
             guard let sourceURL = try? await mediaStorage.getMediaFileURL(relativePath: attachment.relativePath),
                   let destURL = try? PathAsfaleia.asfalhs_resolved_url(
                     relativePath: attachment.relativePath,
@@ -116,57 +293,91 @@ public actor ObsidianVaultBridge {
                 continue
             }
             if FileManager.default.fileExists(atPath: sourceURL.path) {
-                try? FileManager.default.createDirectory(at: destURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? FileManager.default.createDirectory(
+                    at: destURL.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
                 if !FileManager.default.fileExists(atPath: destURL.path) {
                     try? FileManager.default.copyItem(at: sourceURL, to: destURL)
                 }
             }
         }
-
-        var existingContent = ""
-        if FileManager.default.fileExists(atPath: noteURL.path) {
-            existingContent = (try? String(contentsOf: noteURL, encoding: .utf8)) ?? ""
-        }
-
-        let updatedContent = mergeEntryIntoMarkdown(existingContent: existingContent, entry: entry, dayTitle: dayString)
-        try updatedContent.write(to: noteURL, atomically: true, encoding: .utf8)
-
-        lastKnownHashes[relativeNotePath] = updatedContent.sha256Hash
-        return ObsidianSingleExportResult(noteURL: noteURL, hadConflict: false, conflictSidecarRelativePath: nil)
     }
 
-    /// Εξαγωγή συνόλου εγγραφών (Batch Export)
-    public func exportBatch(entries: [JournalEntry], mediaStorage: MediaStorageProtocol) async throws -> ObsidianExportResult {
-        var exportedCount = 0
-        var modifiedList: [String] = []
-        var conflictsList: [String] = []
+    // MARK: - Hash persistence (A09 across restarts)
 
-        let grouped = Dictionary(grouping: entries, by: { $0.dateKey })
+    /// Φόρτωση hashes — καλείται μόνο μέσα σε `me_prosbasi_vault` ή default vault.
+    private func fortosi_hashes_apo_disk_unlocked() {
+        defer { hashesFortomenoi = true }
+        guard let vaultURL = vaultDirectoryURL else {
+            lastKnownHashes = [:]
+            return
+        }
+        do {
+            let storeURL = try PathAsfaleia.asfalhs_resolved_url(
+                relativePath: Self.hashStoreRelativePath,
+                baseDirectory: vaultURL
+            )
+            guard FileManager.default.fileExists(atPath: storeURL.path),
+                  let data = try? Data(contentsOf: storeURL),
+                  let decoded = try? JSONDecoder().decode([String: String].self, from: data) else {
+                lastKnownHashes = [:]
+                return
+            }
+            lastKnownHashes = decoded
+        } catch {
+            lastKnownHashes = [:]
+        }
+    }
 
-        for (_, dayEntries) in grouped {
-            for entry in dayEntries {
-                let outcome = try await exportEntry(entry, mediaStorage: mediaStorage)
-                if outcome.hadConflict {
-                    if let sidecar = outcome.conflictSidecarRelativePath, !conflictsList.contains(sidecar) {
-                        conflictsList.append(sidecar)
-                    }
-                } else {
-                    exportedCount += 1
-                    if !modifiedList.contains(outcome.noteURL.lastPathComponent) {
-                        modifiedList.append(outcome.noteURL.lastPathComponent)
-                    }
-                }
+    private func apothikeusi_hashes_sto_disk(vaultURL: URL) throws {
+        let storeURL = try PathAsfaleia.asfalhs_resolved_url(
+            relativePath: Self.hashStoreRelativePath,
+            baseDirectory: vaultURL
+        )
+        try FileManager.default.createDirectory(
+            at: storeURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let data = try JSONEncoder().encode(lastKnownHashes)
+        try data.write(to: storeURL, options: .atomic)
+    }
+
+    // MARK: - Scoped access
+
+    private func me_prosbasi_vault<T>(
+        _ body: () async throws -> T
+    ) async throws -> T {
+        guard let vaultURL = vaultDirectoryURL else {
+            throw obsidianError(6001, "Δεν έχει οριστεί φάκελος Obsidian Vault.")
+        }
+        var didStart = false
+        if vaultRequiresScopedAccess {
+            didStart = vaultURL.startAccessingSecurityScopedResource()
+            if !didStart {
+                throw obsidianError(6002, "Αποτυχία security-scoped πρόσβασης στο Obsidian vault.")
             }
         }
-
-        return ObsidianExportResult(
-            exportedFilesCount: exportedCount,
-            modifiedFiles: modifiedList,
-            conflictsDetected: conflictsList
-        )
+        defer {
+            if didStart {
+                vaultURL.stopAccessingSecurityScopedResource()
+            }
+        }
+        return try await body()
     }
 
-    /// Συνδυασμός εγγραφής στο υπάρχον Markdown χωρίς να χαθούν υπάρχουσες χειροκίνητες σημειώσεις
+    // MARK: - Markdown merge
+
+    private func relative_note_path(gia dateKey: String) throws -> String {
+        let parts = dateKey.split(separator: "-")
+        guard parts.count == 3,
+              let year = parts.first,
+              let month = parts.dropFirst().first else {
+            throw obsidianError(6003, "Μη έγκυρο dateKey: \(dateKey)")
+        }
+        return "\(year)/\(month)/\(dateKey).md"
+    }
+
     private func mergeEntryIntoMarkdown(existingContent: String, entry: JournalEntry, dayTitle: String) -> String {
         let entryTagMarker = "<!-- r0lling:id:\(entry.id.uuidString) -->"
 
@@ -229,5 +440,13 @@ public actor ObsidianVaultBridge {
         }
 
         return text
+    }
+
+    private func obsidianError(_ code: Int, _ message: String) -> NSError {
+        NSError(
+            domain: "R0lling.Obsidian",
+            code: code,
+            userInfo: [NSLocalizedDescriptionKey: message]
+        )
     }
 }

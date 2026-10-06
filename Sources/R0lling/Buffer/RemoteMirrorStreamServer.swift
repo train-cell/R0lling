@@ -1,10 +1,13 @@
 import Foundation
 import Network
 
-/// Bonjour TCP listener (`_r0lling-mirror._tcp`) για JSON frame packets προς LAN clients.
-/// Δεν στέλνει ακόμα καρέ από το glasses stream — χρειάζεται κλήση `broadcastFrame` από buffer/adapter.
-/// SEC-001: clients μπαίνουν σε broadcast pool ΜΟΝΟ μετά `AUTH <pairingToken>` · χωρίς token ο server δεν ξεκινά.
+/// Bonjour TCP listener (`_r0lling-mirror._tcp`) — **ready=false** μέχρι NWProtocolTLS + glasses `broadcastFrame`.
+/// SEC-001: AUTH pairing token πριν broadcast pool. UI κρυφό μέσω `FeatureReadinessRegistry.mirror`.
+/// SEC-001-TLS: σε Release ο listener **δεν** ξεκινά (χωρίς `NWProtocolTLS` identity) — μόνο DEBUG cleartext+AUTH.
 public final class RemoteMirrorStreamServer: @unchecked Sendable {
+
+    /// Κωδικός απόρριψης όταν Release build ζητά mirror χωρίς TLS.
+    public static let kodikosReleaseXorisTLS = 8402
 
     public struct MirrorFramePacket: Sendable, Codable {
         public let sequenceNumber: UInt64
@@ -48,11 +51,20 @@ public final class RemoteMirrorStreamServer: @unchecked Sendable {
     }
 
     /// Έναρξη του Mirroring Server και Bonjour ανακοίνωσης (απαιτεί μη-κενό pairingToken).
+    /// Release: απορρίπτεται (SEC-001-TLS) μέχρι να υπάρχει TLS identity / PSK.
     public func startServer() throws {
         lock.lock()
         defer { lock.unlock() }
 
         guard !isRunning else { return }
+
+        #if !DEBUG
+        throw NSError(
+            domain: "R0lling.RemoteMirror",
+            code: Self.kodikosReleaseXorisTLS,
+            userInfo: [NSLocalizedDescriptionKey: "Mirror listener απενεργοποιημένος σε Release χωρίς TLS (SEC-001-TLS)."]
+        )
+        #else
 
         let trimmedToken = pairingToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedToken.isEmpty else {
@@ -64,6 +76,7 @@ public final class RemoteMirrorStreamServer: @unchecked Sendable {
         }
         pairingToken = trimmedToken
 
+        // DEBUG-only cleartext TCP + AUTH · production απαιτεί NWProtocolTLS πριν live frames.
         let parameters = NWParameters.tcp
         let nwPort = NWEndpoint.Port(rawValue: port) ?? .init(integerLiteral: 8443)
 
@@ -78,8 +91,9 @@ public final class RemoteMirrorStreamServer: @unchecked Sendable {
             switch state {
             case .ready:
                 break
-            case .failed(let err):
-                print("[RemoteMirror] Server failed: \(err)")
+            case .failed:
+                // SEC-009: χωρίς dump secrets / full connection metadata.
+                print("[RemoteMirror] Server failed (DEBUG)")
             default:
                 break
             }
@@ -88,6 +102,7 @@ public final class RemoteMirrorStreamServer: @unchecked Sendable {
         newListener.start(queue: .global(qos: .userInteractive))
         self.listener = newListener
         self.isRunning = true
+        #endif
     }
 
     /// Τερματισμός του Server
@@ -106,6 +121,10 @@ public final class RemoteMirrorStreamServer: @unchecked Sendable {
 
     /// Μετάδοση frame ΜΟΝΟ σε authenticated θεατές (SEC-001 fail-closed).
     public func broadcastFrame(imageData: Data, width: Int, height: Int, note: String? = nil) {
+        #if !DEBUG
+        // SEC-001-TLS: καμία μετάδοση frames σε Release χωρίς TLS listener.
+        return
+        #else
         lock.lock()
         let tokenOK = !pairingToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let conns = authenticatedConnections
@@ -132,6 +151,7 @@ public final class RemoteMirrorStreamServer: @unchecked Sendable {
         for conn in conns {
             conn.send(content: fullPacket, completion: .contentProcessed({ _ in }))
         }
+        #endif
     }
 
     private func handleIncomingConnection(_ connection: NWConnection) {

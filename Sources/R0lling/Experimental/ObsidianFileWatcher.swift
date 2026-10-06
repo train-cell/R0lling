@@ -1,6 +1,7 @@
 import Foundation
 
 /// Παρατηρητής αλλαγών αρχείων Obsidian Vault (File Watcher) για άμεσο συγχρονισμό εξωτερικών αλλαγών
+/// Vault file watcher — **Experimental orphan** · `FeatureReadinessRegistry.fileWatcher.ready=false`.
 public final class ObsidianFileWatcher: @unchecked Sendable {
     private var fileDescriptor: CInt = -1
     private var source: DispatchSourceFileSystemObject?

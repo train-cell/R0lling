@@ -1,9 +1,14 @@
-# R0lling — Multi-Agent Audit Rollup (canonical)
+# R0lling — Multi-Agent Audit Rollup (legacy lane merge)
 
-**Ημερομηνία σύνθεσης:** 2026-10-06 ~18:05 EEST · **GitHub refresh:** ~18:10 EEST  
-**Workspace:** `C:\Users\skyd3\antigarvity\R0lling`  
+> ⚠ **CANONICAL CTO DOC:** [`docs/AUDIT_FINAL.md`](AUDIT_FINAL.md)  
+> Fresh from-scratch audit · 2026-10-06 ~18:35 EEST · HEAD `543320f` · verdict **CONDITIONAL**.  
+> Αυτό το ROLLUP (~18:05) **υπερκεράστηκε** — ιδίως SEC-001/002/003 πλέον CLOSED (stub) στο FINAL · TLS/Hermes residual παραμένουν.
+
+**Ημερομηνία σύνθεσης (ιστορικό):** 2026-10-06 ~18:05 EEST · **GitHub refresh:** ~18:10 EEST  
+**Workspace:** `.`  
 **Synthesizer:** Rollup lane (pr-triage discipline · session_handoff · godmode severity)  
-**Git / Stage 6:** πλέον own `.git` + `origin` → `https://github.com/train-cell/R0lling.git` · `main` @ `016d8b9` · dirty: HANDOFF/ROLLUP (+ fresh review) · **χωρίς Stage 6** · βλ. `docs/GITHUB_FRESH_REVIEW.md`  
+**Git / Stage 6 (τότε):** own `.git` + `origin` → `https://github.com/train-cell/R0lling.git` · τότε `016d8b9` · **τώρα βλ. AUDIT_FINAL** · **χωρίς Stage 6** · βλ. `docs/GITHUB_FRESH_REVIEW.md`  
+
 
 
 ### Sibling inputs (όλα READY — κανένα PENDING)
@@ -120,7 +125,7 @@
 7. **Docs (P1-12 + P2-04):** verify 7/7 counters · soften SUPER_FEATURES_20 body.  
 8. **Stage 6 (P0-06):** μόνο με πραγματικό device failure report (prompt 06).
 
-**`NEXT_STEP_TO_EXECUTE`:** Άνοιξε Mac host → `cd C:\Users\skyd3\antigarvity\R0lling` (ή sync) → τρέξε `swift test` · αν fail, πρώτο failing XCTest στο handoff traceback.
+**`NEXT_STEP_TO_EXECUTE`:** Άνοιξε Mac host → `cd .` (ή sync) → τρέξε `swift test` · αν fail, πρώτο failing XCTest στο handoff traceback.
 
 ---
 
@@ -140,9 +145,10 @@ swift test
 ## 7. Pointer map
 
 ```text
-THIS FILE (canonical executive)  docs/AUDIT_ROLLUP.md
+CANONICAL CTO                    docs/AUDIT_FINAL.md
+THIS FILE (legacy rollup)        docs/AUDIT_ROLLUP.md
 Architecture                     docs/AUDIT_ARCHITECTURE.md
-Security                         docs/AUDIT_SECURITY.md
+Security (stale OPEN SEC)        docs/AUDIT_SECURITY.md  → superseded by AUDIT_FINAL §5–6
 Verification / ECC               docs/AUDIT_VERIFICATION.md
 Code quality + CQ fixes          docs/AUDIT_CODE_QUALITY.md
 Gemini vs plan                   docs/GEMINI_AUDIT.md
@@ -152,4 +158,4 @@ Session continuity               docs/HANDOFF.md
 
 ---
 
-*Rollup synthesizer complete · 5/5 sibling lanes READY · statuses συγχρονισμένα με CQ-P0-007/P1-012 · χωρίς git commit.*
+*Legacy rollup · superseded by AUDIT_FINAL · χωρίς git commit στο audit pass.*

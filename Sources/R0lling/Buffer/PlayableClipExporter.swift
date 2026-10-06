@@ -4,6 +4,9 @@ import CoreVideo
 
 /// Παράγει πραγματικά playable MP4 μέσω AVAssetWriter (όχι ftyp+mdat χωρίς moov).
 /// Χρησιμοποιείται όταν τα buffered samples δεν είναι έγκυρα H.264 NAL (simulation / μη-DAT stream).
+///
+/// **Stage-4 contract:** `grapsePlayablePlaceholderMP4` παραμένει η σταθερή playable διαδρομή.
+/// Το πραγματικό DAT remux ζει στο `H264AnnexBRemuxer` και καλείται από `RollingBufferService`.
 public enum PlayableClipExporter {
     /// Ελάχιστη διάρκεια εξαγωγής σε δευτερόλεπτα.
     public static let elaxistiDiarkeiaDeuterolepta: Double = 0.1
@@ -13,6 +16,46 @@ public enum PlayableClipExporter {
     public static let platosEikonas: Int = 320
     /// Ύψος placeholder καρέ.
     public static let ypsosEikonas: Int = 240
+
+    /// Συντονιστής A05: δοκιμάζει remux· σε αποτυχία → Stage-4 placeholder (πάντα playable + moov).
+    /// - Returns: `(isSimulationPlaceholder: Bool)` — `false` μόνο μετά επιτυχές remux.
+    public static func grapsePlayableClipApoSamples(
+        samples: [BufferedSample],
+        durationSeconds: Double,
+        destinationURL: URL,
+        preferRemuxWhenNALPresent: Bool = true
+    ) async throws -> Bool {
+        let exeiNAL = samples.contains { sample in
+            guard !sample.isAudio else { return false }
+            let bytes = [UInt8](sample.data.prefix(4))
+            return bytes.count >= 4
+                && bytes[0] == 0x00 && bytes[1] == 0x00
+                && ((bytes[2] == 0x00 && bytes[3] == 0x01) || bytes[2] == 0x01)
+        }
+
+        if preferRemuxWhenNALPresent && exeiNAL {
+            do {
+                try await H264AnnexBRemuxer.eksagogiPlayableMP4(
+                    samples: samples,
+                    destinationURL: destinationURL
+                )
+                return false
+            } catch {
+                // Honest fallback — όχι silent fake remux success.
+                try await grapsePlayablePlaceholderMP4(
+                    durationSeconds: durationSeconds,
+                    destinationURL: destinationURL
+                )
+                return true
+            }
+        }
+
+        try await grapsePlayablePlaceholderMP4(
+            durationSeconds: durationSeconds,
+            destinationURL: destinationURL
+        )
+        return true
+    }
 
     /// Γράφει playable H.264 MP4 με σταθερό χρώμα καρέ για την αιτούμενη διάρκεια.
     /// - Parameters:

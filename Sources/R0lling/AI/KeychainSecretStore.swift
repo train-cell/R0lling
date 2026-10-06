@@ -74,7 +74,12 @@ public enum KeychainSecretStore {
         SecItemDelete(query as CFDictionary)
     }
 
+    /// UserDefaults fallback ΜΟΝΟ σε DEBUG + ρητό env — ποτέ σε Release (Keychain audit).
     private static func shouldUseUserDefaultsFallback() -> Bool {
-        ProcessInfo.processInfo.environment[userDefaultsFallbackEnvKey] == "1"
+        #if DEBUG
+        return ProcessInfo.processInfo.environment[userDefaultsFallbackEnvKey] == "1"
+        #else
+        return false
+        #endif
     }
 }

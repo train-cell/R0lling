@@ -1,6 +1,6 @@
 import Foundation
 
-/// Ανιχνευτής κινήσεων κεφαλιού (Head Gestures: Double Nod) από το IMU των Meta Glasses
+/// Head double-nod IMU detector — **ready=false** μέχρι IMU feed (`FeatureReadinessRegistry.headGesture`).
 public final class HeadGestureDetector: @unchecked Sendable {
     public struct IMUSample: Sendable {
         public let pitch: Double // Κλίση πάνω/κάτω (Nod)

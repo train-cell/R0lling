@@ -197,7 +197,7 @@ public struct AISettings: Codable, Sendable, Equatable {
         directAPIBaseURL: String = "https://api.openai.com/v1",
         directAPIModel: String = "gpt-4o-mini",
         directAPIKeyKeychainKey: String = "r0lling.direct_api_key",
-        hermesBaseURL: String = "http://192.168.1.50:8080/v1",
+        hermesBaseURL: String = "https://127.0.0.1:8080/v1",
         hermesTokenKeychainKey: String = "r0lling.hermes_token",
         includeLocationInContext: Bool = false,
         maxContextEntries: Int = 10
@@ -220,10 +220,11 @@ public struct AgentMemory: Codable, Sendable, Equatable {
     public var openLoops: String
     public var lastUpdated: Date
 
+    /// CQ-P0-001: άδεια templates μόνο — ποτέ εφευρεμένα persona facts (fake memory poisoning).
     public init(
-        memoryNotes: String = "# Σημειώσεις Μνήμης Βοηθού\n\n- Αγαπημένα θέματα: Ταξίδια, τεχνολογία, προγραμματισμός.\n",
-        userPreferences: String = "# Προτιμήσεις Χρήστη\n\n- Γλώσσα: Ελληνικά\n- Στυλ απαντήσεων: Συνοπτικό, ουσιαστικό, φιλικό.\n",
-        openLoops: String = "# Εκκρεμότητες & Ανοιχτά Θέματα\n\n- Ενημέρωση Μαρίας για το ταξίδι.\n",
+        memoryNotes: String = "# Σημειώσεις Μνήμης Βοηθού\n\n",
+        userPreferences: String = "# Προτιμήσεις Χρήστη\n\n",
+        openLoops: String = "# Εκκρεμότητες & Ανοιχτά Θέματα\n\n",
         lastUpdated: Date = Date()
     ) {
         self.memoryNotes = memoryNotes

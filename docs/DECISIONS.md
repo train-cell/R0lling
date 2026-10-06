@@ -19,3 +19,59 @@
 | **Κύρια Πηγή Δεδομένων** | Τοπικό Sandbox του R0lling (SQLite / SwiftData). Το Obsidian λειτουργεί ως export mirror. | Αποτροπή αλλοίωσης δεδομένων αν αλλάξει ή μετακινηθεί ο εξωτερικός φάκελος Obsidian. |
 | **Διένεξη Obsidian** | Έλεγχος SHA256 hashes. Καμία σιωπηρή διαγραφή εξωτερικών αλλαγών. | Προστασία σημειώσεων που ενδέχεται να συμπλήρωσε ο χρήστης απευθείας στο Obsidian Desktop. |
 | **Διπλό AI Interface** | Ρητή επιλογή χρήστη μεταξύ **Hermes (Home PC)** και **Direct API**. | Απόλυτος σεβασμός στην ιδιωτικότητα. Χωρίς αυτόματη/κρυφή διαρροή δεδομένων. |
+
+---
+
+## 2. Meta DAT / Simulation (Lane Clip+Meta — 2026-10-06)
+
+| Απόφαση | Τιμή | Αιτιολόγηση |
+|---|---|---|
+| **Windows / no DAT vendor** | Simulation-only path + πλήρες protocol/adapter/remux structure | Το MetaWearablesDAT δεν vendor-άρεται αξιόπιστα σε Windows SPM. |
+| **Simulation labeling** | Device name περιέχει `SIMULATION — όχι φυσική συσκευή` | Αποφυγή LIVE hardware claims χωρίς Gen 2. |
+| **Non-sim χωρίς SDK** | Error `4002` · ποτέ fake `.connected` | R3-003 / plan honesty. |
+| **Playable clip χωρίς NAL** | Stage-4 `PlayableClipExporter` placeholder + moov | A05 software-complete · remux όταν υπάρχουν SPS/PPS. |
+| **Background capture promise** | `promisesContinuousBackgroundCapture = false` default | Μέχρι εμπειρικό DAT proof στο device. |
+| **Acoustic/IMU product** | Feed API wired · `FeatureReadinessRegistry.*.ready = false` | Flip flag = auto-clip χωρίς νέο wiring. |
+| **Mac flip path** | `docs/LANE_CLIP_META.md` | Ακριβή βήματα για DAT SPM + bridge wire. |
+
+---
+
+## 3. AI Dual-Path Software DoD (Lane AI — 2026-10-06)
+
+| Απόφαση | Τιμή | Αιτιολόγηση |
+|---|---|---|
+| **A10 SW ready** | Adapters + Keychain + SEC-004/007 + empty-key 7004/7104 = **software-complete** | Live HTTPS/LAN credentials = **DEV** proof, όχι SW blocker. |
+| **A11/A12 SW ready** | Path + OCR/keyword + fail-closed empty = SW · live vision/AI reply = DEV | Honesty: UI δεν ισχυρίζεται live χωρίς key. |
+| **A13 SW ready** | AgentFolderManager + PathAsfaleia + empty templates (CQ-P0-001) | Device Files accept/export = DEV. |
+| **No silent failover** | Provider switch manual only | Plan A10 — χωρίς κρυφή εναλλαγή Direct↔Hermes. |
+
+---
+
+## 4. App Target & Permissions (P0-05 / A16 — 2026-10-06)
+
+| Απόφαση | Τιμή | Αιτιολόγηση |
+|---|---|---|
+| **SPM library ≠ app** | Installable shell στο `Apps/R0llingApp/` (Info.plist + README + XcodeGen yml) | Χωρίς committed `.xcodeproj` (merge thrash). |
+| **Privacy strings** | Όλα τα NS*UsageDescription στο `Apps/R0llingApp/Info.plist` | A16 SW scaffolding πριν device deny prompts. |
+| **Disk full** | `ELAXISTOS_ELEUTHEROS_XOROS_BYTES` + `AppErrorTaxonomy.diskFull` | Typed error · data safe. |
+| **P0-01** | GHA `.github/workflows/swift-ci.yml` = contract · green log = HANDOFF proof | Windows host δεν τρέχει `swift test`. |
+
+---
+
+## 5. Wave-B Orphans → Experimental/ (P1-04 — 2026-10-06)
+
+| Απόφαση | Τιμή | Αιτιολόγηση |
+|---|---|---|
+| **Spatial / Metal / Watermark / FileWatcher** | Μετακίνηση σε `Sources/R0lling/Experimental/` | AUDIT P1-04: delete **ή** Experimental — όχι delete (μαθηματικά/schema χρήσιμα μετά device proof). |
+| **Product surface** | `FeatureReadinessRegistry.*.ready = false` · **0** AppState holds | FREEZE μέχρι A05/A10 device. |
+| **DoD CLOSED** | Experimental path + flags + README | Δεν μετράει ως product feature. |
+
+---
+
+## 6. AppState God-Object (P1-05 — 2026-10-06)
+
+| Απόφαση | Τιμή | Αιτιολόγηση |
+|---|---|---|
+| **Split Journal/Clip/Assistant/Experimental** | **DEFERRED** μέχρι soft-GO (πράσινο `swift test`) | Μεγάλο refactor · regression risk · Karpathy surgical. |
+| **Orphan holds** | **CLOSED** | Spatial/Metal/Watermark/FileWatcher **δεν** κρατιούνται στο AppState · μόνο READY engines + gated acoustic/IMU/mirror. |
+| **Gate** | `FeatureReadinessRegistry` | Μοναδική πηγή αλήθειας για wave-B/C UI surface. |

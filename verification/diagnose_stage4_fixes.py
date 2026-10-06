@@ -96,7 +96,10 @@ def test_r3_003() -> None:
     )
     check(
         "R3-007 capturePhoto",
-        "case .connected, .streaming:" in src,
+        (
+            "case .connected, .streaming:" in src
+            or "case .connected, .streaming, .paused:" in src
+        ),
         "capturePhoto accepts connected OR streaming",
     )
 

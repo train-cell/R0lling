@@ -1,5 +1,11 @@
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
 /// Bevel-style Concentric 3-Ring Visualization (Buffer, Captures Target, Vault Status)
 public struct BevelConcentricRingsView: View {
     public let bufferRatio: Double    // 0.0 ... 1.0 (Ring 1: Outer Cyan)
@@ -198,13 +204,27 @@ public struct BevelTelemetryCard: View {
 /// Κάρτα καταχώρισης στο στυλ Strava Activity Card
 public struct TimelineEntryCard: View {
     public let entry: JournalEntry
+    /// `true` μόνο αν έχει γίνει πραγματικό Obsidian export σε αυτή τη συνεδρία/config.
+    public var einaiObsidianSync: Bool
     public var onFavoriteToggle: (() -> Void)?
     public var onDelete: (() -> Void)?
+    public var onEdit: (() -> Void)?
+    public var resolveMediaURL: ((String) async -> URL?)?
 
-    public init(entry: JournalEntry, onFavoriteToggle: (() -> Void)? = nil, onDelete: (() -> Void)? = nil) {
+    public init(
+        entry: JournalEntry,
+        einaiObsidianSync: Bool = false,
+        onFavoriteToggle: (() -> Void)? = nil,
+        onDelete: (() -> Void)? = nil,
+        onEdit: (() -> Void)? = nil,
+        resolveMediaURL: ((String) async -> URL?)? = nil
+    ) {
         self.entry = entry
+        self.einaiObsidianSync = einaiObsidianSync
         self.onFavoriteToggle = onFavoriteToggle
         self.onDelete = onDelete
+        self.onEdit = onEdit
+        self.resolveMediaURL = resolveMediaURL
     }
 
     public var body: some View {
@@ -303,7 +323,12 @@ public struct TimelineEntryCard: View {
             if !entry.attachments.isEmpty {
                 VStack(spacing: 8) {
                     ForEach(entry.attachments) { att in
-                        MediaPreviewCard(attachment: att)
+                        MediaPreviewCard(
+                            attachment: att,
+                            resolveURL: resolveMediaURL.map { resolver in
+                                { await resolver(att.relativePath) }
+                            }
+                        )
                     }
                 }
             }
@@ -317,13 +342,13 @@ public struct TimelineEntryCard: View {
                 }
             }
 
-            // 6. Strava Activity Footer (Kudos / Sync status)
+            // 6. Footer — honest local/Obsidian status (no fake vault sync)
             HStack {
                 HStack(spacing: 4) {
-                    Image(systemName: "checkmark.seal.fill")
+                    Image(systemName: einaiObsidianSync ? "checkmark.seal.fill" : "internaldrive.fill")
                         .font(.system(size: 11))
-                        .foregroundColor(R0llingTheme.bevelEmerald)
-                    Text("Synced to Obsidian Local Vault")
+                        .foregroundColor(einaiObsidianSync ? R0llingTheme.bevelEmerald : R0llingTheme.textMuted)
+                    Text(einaiObsidianSync ? "Obsidian export OK" : "Τοπικό ημερολόγιο")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(R0llingTheme.textSecondary)
                 }
@@ -351,6 +376,23 @@ public struct TimelineEntryCard: View {
             .padding(.top, 4)
         }
         .r0llingCard()
+        .contextMenu {
+            if let onEdit {
+                Button("Επεξεργασία…", systemImage: "pencil") {
+                    onEdit()
+                }
+            }
+            if let onFavoriteToggle {
+                Button(entry.isFavorite ? "Αφαίρεση αγαπημένου" : "Αγαπημένο", systemImage: "heart") {
+                    onFavoriteToggle()
+                }
+            }
+            if let onDelete {
+                Button("Διαγραφή", systemImage: "trash", role: .destructive) {
+                    onDelete()
+                }
+            }
+        }
     }
 }
 
@@ -382,24 +424,31 @@ public struct BevelStatPill: View {
     }
 }
 
-/// Strava Athletic Video / Media Preview Card
+/// Media preview με πραγματικό τοπικό αρχείο όταν υπάρχει URL — αλλιώς honest error/placeholder.
 public struct MediaPreviewCard: View {
     public let attachment: MediaAttachment
+    public var resolveURL: (() async -> URL?)?
+
+    @State private var photoImage: Image?
+    @State private var resolvedURL: URL?
+    @State private var loadError: String?
+    @State private var isLoading = false
+
+    public init(
+        attachment: MediaAttachment,
+        resolveURL: (() async -> URL?)? = nil
+    ) {
+        self.attachment = attachment
+        self.resolveURL = resolveURL
+    }
 
     public var body: some View {
         ZStack(alignment: .bottomLeading) {
-            // Media Container Box
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(R0llingTheme.bgElevated)
                 .frame(height: 140)
-                .overlay(
-                    // Grid subtle lines simulating video frame
-                    Image(systemName: "video.fill")
-                        .font(.system(size: 44))
-                        .foregroundColor(R0llingTheme.textMuted.opacity(0.18))
-                )
+                .overlay(previewOverlay)
 
-            // Top-right Strava Orange Duration Pill
             VStack {
                 HStack {
                     Spacer()
@@ -416,36 +465,34 @@ public struct MediaPreviewCard: View {
                         .padding(.vertical, 4)
                         .background(R0llingTheme.stravaOrange)
                         .clipShape(Capsule())
-                        .shadow(color: R0llingTheme.stravaOrange.opacity(0.4), radius: 6, x: 0, y: 2)
                     }
                 }
                 Spacer()
             }
             .padding(10)
 
-            // Center: Play Button Overlay
-            VStack {
-                Spacer()
-                HStack {
+            if attachment.mediaType == .video || attachment.mediaType == .clip || attachment.mediaType == .audio {
+                VStack {
                     Spacer()
-                    ZStack {
-                        Circle()
-                            .fill(Color.black.opacity(0.65))
-                            .frame(width: 48, height: 48)
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.white)
-                            .offset(x: 2)
+                    HStack {
+                        Spacer()
+                        ZStack {
+                            Circle()
+                                .fill(Color.black.opacity(0.65))
+                                .frame(width: 48, height: 48)
+                            Image(systemName: attachment.mediaType == .audio ? "waveform" : "play.fill")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
+                                .offset(x: attachment.mediaType == .audio ? 0 : 2)
+                        }
+                        Spacer()
                     }
-                    .shadow(color: Color.black.opacity(0.5), radius: 8, x: 0, y: 4)
                     Spacer()
                 }
-                Spacer()
             }
 
-            // Bottom Overlay Strip: File Info & Codec Details
             HStack(spacing: 8) {
-                Image(systemName: "film.stack")
+                Image(systemName: eikonaTypou)
                     .font(.system(size: 12))
                     .foregroundColor(R0llingTheme.bevelCyan)
 
@@ -462,9 +509,9 @@ public struct MediaPreviewCard: View {
 
                 Spacer()
 
-                Text("H.264 / AAC")
+                Text(katastasiArxeiou)
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(R0llingTheme.bevelEmerald)
+                    .foregroundColor(loadError == nil ? R0llingTheme.bevelEmerald : R0llingTheme.stravaOrange)
             }
             .padding(10)
             .background(
@@ -481,6 +528,105 @@ public struct MediaPreviewCard: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(R0llingTheme.borderSubtle, lineWidth: 1)
         )
+        .task(id: attachment.id) {
+            await fortoseMedia()
+        }
+    }
+
+    @ViewBuilder
+    private var previewOverlay: some View {
+        if let photoImage {
+            photoImage
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: 140)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        } else if isLoading {
+            ProgressView()
+        } else if let loadError {
+            VStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 28))
+                    .foregroundColor(R0llingTheme.stravaOrange)
+                Text(loadError)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(R0llingTheme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 12)
+            }
+        } else {
+            Image(systemName: eikonaTypou)
+                .font(.system(size: 44))
+                .foregroundColor(R0llingTheme.textMuted.opacity(0.18))
+        }
+    }
+
+    private var eikonaTypou: String {
+        switch attachment.mediaType {
+        case .photo: return "photo.fill"
+        case .video, .clip: return "video.fill"
+        case .audio: return "waveform"
+        }
+    }
+
+    private var katastasiArxeiou: String {
+        if loadError != nil { return "MISSING" }
+        if resolvedURL != nil { return "LOCAL FILE" }
+        return "NO RESOLVER"
+    }
+
+    private func fortoseMedia() async {
+        guard let resolveURL else {
+            loadError = nil
+            resolvedURL = nil
+            photoImage = nil
+            return
+        }
+        isLoading = true
+        defer { isLoading = false }
+
+        guard let url = await resolveURL() else {
+            loadError = "Αρχείο μη διαθέσιμο"
+            resolvedURL = nil
+            photoImage = nil
+            return
+        }
+
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            loadError = "Λείπει από δίσκο"
+            resolvedURL = nil
+            photoImage = nil
+            return
+        }
+
+        resolvedURL = url
+        loadError = nil
+
+        guard attachment.mediaType == .photo else { return }
+
+        do {
+            let data = try Data(contentsOf: url)
+            photoImage = eikonaApoDedomena(data)
+            if photoImage == nil {
+                loadError = "Δεν αποκωδικοποιήθηκε η εικόνα"
+            }
+        } catch {
+            photoImage = nil
+            loadError = error.localizedDescription
+        }
+    }
+
+    private func eikonaApoDedomena(_ data: Data) -> Image? {
+#if canImport(UIKit)
+        guard let ui = UIImage(data: data) else { return nil }
+        return Image(uiImage: ui)
+#elseif canImport(AppKit)
+        guard let ns = NSImage(data: data) else { return nil }
+        return Image(nsImage: ns)
+#else
+        return nil
+#endif
     }
 }
 

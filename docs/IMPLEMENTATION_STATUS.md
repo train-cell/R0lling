@@ -1,11 +1,12 @@
 # R0lling — Κατάσταση Υλοποίησης (IMPLEMENTATION_STATUS)
 
 **Έργο:** `R0lling`  
-**Ημερομηνία:** 6 Οκτωβρίου 2026 (~18:00 EEST rectification pass)  
-**Έκδοση:** 1.0.0-rc1 (post Stage 5 + code-quality P0)  
-**Περιβάλλον:** Windows host · Python diagnostics PASS · **χωρίς** Swift/Xcode runtime verification  
+**Ημερομηνία:** 6 Οκτωβρίου 2026 (~19:45 EEST · CreateGoal SW close)  
+**Έκδοση:** 1.0.0-rc1 (post Stage 5 + P0/P1 SW residuals)  
+**Περιβάλλον:** Windows host · Python diagnostics · **χωρίς** Swift/Xcode runtime  
 
-> **Honesty note (R3-011):** Καμία δήλωση «ελεγμένο σε device» χωρίς proof. Python harness ≠ Swift actors.
+> **Honesty note (R3-011):** Καμία δήλωση «ελεγμένο σε device» χωρίς proof. Python harness ≠ Swift actors.  
+> Canonical: `docs/AUDIT_FINAL.md` · DoD: `docs/GOAL_100_FEATURE_MATRIX.md` · Progress: `docs/GOAL_100_PROGRESS.md`
 
 ---
 
@@ -13,22 +14,24 @@
 
 | ID | Κατάσταση | Τεκμηρίωση | Επόμενο |
 |---|---|---|---|
-| **A01** | **Κώδικας διορθωμένος · Swift XCTest εκκρεμεί** | R3-001 ISO8601 decode parity | `swift test` σε Mac · device relaunch |
-| **A02** | **Κώδικας διορθωμένος · Swift XCTest εκκρεμεί** | R3-009: `makeDateKey` + `getEntriesForDate(_:displayTimeZone:)` | Mac XCTest · travel UI smoke |
-| **A03** | **Μερικώς** | Media paths υπάρχουν· device Photos picker εκκρεμεί | iPhone |
-| **A04** | **Κώδικας διορθωμένος · Swift XCTest εκκρεμεί** | R3-006 voice dedup | device mic / glasses |
-| **A05** | **Κώδικας διορθωμένος · device εκκρεμεί** | R3-002 playable placeholder MP4· πραγματικό DAT NAL remux όχι ακόμα | Mac AVAsset.isPlayable · DAT |
-| **A06** | **Μερικώς** | Warm-up math OK (Python)· concurrency σε device εκκρεμεί | device |
-| **A07** | **External test required** | Pause policy στον κώδικα· χωρίς device proof | iPhone background |
-| **A08** | **Κώδικας OK · Files picker εκκρεμεί** | Idempotent markers + batch export | iOS Files |
-| **A09** | **Κώδικας διορθωμένος · Swift XCTest εκκρεμεί** | R3-005 conflict sidecar | Obsidian vault σε device |
-| **A10** | **Κώδικας διορθωμένος · live endpoint εκκρεμεί** | R3-004 Keychain + R3-012 empty-key guard | πραγματικά tokens |
-| **A11** | **Μερικώς** | Path + R3-007 capturePhoto· vision endpoint εκκρεμεί | device + AI key |
-| **A12** | **Μερικώς** | Local keyword recall + AI path | live endpoint |
-| **A13** | **Μερικώς** | Agent folder UI υπάρχει | device sync |
-| **A14** | **Μερικώς** | ObservationGameEngine + Gemini scavenger streak scaffolding | device |
-| **A15** | **Μερικώς** | Backup engine + journal restart aligned | device restore |
-| **A16** | **Κώδικας βελτιωμένος · device εκκρεμεί** | Disk check · Keychain · empty-key guard | device permissions |
+| **A01** | **SW ✅ · Mac/DEV 🚫** | Offline note + ISO8601 restart (R3-001) · XCTest γραμμένα | `swift test` / GHA · DEVICE_TESTS DEV-02 |
+| **A02** | **SW ✅ · Mac/DEV 🚫** | Edit/search/TZ `makeDateKey` (R3-009) · EntryEditorSheet | Mac XCTest · DEV-05b |
+| **A03** | **SW ✅ · DEV 🚫** | PhotosUI+Files picker · MediaStorage · PathAsfaleia | iPhone Photos permission |
+| **A04** | **SW ✅ · DEV 🚫** | R3-006 voice dedup · SpeechStopResult | device mic |
+| **A05** | **SW ✅ sim · DEV 🚫** | Playable placeholder + H264 remux · `LANE_CLIP_META` · DECISIONS §2 sim-only | Mac `AVAsset.isPlayable` · DAT NAL |
+| **A06** | **SW ✅ · DEV 🚫** | Warm-up · disconnect generation · concurrent 3012 | device concurrency |
+| **A07** | **SW ✅ policy · DEV 🚫** | ScenePhase PAUSED · `promisesContinuousBackgroundCapture=false` | iPhone background |
+| **A08** | **SW ✅ · DEV 🚫** | Idempotent export + Files picker + bookmark | iOS Files vault |
+| **A09** | **SW ✅ · DEV 🚫** | Conflict sidecar + hash persist | Obsidian vault device |
+| **A10** | **SW ✅ adapters · DEV 🚫** | Keychain + SEC-004/007 · DECISIONS §3 | live tokens |
+| **A11** | **SW ✅ path · DEV 🚫** | capturePhoto + OCR | live vision |
+| **A12** | **SW ✅ keyword · DEV 🚫** | Local keyword recall | live AI polish |
+| **A13** | **SW ✅ · DEV 🚫** | AgentFolder + PathAsfaleia + empty templates | device Files |
+| **A14** | **SW ✅ · DEV 🚫** | ObservationGameEngine + fail-closed | device vision |
+| **A15** | **SW ✅ · DEV 🚫** | Backup+agent+media · clean restore XCTest | device restore |
+| **A16** | **SW ✅ scaffold · DEV 🚫** | `AppErrorTaxonomy` · `Apps/R0llingApp/Info.plist` · disk-full | device permissions |
+
+**Device-proven:** **0 / 16**
 
 ---
 
@@ -36,29 +39,43 @@
 
 | Έλεγχος | Αποτέλεσμα |
 |---|---|
-| `python verification/diagnose_stage5_finalize.py` | ALL PASSED (R3-009, R3-012, Stage-4 regression, Gemini module presence) |
+| `python verification/diagnose_stage3_defects.py` | PASS (delegates stage4) |
 | `python verification/diagnose_stage4_fixes.py` | ALL PASSED |
-| `python verification/verify_all_subsystems.py` | 5/5 PASS (schema/math mirrors — **όχι** Swift runtime) |
-| `swift test` / Xcode | **Μη διαθέσιμα** σε αυτό το host |
-| Meta Gen 2 / DAT SDK | **Μη συνδεδεμένο** · simulation-only |
+| `python verification/diagnose_stage5_finalize.py` | ALL PASSED (+ SEC + A01–A16 suites) |
+| `python verification/diagnose_journal_media_a01_a03.py` | ALL PASSED |
+| `python verification/verify_all_subsystems.py` | 7/7 phases · modules PASS |
+| `swift test` / Xcode / GHA green log | 🚫 **BLOCKED** — `docs/DEVICE_TESTS.md` §3 |
+| Meta Gen 2 / DAT SDK | Simulation-only · DECISIONS §2 |
 
 ---
 
 ## 3. Finding status
 
-Κλειστά στον κώδικα: R3-001 … R3-012.  
-Ανοιχτά εξωτερικά: DAT remux, device proof (A05/A07 κ.ά.), live AI/Hermes, Stage 6 device tickets.
-
-## 4. Gemini super-features (honest)
-
-Υπάρχουν ως κώδικας/hooks (Earcons, Time Capsule UI, WatchConnectivity, κ.ά.).  
-Acoustic / head-nod auto-clip: **απενεργοποιημένα** (`SUPER_FEATURE_*_FEED_WIRED = false`) μέχρι mic/IMU feed — CQ-P0-007.  
-**Δεν** θεωρούνται device-verified. Watch απαιτεί companion target.
-
-## 5. Code-quality rectification (2026-10-06)
-
-| ID | Κατάσταση |
+| Suite | Status |
 |---|---|
-| CQ-P0-001…006 | Διορθώθηκαν (βλ. `AUDIT_CODE_QUALITY.md` §5) |
-| CQ-P0-007 | Gated acoustic/IMU hooks — όχι ψευδο-hardware toasts |
-| CQ-P1-012 | Obsidian post-save export warning toast |
+| R3-001…012 | ✅ CLOSED (code) |
+| G5-001…005 | ✅ CLOSED |
+| CQ-P0-001…007 · CQ-P1-012 | ✅ CLOSED |
+| SEC-001…009 (+ TLS kill-in-Release) | ✅ CLOSED |
+| P0-02 / P0-05 / P1-04 / P1-05 / P1-09 / P1-TLS / P1-HERMES | ✅ SW CLOSED |
+| P0-01 Mac/`swift test` | 🚫 checklist |
+| P0-06 Stage 6 | 🚫 no device report |
+
+## 4. Wave-B/C honesty
+
+- READY flags: earcon · timeCapsule · highlightReel · podcast · canvas · KG · emotion · streak · speech · OCR · entity · nutrition · dataview · adaptiveBattery  
+- Orphans: `Sources/R0lling/Experimental/` (Spatial · Metal · Watermark · FileWatcher) · ready=false  
+- Pseudo vector: `PseudoLexicalVectorSearchEngine` (όχι MobileCLIP weights) · ready=false  
+- Mirror: AUTH + Release kill · ready=false μέχρι TLS+frames  
+- Acoustic/IMU: feed wired · ready=false  
+
+## 5. Pointers
+
+```text
+AUDIT_FINAL          docs/AUDIT_FINAL.md
+GOAL matrix          docs/GOAL_100_FEATURE_MATRIX.md
+GOAL progress        docs/GOAL_100_PROGRESS.md
+Device/Mac checklist docs/DEVICE_TESTS.md §3
+DAT flip             docs/LANE_CLIP_META.md
+Decisions            docs/DECISIONS.md
+```

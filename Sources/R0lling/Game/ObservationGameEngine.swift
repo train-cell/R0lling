@@ -1,9 +1,51 @@
 import Foundation
 
-/// Μηχανή παιχνιδιού παρατήρησης («Βρες κάτι κόκκινο»)
+/// Πηγή αξιολόγησης — ειλικρίνεια UI (A14): manual ≠ AI.
+public enum ObservationEvaluationSource: String, Codable, Sendable, Equatable {
+    case aiVision
+    case manual
+    case unavailable
+}
+
+/// Αποτέλεσμα αξιολόγησης αποστολής (fail-closed scoring).
+public struct ObservationEvaluationResult: Sendable, Equatable {
+    public let success: Bool
+    public let feedback: String
+    public let source: ObservationEvaluationSource
+    public let awardedPoints: Int
+
+    public init(
+        success: Bool,
+        feedback: String,
+        source: ObservationEvaluationSource,
+        awardedPoints: Int
+    ) {
+        self.success = success
+        self.feedback = feedback
+        self.source = source
+        self.awardedPoints = awardedPoints
+    }
+}
+
+/// Κατάσταση συνόδου παιχνιδιού παρατήρησης.
+public enum ObservationGameSessionState: Sendable, Equatable {
+    case idle
+    case active
+    case evaluating
+    case completed
+    case failed
+}
+
+/// Μηχανή παιχνιδιού παρατήρησης («Βρες κάτι κόκκινο») — session + fail-closed score + persistence.
 public actor ObservationGameEngine {
+    public static let pontosAIEpityxias: Int = 10
+    public static let pontosXeirokinitis: Int = 5
+    private static let scoreDefaultsKey = "r0lling.observation_game_score"
+
     private var currentMission: ObservationMission?
     private var score: Int = 0
+    private var sessionState: ObservationGameSessionState = .idle
+    private var lastEvaluation: ObservationEvaluationResult?
     private let aiRouter: AIRouter
 
     private let presetMissions = [
@@ -18,30 +60,68 @@ public actor ObservationGameEngine {
 
     public init(aiRouter: AIRouter) {
         self.aiRouter = aiRouter
-        self.currentMission = startNewMission()
+        if let saved = UserDefaults.standard.object(forKey: Self.scoreDefaultsKey) as? Int, saved >= 0 {
+            self.score = saved
+        }
+        self.currentMission = nil
+        self.sessionState = .idle
     }
 
     public func getCurrentMission() -> ObservationMission? {
-        return currentMission
+        currentMission
     }
 
     public func getScore() -> Int {
-        return score
+        score
     }
 
+    public func getSessionState() -> ObservationGameSessionState {
+        sessionState
+    }
+
+    public func getLastEvaluation() -> ObservationEvaluationResult? {
+        lastEvaluation
+    }
+
+    /// Ξεκινά νέα σύνοδο με τυχαία αποστολή.
+    @discardableResult
     public func startNewMission() -> ObservationMission {
         let randomIndex = Int.random(in: 0..<presetMissions.count)
         let (prompt, target) = presetMissions[randomIndex]
         let mission = ObservationMission(prompt: prompt, targetDescription: target)
         self.currentMission = mission
+        self.sessionState = .active
+        self.lastEvaluation = nil
         return mission
     }
 
-    /// Αξιολόγηση ληφθείσας φωτογραφίας από τα γυαλιά ή την κάμερα
-    public func evaluateCapturedPhoto(imageData: Data) async throws -> (success: Bool, feedback: String) {
-        guard var mission = currentMission else {
-            throw NSError(domain: "R0lling.Game", code: 8001, userInfo: [NSLocalizedDescriptionKey: "Δεν υπάρχει ενεργή αποστολή."])
+    /// Αξιολόγηση φωτογραφίας (γυαλιά ή Photos picker). Fail-closed: ασαφές/σφάλμα AI → 0 πόντοι.
+    public func evaluateCapturedPhoto(imageData: Data) async -> ObservationEvaluationResult {
+        guard var mission = currentMission, !mission.isCompleted else {
+            let result = ObservationEvaluationResult(
+                success: false,
+                feedback: "Δεν υπάρχει ενεργή αποστολή. Πάτησε «Επόμενη Αποστολή».",
+                source: .unavailable,
+                awardedPoints: 0
+            )
+            lastEvaluation = result
+            sessionState = .failed
+            return result
         }
+
+        guard !imageData.isEmpty else {
+            let result = ObservationEvaluationResult(
+                success: false,
+                feedback: "Κενή εικόνα — δεν απονεμήθηκαν πόντοι.",
+                source: .unavailable,
+                awardedPoints: 0
+            )
+            lastEvaluation = result
+            sessionState = .failed
+            return result
+        }
+
+        sessionState = .evaluating
 
         let evaluationQuestion = """
         Εξέτασε την εικόνα. Περιέχει \(mission.targetDescription);
@@ -49,35 +129,148 @@ public actor ObservationGameEngine {
         """
 
         do {
-            let reply = try await aiRouter.askWhatAmISeeing(imageData: imageData, customQuestion: evaluationQuestion)
-            let isFound = reply.trimmingCharacters(in: .whitespacesAndNewlines).uppercased().hasPrefix("ΝΑΙ") ||
-                          reply.uppercased().contains("YES")
+            let reply = try await aiRouter.askWhatAmISeeing(
+                imageData: imageData,
+                customQuestion: evaluationQuestion
+            )
+            let verdict = Self.parseFailClosedVerdict(reply)
 
-            if isFound {
-                score += 10
+            switch verdict {
+            case .yes:
+                score += Self.pontosAIEpityxias
+                persistScore()
                 mission.isCompleted = true
                 mission.completedTimestamp = Date()
                 mission.evaluationFeedback = reply
-                self.currentMission = mission
-                return (success: true, feedback: reply)
-            } else {
+                currentMission = mission
+                let result = ObservationEvaluationResult(
+                    success: true,
+                    feedback: reply,
+                    source: .aiVision,
+                    awardedPoints: Self.pontosAIEpityxias
+                )
+                lastEvaluation = result
+                sessionState = .completed
+                return result
+
+            case .no:
                 mission.evaluationFeedback = reply
-                self.currentMission = mission
-                return (success: false, feedback: reply)
+                currentMission = mission
+                let result = ObservationEvaluationResult(
+                    success: false,
+                    feedback: reply,
+                    source: .aiVision,
+                    awardedPoints: 0
+                )
+                lastEvaluation = result
+                sessionState = .failed
+                return result
+
+            case .ambiguous:
+                // Fail-closed: χωρίς σαφές ΝΑΙ/ΟΧΙ → κανένας πόντος.
+                let msg = "Ασαφής απάντηση AI — δεν απονεμήθηκαν πόντοι. Απάντηση: \(reply)"
+                mission.evaluationFeedback = msg
+                currentMission = mission
+                let result = ObservationEvaluationResult(
+                    success: false,
+                    feedback: msg,
+                    source: .aiVision,
+                    awardedPoints: 0
+                )
+                lastEvaluation = result
+                sessionState = .failed
+                return result
             }
         } catch {
-            // Manual fallback αν το AI δεν είναι διαθέσιμο
-            let fallbackFeedback = "Το AI δεν ήταν προσβάσιμο. Μπορείτε να επιβεβαιώσετε χειροκίνητα αν βρήκατε: \(mission.targetDescription)."
-            return (success: false, feedback: fallbackFeedback)
+            let fallbackFeedback = """
+            Το Vision AI δεν ήταν διαθέσιμο (\(error.localizedDescription)). \
+            Χρησιμοποίησε χειροκίνητη επιβεβαίωση — δεν είναι αξιολόγηση AI. Δεν απονεμήθηκαν πόντοι από AI.
+            """
+            let result = ObservationEvaluationResult(
+                success: false,
+                feedback: fallbackFeedback,
+                source: .unavailable,
+                awardedPoints: 0
+            )
+            lastEvaluation = result
+            sessionState = .failed
+            return result
         }
     }
 
-    public func confirmManually() {
-        guard var mission = currentMission else { return }
-        score += 5
+    /// Χειροκίνητη επιβεβαίωση χρήστη — ρητά ΟΧΙ AI αξιολόγηση (A14 honesty).
+    @discardableResult
+    public func confirmManually() -> ObservationEvaluationResult {
+        guard var mission = currentMission, !mission.isCompleted else {
+            let result = ObservationEvaluationResult(
+                success: false,
+                feedback: "Δεν υπάρχει ενεργή αποστολή για χειροκίνητη επιβεβαίωση.",
+                source: .manual,
+                awardedPoints: 0
+            )
+            lastEvaluation = result
+            return result
+        }
+
+        score += Self.pontosXeirokinitis
+        persistScore()
         mission.isCompleted = true
         mission.completedTimestamp = Date()
-        mission.evaluationFeedback = "Χειροκίνητη επιβεβαίωση από τον χρήστη."
-        self.currentMission = mission
+        mission.evaluationFeedback = "Χειροκίνητη επιβεβαίωση χρήστη (όχι AI)."
+        currentMission = mission
+
+        let result = ObservationEvaluationResult(
+            success: true,
+            feedback: mission.evaluationFeedback ?? "",
+            source: .manual,
+            awardedPoints: Self.pontosXeirokinitis
+        )
+        lastEvaluation = result
+        sessionState = .completed
+        return result
     }
+
+    /// Fail-closed parser: μόνο ρητό ΝΑΙ/YES ή ΟΧΙ/NO στην πρώτη γραμμή.
+    public static func parseFailClosedVerdict(_ reply: String) -> ObservationVerdict {
+        let firstLine = reply
+            .split(whereSeparator: \.isNewline)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            ?? ""
+        let normalized = firstLine
+            .uppercased()
+            .replacingOccurrences(of: ".", with: "")
+            .replacingOccurrences(of: "!", with: "")
+            .replacingOccurrences(of: ";", with: "")
+            .replacingOccurrences(of: "?", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let yesTokens: Set<String> = ["ΝΑΙ", "NAI", "YES", "ΝΑΙ,", "YES,"]
+        let noTokens: Set<String> = ["ΟΧΙ", "OXI", "NO", "ΟΧΙ,", "NO,"]
+
+        if yesTokens.contains(normalized) { return .yes }
+        if noTokens.contains(normalized) { return .no }
+
+        // Επιτρέπουμε "ΝΑΙ — ..." / "YES - ..." μόνο αν ξεκινά με token + διαχωριστικό.
+        let yesPrefixes = ["ΝΑΙ ", "ΝΑΙ-", "ΝΑΙ—", "ΝΑΙ:", "YES ", "YES-", "YES:", "NAI "]
+        let noPrefixes = ["ΟΧΙ ", "ΟΧΙ-", "ΟΧΙ—", "ΟΧΙ:", "NO ", "NO-", "NO:", "OXI "]
+        for p in yesPrefixes where normalized.hasPrefix(p) || firstLine.uppercased().hasPrefix(p) {
+            return .yes
+        }
+        for p in noPrefixes where normalized.hasPrefix(p) || firstLine.uppercased().hasPrefix(p) {
+            return .no
+        }
+        return .ambiguous
+    }
+
+    private func persistScore() {
+        UserDefaults.standard.set(score, forKey: Self.scoreDefaultsKey)
+    }
+}
+
+/// Ρητό verdict για fail-closed scoring.
+public enum ObservationVerdict: Sendable, Equatable {
+    case yes
+    case no
+    case ambiguous
 }

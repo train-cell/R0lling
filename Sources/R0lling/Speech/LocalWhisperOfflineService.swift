@@ -1,7 +1,8 @@
 import Foundation
 
-/// Stub τοπικής απομαγνητοφώνησης (χωρίς bundled Whisper weights).
-/// Δεν παρουσιάζεται ως πραγματικό Whisper/ANE μέχρι να υπάρχει πραγματικό model asset.
+/// Stub τοπικής απομαγνητοφώνησης — **REMOVED από product surface**.
+/// `FeatureReadinessRegistry.whisperStub.ready == false`.
+/// Χωρίς bundled Whisper/GGML weights. Offline speech = `SpeechTranscriptionService` (Apple Speech).
 public actor LocalWhisperOfflineService {
 
     public enum ModelQuantization: String, Sendable {
@@ -38,26 +39,28 @@ public actor LocalWhisperOfflineService {
 
     public enum WhisperStubError: Error, LocalizedError, Sendable {
         case modelWeightsNotBundled(String)
+        case featureDisabled
 
         public var errorDescription: String? {
             switch self {
             case .modelWeightsNotBundled(let name):
-                return "Local Whisper μη διαθέσιμο: δεν υπάρχει bundled model (\(name)). Χρησιμοποίησε iOS Speech."
+                return "Whisper stub απενεργοποιημένο: δεν υπάρχει bundled model (\(name)). Χρησιμοποίησε SpeechTranscriptionService."
+            case .featureDisabled:
+                return "Whisper stub: FeatureReadinessRegistry.whisperStub.ready == false."
             }
         }
     }
 
     private var requestedModel: ModelQuantization = .q4_0
-    /// Πάντα false μέχρι να υπάρχει πραγματικό asset στο bundle.
     private var hasRealModelWeights: Bool = false
 
     public init() {}
 
-    /// Δηλώνει ποιο quantization θα φορτωνόταν — fail-closed χωρίς πραγματικά weights.
+    /// Πάντα fail-closed — feature disabled + χωρίς weights.
     public func loadModel(quantization: ModelQuantization = .q4_0) async throws {
         self.requestedModel = quantization
         self.hasRealModelWeights = false
-        throw WhisperStubError.modelWeightsNotBundled(quantization.rawValue)
+        throw WhisperStubError.featureDisabled
     }
 
     /// Δεν εφευρίσκει κείμενο. Stub → άδειο transcript + `isStubUnavailable`.
@@ -76,8 +79,8 @@ public actor LocalWhisperOfflineService {
         )
     }
 
-    /// Έτοιμο μόνο με πραγματικά model weights (προς το παρόν πάντα false).
+    /// Πάντα false — χωρίς model asset και ready=false.
     public func isReady() -> Bool {
-        return hasRealModelWeights
+        return false
     }
 }

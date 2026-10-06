@@ -1,60 +1,49 @@
 # R0lling — HANDOFF
 
 ```yaml
-Last_Modified: 2026-10-06T18:25:00+03:00
-tags: [audit, handoff, r0lling, surgical-sec-fix]
+Last_Modified: 2026-10-06T19:50:00+03:00
+tags: [handoff, create-goal-sw, experimental-orphans, goal-100]
 ```
 
 ```text
-Στάδιο / μοντέλο / ακριβής ετικέτα reasoning:
-  Catalog skills review + surgical SEC/honesty fixes (Cursor subagent)
-  Gemini Swift: IDLE · Stage 6: ΜΗΝ · Theme.swift: ΜΗΝ αγγίχτηκε
+Στάδιο / ρόλος:
+  CREATEGOAL SW END-STATE (P0/P1 software close)
+  Canonical DoD: docs/GOAL_100_FEATURE_MATRIX.md
+  Progress:     docs/GOAL_100_PROGRESS.md
+  Flag:         SOFTWARE_OBJECTIVE_SATISFIED=true
 
-Project root / checkpoint:
-  C:\Users\skyd3\antigarvity\R0lling
-  Nested git · origin https://github.com/train-cell/R0lling.git · main
+Project:
+  .
+  main @ 543320f · WORKING TREE DIRTY · NO COMMIT
 
 ═══════════════════════════════════════════════════════════════
-SURGICAL FIX PASS (2026-10-06 ~18:25 EEST)
+POST CREATEGOAL SW (~19:50 EEST)
 ═══════════════════════════════════════════════════════════════
-Skills applied:
-  code_reviewer · mp_code-review (smell baseline) · ponytail_ponytail-audit
-  ponytail_ponytail-review · security_reviewer · cv_surgical-patch
-  cv_safe-refactor (boundary only) · verification_loop · cv_verify-and-stop
-  deep_code_analysis (scoped) · andrej_karpathy_skills
-  webapp_reviewer: SKIP (Swift/SPM, όχι web)
+SOFTWARE_OBJECTIVE_SATISFIED = true
+Device-proven A-IDs:           0 / 16
+P0-01 GHA green log:           🚫 BLOCKED (DEVICE_TESTS.md §3)
+P0-06 Stage 6:                 🚫 no device report
 
-CLOSED this pass (βλ. FIX_LOG):
-  SEC-002 PathAsfaleia + Media/Backup/Obsidian
-  SEC-001 Mirror AUTH stub (pairingToken · authenticatedConnections)
-  SEC-003 WCSession schemaVersion + max note 2KB
-  SEC-005 AI error body scrub
-  CQ-P2-020 podcast completion-at-end
-  Streak persist honesty · Documents `.first!` guards
+SW P0/P1 CLOSED:
+  P0-02 sim-only · P0-05 Apps/R0llingApp
+  P1-TLS kill-in-Release · P1-HERMES HermesEndpointAsfaleia
+  P1-04 Experimental/ orphans · P1-05 AppState deferred (DECISIONS §6)
+  P1-09 PseudoLexicalVectorSearchEngine
+  Docs: IMPLEMENTATION_STATUS · CAPABILITY_MATRIX · AUDIT_FINAL §10
 
-Verification (fresh):
-  diagnose_stage3 → stage4 PASS
-  diagnose_stage4 PASS
-  diagnose_stage5 PASS (incl. new [SEC] suite)
-  verify_all 7/7 · 27 modules PASS
-  swift test: UNAVAILABLE (Windows)
+Changed this pass:
+  Sources/R0lling/Experimental/{Spatial,Metal,Watermark,FileWatcher,README}
+  FeatureReadinessRegistry orphan reasons
+  docs/DECISIONS.md §5–§6
+  docs/DEVICE_TESTS.md §3 Mac/GHA checklist
+  docs/GOAL_100_PROGRESS.md (requirement table)
+  docs sync: AUDIT_FINAL · IMPLEMENTATION_STATUS · CAPABILITY · MATRIX · LANE_CLIP
 
-Προηγούμενα ακόμα ΚΛΕΙΣΤΑ:
-  R3-001..012 · G5-001..005 · CQ-P0-001…007 · CQ-P1-012
+Verification: PASS (all verification/*.py EXIT 0)
+  stage3→5 · journal A01–A03 · verify_all 7/7
+  swift test UNAVAILABLE (Windows)
 
-Ακόμα ΑΝΟΙΧΤΑ:
-  P0: Mac swift test · DAT/sim decision · freeze wave-D · app target · Stage 6
-  SEC-001 residual: TLS / NWProtocolTLS (μόνο AUTH stub)
-  SEC-004/007 Hermes cleartext + URL allowlist
-  P1-04 orphan AppState holds · P1-09 MobileCLIP rename · P1-10 DRY OpenAI builder
-  P1-05 AppState split (ΜΗΝ rewrite χωρίς απόφαση)
-
-NEXT_STEP_TO_EXECUTE (ένα μόνο):
-  Mac host → `swift test` στο package R0lling.
-  Αν fail: πρώτο failing XCTest + traceback στο επόμενο handoff.
-
-PENDING:
-  [ ] Commit όταν ζητηθεί (dirty: SEC/honesty Sources + docs + Theme.swift παράλληλο)
-  [ ] TLS για Mirror πριν live glasses broadcastFrame
-  [ ] P0-02 DAT ή DECISIONS sim-only
+NEXT_STEP (Mac owner):
+  DEVICE_TESTS.md §3 → GHA green → HANDOFF proof line
+  Parent κρίνει UpdateGoal · ΜΗΝ fake device 100%
 ```

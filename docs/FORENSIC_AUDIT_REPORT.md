@@ -8,7 +8,7 @@
 
 ## 🏛️ 1. Επανεξέταση Αρχικού Σχεδίου (Plan & Requirements)
 
-Με βάση το [R0lling-Project-Plan.md](file:///c:/Users/skyd3/.codex/.chatgpt-projects/g-p-6ac3f4632f388191b09477f82d69c31a/R0lling-Project-Plan.md) και το [R0lling-Model-Assignments.md](file:///c:/Users/skyd3/.codex/.chatgpt-projects/g-p-6ac3f4632f388191b09477f82d69c31a/R0lling-Model-Assignments.md):
+Με βάση το [R0lling-Project-Plan.md](docs/R0lling-Project-Plan.md) και το [R0lling-Model-Assignments.md](docs/R0lling-Model-Assignments.md):
 
 1. **Σκοπός Έργου:** Το `R0lling` είναι μια αυτόνομη, **local-first** εφαρμογή iPhone για ημερολόγιο, καταγραφή rolling video clips (5–10 δευτερόλεπτα) από Meta Glasses Gen 2, εξαγωγή σε Obsidian Vault, και διπλή διασύνδεση AI (Direct API + Hermes στο Home PC).
 2. **Απαρέγκλιτος Κανόνας (Section 0):**
@@ -62,7 +62,7 @@
 
 Κατόπιν ρητής εντολής του χρήστη, το `R0lling` **απομονώθηκε πλήρως** από τα υπόλοιπα projects:
 
-1. **Τοπικό Git Init:** Δημιουργήθηκε ανεξάρτητο git repository στο `c:\Users\skyd3\antigarvity\R0lling` με branch `main`.
+1. **Τοπικό Git Init:** Δημιουργήθηκε ανεξάρτητο git repository στο `.` με branch `main`.
 2. **.gitignore:** Προστέθηκε αυστηρό `.gitignore` για Xcode, Swift build artifacts, και Python caches.
 3. **GitHub Remote:** Δημιουργήθηκε νέο private repository στο GitHub:
    👉 **[https://github.com/train-cell/R0lling.git](https://github.com/train-cell/R0lling.git)**

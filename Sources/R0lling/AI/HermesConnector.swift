@@ -1,6 +1,7 @@
 import Foundation
 
-/// Connector για τον προσωπικό Hermes Agent στο Home PC (μέσω Τοπικού Δικτύου ή VPN)
+/// Connector για τον προσωπικό Hermes Agent στο Home PC (μέσω Τοπικού Δικτύου ή VPN).
+/// SEC-004/007: HTTPS ή allowlisted cleartext · R3-012 empty-token · SEC-005 status-only errors.
 public final class HermesConnector: AIConnectorProtocol, @unchecked Sendable {
     public let providerType: AIProviderType = .hermes
     private let baseURLString: String
@@ -15,93 +16,63 @@ public final class HermesConnector: AIConnectorProtocol, @unchecked Sendable {
         // R3-012: άδειο Hermes token → typed error πριν το network.
         let trimmedToken = authToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedToken.isEmpty else {
-            throw NSError(
-                domain: "R0lling.Hermes",
-                code: 7104,
-                userInfo: [NSLocalizedDescriptionKey: "Λείπει Hermes auth token. Αποθήκευσέ το στο Keychain από τις Ρυθμίσεις."]
+            throw AIErrorTaxonomy.makeError(
+                domain: AIErrorTaxonomy.hermesDomain,
+                code: AIErrorTaxonomy.hermesEmptyToken,
+                message: "Λείπει Hermes auth token. Αποθήκευσέ το στο Keychain από τις Ρυθμίσεις."
             )
         }
 
-        guard let endpointURL = URL(string: "\(baseURLString)/chat/completions") else {
-            throw NSError(domain: "R0lling.Hermes", code: 7101, userInfo: [NSLocalizedDescriptionKey: "Μη έγκυρη διεύθυνση URL για τον Hermes Agent στο Home PC."])
-        }
+        // SEC-004/007: επικύρωση endpoint πριν το network.
+        let baseURL = try HermesEndpointAsfaleia.epikyroseHermesBaseURL(baseURLString)
+        let endpointURL = try HermesEndpointAsfaleia.chatCompletionsURL(fromBaseURL: baseURL)
 
         try Task.checkCancellation()
 
-        var messages: [[String: Any]] = []
+        let messages = OpenAIChatRequestBuilder.buildMessages(
+            payload: payload,
+            defaultSystemPrompt: "Είσαι ο Hermes, ο προσωπικός AI Jarvis βοηθός του R0lling που εκτελείται στο Home PC. Απαντάς στα Ελληνικά με εξαιρετική ακρίβεια.",
+            memoryHeader: "Μνήμη & Σημειώσεις Agent:"
+        )
 
-        var sysContent = payload.systemPrompt ?? "Είσαι ο Hermes, ο προσωπικός AI Jarvis βοηθός του R0lling που εκτελείται στο Home PC. Απαντάς στα Ελληνικά με εξαιρετική ακρίβεια."
-        if let memory = payload.agentMemoryContext, !memory.isEmpty {
-            sysContent += "\n\nΜνήμη & Σημειώσεις Agent:\n\(memory)"
-        }
-        messages.append(["role": "system", "content": sysContent])
+        let body = try OpenAIChatRequestBuilder.buildRequestBody(
+            model: "hermes-agent",
+            messages: messages,
+            temperature: 0.6
+        )
 
-        for entry in payload.contextEntries.prefix(5) {
-            messages.append([
-                "role": "user",
-                "content": "[Εγγραφή \(entry.formattedTime)] \(entry.content)"
-            ])
-        }
-
-        if let b64 = payload.imageBase64, !b64.isEmpty {
-            let visionContent: [[String: Any]] = [
-                ["type": "text", "text": payload.prompt],
-                ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(b64)"]]
-            ]
-            messages.append(["role": "user", "content": visionContent])
-        } else {
-            messages.append(["role": "user", "content": payload.prompt])
-        }
-
-        let requestBody: [String: Any] = [
-            "model": "hermes-agent",
-            "messages": messages,
-            "temperature": 0.6
-        ]
-
-        var request = URLRequest(url: endpointURL)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(trimmedToken)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 20.0
-        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        let hostLabel = HermesEndpointAsfaleia.asfales_host_gia_log(baseURL)
+        let config = AIHTTPClient.RequestConfig(
+            url: endpointURL,
+            bearerToken: trimmedToken,
+            body: body,
+            timeout: AIHTTPClient.hermesTimeoutSeconds,
+            errorDomain: AIErrorTaxonomy.hermesDomain,
+            httpRejectedCode: AIErrorTaxonomy.hermesHTTPRejected,
+            transportCode: AIErrorTaxonomy.hermesTransport,
+            retryExhaustedCode: AIErrorTaxonomy.hermesRetryExhausted,
+            httpRejectedMessagePrefix: "Ο Hermes Agent απέρριψε την κλήση",
+            transportMessage: "Αδυναμία σύνδεσης με τον Hermes στο Home PC (\(hostLabel)). Βεβαιωθείτε ότι είστε στο οικιακό δίκτυο ή έχετε ενεργό VPN."
+        )
 
         do {
-            try Task.checkCancellation()
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-                // SEC-005: μην περνάς raw provider body στο UI (πιθανό echo secrets).
-                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-                throw NSError(
-                    domain: "R0lling.Hermes",
-                    code: 7102,
-                    userInfo: [NSLocalizedDescriptionKey: "Ο Hermes Agent απέρριψε την κλήση (HTTP \(status))."]
-                )
-            }
-
-            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-            let choices = json?["choices"] as? [[String: Any]]
-            let firstChoice = choices?.first?["message"] as? [String: Any]
-            let replyText = firstChoice?["content"] as? String ?? "Δεν ελήφθη απάντηση από τον Hermes."
-
-            let usage = json?["usage"] as? [String: Any]
-            let totalTokens = usage?["total_tokens"] as? Int
-
-            return AIResponseResult(reply: replyText, tokensUsed: totalTokens, referencedEntryIDs: payload.contextEntries.map { $0.id })
-        } catch let hermesError as NSError where hermesError.domain == "R0lling.Hermes" {
+            let data = try await AIHTTPClient.postJSON(config)
+            return try OpenAIChatRequestBuilder.parseChatCompletionResponse(
+                data: data,
+                fallbackReply: "Δεν ελήφθη απάντηση από τον Hermes.",
+                referencedEntryIDs: payload.contextEntries.map { $0.id }
+            )
+        } catch let hermesError as NSError where hermesError.domain == AIErrorTaxonomy.hermesDomain {
             // CQ-P0-003: μην καλύπτεις typed 7102/cancellation ως «αδυναμία σύνδεσης».
             throw hermesError
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            throw NSError(
-                domain: "R0lling.Hermes",
-                code: 7103,
-                userInfo: [
-                    NSLocalizedDescriptionKey: "Αδυναμία σύνδεσης με τον Hermes στο Home PC (\(baseURLString)). Βεβαιωθείτε ότι είστε στο οικιακό δίκτυο ή έχετε ενεργό VPN.",
-                    NSUnderlyingErrorKey: error
-                ]
+            throw AIErrorTaxonomy.makeError(
+                domain: AIErrorTaxonomy.hermesDomain,
+                code: AIErrorTaxonomy.hermesTransport,
+                message: "Αδυναμία σύνδεσης με τον Hermes στο Home PC (\(hostLabel)). Βεβαιωθείτε ότι είστε στο οικιακό δίκτυο ή έχετε ενεργό VPN.",
+                underlying: error
             )
         }
     }

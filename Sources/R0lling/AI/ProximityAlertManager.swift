@@ -1,6 +1,6 @@
 import Foundation
 
-/// Διαχειριστής προληπτικών ειδοποιήσεων Jarvis βάσει τοποθεσίας (Proximity Alerts)
+/// Proximity keyword alerts — **ready=false** (χωρίς location/vision feed · όχι AppState surface).
 public final class ProximityAlertManager: @unchecked Sendable {
     public struct ProximityAlert: Identifiable, Sendable {
         public let id: UUID

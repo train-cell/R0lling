@@ -17,13 +17,16 @@ let package = Package(
         )
     ],
     dependencies: [
-        // Meta Wearables DAT SDK will be added in Xcode or via SPM git repository:
+        // Meta Wearables DAT — ΔΕΝ vendor σε Windows.
+        // Mac flip: docs/LANE_CLIP_META.md βήμα 1 (uncomment + product dependency).
         // .package(url: "https://github.com/facebook/meta-wearables-dat-ios.git", from: "1.0.0")
     ],
     targets: [
         .target(
             name: "R0lling",
-            dependencies: [],
+            dependencies: [
+                // Mac: .product(name: "MetaWearablesDAT", package: "meta-wearables-dat-ios")
+            ],
             path: "Sources/R0lling",
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),

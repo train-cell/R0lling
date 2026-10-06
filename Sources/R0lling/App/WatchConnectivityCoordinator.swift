@@ -3,7 +3,8 @@ import Foundation
 import WatchConnectivity
 #endif
 
-/// Συντονιστής επικοινωνίας με το Apple Watch Companion App (WatchConnectivity WCSession)
+/// WCSession coordinator — **ready=false** χωρίς watchOS target (`FeatureReadinessRegistry.watchCompanion`).
+/// Latent handlers παραμένουν· UI/product claims απενεργοποιημένα.
 public final class WatchConnectivityCoordinator: NSObject, @unchecked Sendable {
     public static let shared = WatchConnectivityCoordinator()
 
@@ -11,6 +12,8 @@ public final class WatchConnectivityCoordinator: NSObject, @unchecked Sendable {
     public static let maxMikosNoteApoWatch = 2048
     /// SEC-003: επιτρεπόμενο schema version στα εισερχόμενα μηνύματα.
     public static let schemaVersionApaitoumenos = 1
+    /// SEC-003 harden: ρητή allowlist ενεργειών (όχι ανοιχτό switch).
+    public static let epitrepomenesEnergies: Set<String> = ["triggerClip", "saveNote"]
 
     public var onRemoteClipTriggerRequested: (@Sendable () -> Void)?
     public var onRemoteNoteReceived: (@Sendable (String) -> Void)?
@@ -60,8 +63,9 @@ extension WatchConnectivityCoordinator: WCSessionDelegate {
             replyHandler(["status": "error", "message": "unsupported or missing schemaVersion"])
             return
         }
-        guard let action = message["action"] as? String else {
-            replyHandler(["status": "error", "message": "missing action"])
+        guard let action = message["action"] as? String,
+              Self.epitrepomenesEnergies.contains(action) else {
+            replyHandler(["status": "error", "message": "missing or disallowed action"])
             return
         }
 
@@ -74,11 +78,20 @@ extension WatchConnectivityCoordinator: WCSessionDelegate {
                 replyHandler(["status": "error", "message": "missing text"])
                 return
             }
-            guard noteText.count <= Self.maxMikosNoteApoWatch else {
+            let trimmed = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                replyHandler(["status": "error", "message": "empty note"])
+                return
+            }
+            guard !trimmed.contains("\0") else {
+                replyHandler(["status": "error", "message": "invalid note characters"])
+                return
+            }
+            guard trimmed.count <= Self.maxMikosNoteApoWatch else {
                 replyHandler(["status": "error", "message": "note exceeds max length"])
                 return
             }
-            onRemoteNoteReceived?(noteText)
+            onRemoteNoteReceived?(trimmed)
             replyHandler(["status": "success", "message": "Note queued"])
         default:
             replyHandler(["status": "error", "message": "unknown action"])

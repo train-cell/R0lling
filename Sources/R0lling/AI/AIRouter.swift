@@ -1,6 +1,6 @@
 import Foundation
 
-/// Κεντρικός δρομολογητής AI (AIRouter) που διαχειρίζεται τα ερωτήματα και τη μνήμη
+/// Κεντρικός δρομολογητής AI (AIRouter) που διαχειρίζεται τα ερωτήματα και τη μνήμη.
 public actor AIRouter {
     private var settings: AISettings
     private var directConnector: DirectAPIConnector?
@@ -35,12 +35,20 @@ public actor AIRouter {
         switch settings.activeProvider {
         case .directAPI:
             guard let connector = directConnector else {
-                throw NSError(domain: "R0lling.AI", code: 7201, userInfo: [NSLocalizedDescriptionKey: "Ο Direct AI Connector δεν είναι αρχικοποιημένος."])
+                throw AIErrorTaxonomy.makeError(
+                    domain: AIErrorTaxonomy.directDomain,
+                    code: AIErrorTaxonomy.routerDirectMissing,
+                    message: "Ο Direct AI Connector δεν είναι αρχικοποιημένος."
+                )
             }
             return connector
         case .hermes:
             guard let connector = hermesConnector else {
-                throw NSError(domain: "R0lling.AI", code: 7202, userInfo: [NSLocalizedDescriptionKey: "Ο Hermes Connector δεν είναι αρχικοποιημένος."])
+                throw AIErrorTaxonomy.makeError(
+                    domain: AIErrorTaxonomy.directDomain,
+                    code: AIErrorTaxonomy.routerHermesMissing,
+                    message: "Ο Hermes Connector δεν είναι αρχικοποιημένος."
+                )
             }
             return connector
         }
@@ -51,8 +59,9 @@ public actor AIRouter {
         contextEntries: [JournalEntry],
         agentMemory: AgentMemory?
     ) async throws -> AIResponseResult {
+        try Task.checkCancellation()
         let connector = try activeConnector()
-        let memoryText = agentMemory.map { "\($0.memoryNotes)\n\($0.userPreferences)\n\($0.openLoops)" }
+        let memoryText = Self.formatAgentMemory(agentMemory)
         let payload = AIRequestPayload(
             prompt: prompt,
             contextEntries: contextEntries,
@@ -62,31 +71,48 @@ public actor AIRouter {
     }
 
     public func askWhatAmISeeing(imageData: Data, customQuestion: String?) async throws -> String {
+        try Task.checkCancellation()
         let connector = try activeConnector()
         return try await connector.describeImage(imageData: imageData, question: customQuestion)
     }
 
-    /// Πολυ-καδρική σύνθεση (Multi-Frame Keyframe Synthesis) για περιγραφή κίνησης και σκηνής
+    /// Πολυ-καδρική σύνθεση (A11) — connector δέχεται `imageBase64Frames`.
+    /// `FeatureReadinessRegistry.multiFrameVision.ready == false` μέχρι AppState να τραβάει πραγματικά buffer keyframes.
     public func askWhatAmISeeingMultiFrames(frames: [Data], customQuestion: String?) async throws -> String {
-        guard let first = frames.first else {
-            throw NSError(domain: "R0lling.AI", code: 7203, userInfo: [NSLocalizedDescriptionKey: "Δεν δόθηκαν καρέ για πολυ-καδρική ανάλυση."])
+        try Task.checkCancellation()
+        guard !frames.isEmpty else {
+            throw AIErrorTaxonomy.makeError(
+                domain: AIErrorTaxonomy.directDomain,
+                code: AIErrorTaxonomy.routerNoVisionFrames,
+                message: "Δεν δόθηκαν καρέ για πολυ-καδρική ανάλυση."
+            )
         }
         let connector = try activeConnector()
-        let prompt = (customQuestion ?? "Περιέγραψε τι συμβαίνει σε αυτή τη χρονική σειρά καρέ από τα Meta Glasses μου.") + " (Ανάλυση \(frames.count) διαδοχικών στιγμιοτύπων)."
-        return try await connector.describeImage(imageData: first, question: prompt)
+        let limited = Array(frames.prefix(OpenAIChatRequestBuilder.maxVisionFrames))
+        let b64Frames = limited.map { $0.base64EncodedString() }
+        let prompt = (customQuestion ?? "Περιέγραψε τι συμβαίνει σε αυτή τη χρονική σειρά καρέ από τα Meta Glasses μου.")
+            + " (Ανάλυση \(limited.count) διαδοχικών στιγμιοτύπων)."
+        let payload = AIRequestPayload(
+            prompt: prompt,
+            imageBase64: b64Frames.first,
+            imageBase64Frames: b64Frames
+        )
+        let result = try await connector.generateReply(payload: payload)
+        return result.reply
     }
 
     public func summarizeDay(entries: [JournalEntry]) async throws -> String {
+        try Task.checkCancellation()
         let connector = try activeConnector()
         return try await connector.summarizeDay(entries: entries)
     }
 
-    /// Ανάκληση αναμνήσεων (π.χ. "τι ήθελα να πω στους αγαπημένους μου;")
+    /// Ανάκληση αναμνήσεων (A12) — local keyword recall + AI σύνθεση.
     public func recallMemories(query: String, allEntries: [JournalEntry]) async throws -> (reply: String, matchingEntries: [JournalEntry]) {
+        try Task.checkCancellation()
         let cleanQuery = query.lowercased()
         let keywords = cleanQuery.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { $0.count > 2 }
 
-        // Εντοπισμός σχετικών καταχωρίσεων βάσει λέξεων-κλειδιών
         let scored = allEntries.map { entry -> (entry: JournalEntry, score: Int) in
             var score = 0
             let lowerContent = entry.content.lowercased()
@@ -122,5 +148,36 @@ public actor AIRouter {
     public func storeSecret(value: String, forKey key: String) throws {
         try KeychainSecretStore.store(value: value, forKey: key)
         updateConnectors()
+    }
+
+    /// Επικυρώνει Hermes URL πριν αποθήκευση ρυθμίσεων (fail-closed UI).
+    public func validateHermesURL(_ raw: String) throws {
+        _ = try HermesEndpointAsfaleia.epikyroseHermesBaseURL(raw)
+    }
+
+    /// Επικυρώνει Direct HTTPS URL πριν αποθήκευση ρυθμίσεων.
+    public func validateDirectURL(_ raw: String) throws {
+        _ = try HermesEndpointAsfaleia.epikyroseDirectBaseURL(raw)
+    }
+
+    // MARK: - Agent memory honesty (CQ-P0-001)
+
+    /// Μορφοποιεί πραγματική Agent memory· αγνοεί άδεια markdown headings (χωρίς fake persona).
+    internal static func formatAgentMemory(_ memory: AgentMemory?) -> String? {
+        guard let memory else { return nil }
+        let parts = [memory.memoryNotes, memory.userPreferences, memory.openLoops]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && !isEmptyMarkdownTemplate($0) }
+        guard !parts.isEmpty else { return nil }
+        return parts.joined(separator: "\n\n")
+    }
+
+    private static func isEmptyMarkdownTemplate(_ text: String) -> Bool {
+        let lines = text.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        guard !lines.isEmpty else { return true }
+        // Μόνο headings (# ...) χωρίς περιεχόμενο → δεν στέλνουμε στο LLM.
+        return lines.allSatisfy { $0.hasPrefix("#") }
     }
 }

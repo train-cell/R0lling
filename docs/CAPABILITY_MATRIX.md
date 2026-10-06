@@ -39,8 +39,10 @@
 
 ## Stage 4–5 note (2026-10-06)
 
-Μην βασίζεσαι σε παλιές δηλώσεις «100% Υλοποιημένο» για hardware paths. Βλέπε `IMPLEMENTATION_STATUS.md` και `FIX_LOG.md`.  
-Gemini super-features: earcons / Time Capsule / Watch hooks = partial wiring· acoustic + head-nod **disabled** until mic/IMU feed (CQ-P0-007)· όχι Gen 2 proof.
+Μην βασίζεσαι σε παλιές δηλώσεις «100% Υλοποιημένο» για hardware paths. Βλέπε `IMPLEMENTATION_STATUS.md`, `AUDIT_FINAL.md`, `GOAL_100_PROGRESS.md`.  
+Gemini super-features: READY via `FeatureReadinessRegistry` · orphans σε `Sources/R0lling/Experimental/` · acoustic/head-nod **ready=false** · Mirror TLS kill-in-Release · **όχι** Gen 2 proof (0/16 device).  
+v1 Meta: **simulation-only** (`DECISIONS.md` §2). App shell: `Apps/R0llingApp/`. Mac/`swift test`: checklist `DEVICE_TESTS.md` §3.
+
 
 ## 3. Lifecycle Πολιτική (State Transitions)
 

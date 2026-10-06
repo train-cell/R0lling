@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 /// Οθόνη προσωπικού AI βοηθού (Assistant & Jarvis Hub)
 public struct AssistantView: View {
@@ -79,28 +80,62 @@ public struct AssistantView: View {
     private var quickActionsBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                Button(action: {
-                    Task {
-                        await appState.executeWhatAmISeeing()
+                    Button(action: {
+                        Task {
+                            await appState.executeWhatAmISeeing()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "eye.fill")
+                            Text("Τι βλέπω;")
+                        }
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(R0llingTheme.stravaButtonGradient)
+                        .clipShape(Capsule())
+                        .shadow(color: R0llingTheme.stravaOrange.opacity(0.3), radius: 6, x: 0, y: 2)
                     }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "eye.fill")
-                        Text("Τι βλέπω;")
-                    }
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(R0llingTheme.stravaButtonGradient)
-                    .clipShape(Capsule())
-                    .shadow(color: R0llingTheme.stravaOrange.opacity(0.3), radius: 6, x: 0, y: 2)
-                }
 
-                Button(action: {
-                    Task {
-                        do {
-                            let s = try await appState.aiRouter.summarizeDay(entries: appState.todayEntries)
+                    Button(action: {
+                        Task {
+                            await appState.executeRecall(query: inputPrompt.isEmpty ? "τι ήθελα να θυμηθώ;" : inputPrompt)
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(R0llingTheme.bevelCyan)
+                            Text("Ανάκληση")
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(R0llingTheme.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(R0llingTheme.bgElevated)
+                        .clipShape(Capsule())
+                    }
+
+                    Button(action: {
+                        appState.cancelActiveAIRequest()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark.circle")
+                                .foregroundColor(R0llingTheme.stravaFlame)
+                            Text("Άκυρο")
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(R0llingTheme.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(R0llingTheme.bgElevated)
+                        .clipShape(Capsule())
+                    }
+
+                    Button(action: {
+                        Task {
+                            do {
+                                let s = try await appState.aiRouter.summarizeDay(entries: appState.todayEntries)
                             appState.chatMessages.append((
                                 id: UUID(),
                                 isUser: false,
@@ -202,19 +237,22 @@ public struct AssistantView: View {
                     .clipShape(Capsule())
                 }
 
-                Button(action: {
-                    appState.toggleMirrorStreaming()
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: appState.isMirrorStreaming ? "airplayvideo.fill" : "airplayvideo")
-                        Text(appState.isMirrorStreaming ? "🪞 On (\(appState.activeMirrorClientsCount))" : "🪞 Mirror")
+                // Mirror: FeatureReadinessRegistry.mirror.ready == false (TLS + frame pipeline)
+                if FeatureReadinessRegistry.mirror.ready {
+                    Button(action: {
+                        appState.toggleMirrorStreaming()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: appState.isMirrorStreaming ? "airplayvideo.fill" : "airplayvideo")
+                            Text(appState.isMirrorStreaming ? "🪞 On (\(appState.activeMirrorClientsCount))" : "🪞 Mirror")
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(appState.isMirrorStreaming ? R0llingTheme.bevelEmerald : R0llingTheme.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(R0llingTheme.bgElevated)
+                        .clipShape(Capsule())
                     }
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(appState.isMirrorStreaming ? R0llingTheme.bevelEmerald : R0llingTheme.textPrimary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(R0llingTheme.bgElevated)
-                    .clipShape(Capsule())
                 }
 
                 Button(action: { isShowingGameSheet = true }) {
@@ -366,6 +404,8 @@ public struct AgentMemorySheet: View {
 public struct ObservationGameSheet: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var isEvaluating: Bool = false
 
     public var body: some View {
         NavigationView {
@@ -379,6 +419,14 @@ public struct ObservationGameSheet: View {
                     Label("\(appState.gameScore) πόντοι", systemImage: "star.fill")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(R0llingTheme.accentLavender)
+
+                    Text(sessionStateLabel)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(R0llingTheme.textSecondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(R0llingTheme.bgElevated)
+                        .clipShape(Capsule())
                 }
 
                 if !appState.scavengerBadges.isEmpty {
@@ -411,26 +459,46 @@ public struct ObservationGameSheet: View {
                             .foregroundColor(R0llingTheme.textPrimary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
+
+                        if mission.isCompleted {
+                            Text("Ολοκληρώθηκε")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(R0llingTheme.bevelEmerald)
+                        }
                     }
                     .r0llingCard()
+                } else {
+                    Text("Καμία ενεργή αποστολή — πάτησε «Επόμενη Αποστολή».")
+                        .font(.system(size: 14))
+                        .foregroundColor(R0llingTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+
+                if let evaluation = appState.lastGameEvaluation {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(evaluationHonestyLabel(evaluation))
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(R0llingTheme.accentLavender)
+                        Text(evaluation.feedback)
+                            .font(.system(size: 13))
+                            .foregroundColor(R0llingTheme.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(R0llingTheme.bgElevated)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                if isEvaluating {
+                    ProgressView("Αξιολόγηση Vision AI…")
+                        .tint(R0llingTheme.accentLavender)
                 }
 
                 Spacer()
 
-                // Action buttons
                 VStack(spacing: 12) {
                     Button(action: {
-                        Task {
-                            // G5-002: streak μόνο σε επιτυχή αξιολόγηση — όχι σε fail/error.
-                            let epityxia = await appState.evaluateGameCapture()
-                            guard epityxia else { return }
-                            let apotelesma = appState.streakManager.recordMissionCompleted()
-                            appState.scavengerStreak = appState.streakManager.currentStreak
-                            appState.scavengerBadges = appState.streakManager.badges
-                            if !apotelesma.didPersist {
-                                appState.showToast("Το streak ενημερώθηκε στη μνήμη αλλά απέτυχε η αποθήκευση.")
-                            }
-                        }
+                        Task { await trexeAxiologisiGyalion() }
                     }) {
                         HStack {
                             Image(systemName: "camera.fill")
@@ -440,27 +508,50 @@ public struct ObservationGameSheet: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(R0llingTheme.accentPurple)
+                        .background(isEvaluating ? R0llingTheme.bgElevated : R0llingTheme.accentPurple)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .disabled(isEvaluating || appState.currentMission?.isCompleted == true)
+
+                    // A14 fallback χωρίς γυαλιά: Photos picker → ίδια fail-closed αξιολόγηση.
+                    PhotosPicker(
+                        selection: $selectedPhotoItem,
+                        matching: .images,
+                        photoLibrary: .shared()
+                    ) {
+                        HStack {
+                            Image(systemName: "photo.on.rectangle")
+                            Text("Επιλογή Φωτογραφίας (χωρίς γυαλιά)")
+                        }
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(R0llingTheme.textPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(R0llingTheme.bgElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .disabled(isEvaluating || appState.currentMission?.isCompleted == true)
+                    .onChange(of: selectedPhotoItem) { _, newItem in
+                        guard let newItem else { return }
+                        Task { await trexeAxiologisiPicker(newItem) }
                     }
 
                     Button(action: {
                         Task {
-                            await appState.gameEngine.confirmManually()
-                            appState.gameScore = await appState.gameEngine.getScore()
-                            let apotelesma = appState.streakManager.recordMissionCompleted()
-                            appState.scavengerStreak = appState.streakManager.currentStreak
-                            appState.scavengerBadges = appState.streakManager.badges
-                            if !apotelesma.didPersist {
-                                appState.showToast("Το streak ενημερώθηκε στη μνήμη αλλά απέτυχε η αποθήκευση.")
-                            }
-                            await appState.playNextMission()
+                            guard !isEvaluating else { return }
+                            isEvaluating = true
+                            defer { isEvaluating = false }
+                            // G5-002: streak μόνο σε επιτυχία — manual ρητά όχι AI.
+                            let epityxia = await appState.confirmGameManually()
+                            guard epityxia else { return }
+                            _ = appState.recordGameStreakAfterSuccess()
                         }
                     }) {
                         Text("Χειροκίνητη Επιβεβαίωση (Χωρίς AI)")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(R0llingTheme.textSecondary)
                     }
+                    .disabled(isEvaluating)
 
                     Button(action: {
                         Task {
@@ -471,6 +562,7 @@ public struct ObservationGameSheet: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(R0llingTheme.accentLavender)
                     }
+                    .disabled(isEvaluating)
                 }
                 .padding(.horizontal)
             }
@@ -478,6 +570,57 @@ public struct ObservationGameSheet: View {
             .background(R0llingTheme.bgPrimary.ignoresSafeArea())
             .navigationTitle("Παιχνίδι Παρατήρησης")
             .navigationBarItems(trailing: Button("Κλείσιμο") { dismiss() })
+        }
+    }
+
+    private var sessionStateLabel: String {
+        switch appState.gameSessionState {
+        case .idle: return "Idle"
+        case .active: return "Active"
+        case .evaluating: return "Evaluating"
+        case .completed: return "Completed"
+        case .failed: return "Failed"
+        }
+    }
+
+    private func evaluationHonestyLabel(_ evaluation: ObservationEvaluationResult) -> String {
+        switch evaluation.source {
+        case .aiVision:
+            return evaluation.success ? "Αξιολόγηση AI · +\(evaluation.awardedPoints)" : "Αξιολόγηση AI · αποτυχία"
+        case .manual:
+            return "Χειροκίνητη (όχι AI) · +\(evaluation.awardedPoints)"
+        case .unavailable:
+            return "AI μη διαθέσιμο · 0 πόντοι (fail-closed)"
+        }
+    }
+
+    private func trexeAxiologisiGyalion() async {
+        guard !isEvaluating else { return }
+        isEvaluating = true
+        defer { isEvaluating = false }
+        // G5-002: streak μόνο σε επιτυχή αξιολόγηση — όχι σε fail/error.
+        let epityxia = await appState.evaluateGameCapture()
+        guard epityxia else { return }
+        _ = appState.recordGameStreakAfterSuccess()
+    }
+
+    private func trexeAxiologisiPicker(_ item: PhotosPickerItem) async {
+        guard !isEvaluating else { return }
+        isEvaluating = true
+        defer {
+            isEvaluating = false
+            selectedPhotoItem = nil
+        }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self), !data.isEmpty else {
+                appState.showToast("Αδυναμία φόρτωσης φωτογραφίας.")
+                return
+            }
+            let epityxia = await appState.evaluateGameCapture(imageData: data)
+            guard epityxia else { return }
+            _ = appState.recordGameStreakAfterSuccess()
+        } catch {
+            appState.showToast("Σφάλμα φωτογραφίας: \(error.localizedDescription)")
         }
     }
 }

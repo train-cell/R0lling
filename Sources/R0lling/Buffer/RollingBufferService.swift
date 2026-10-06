@@ -3,10 +3,16 @@ import CoreMedia
 
 /// Υλοποίηση του Κυκλικού Buffer 5–10 δευτερολέπτων με Keyframe Alignment και ασφαλές Concurrency.
 /// R3-002: Δεν παράγει πλέον ψευδο-MP4 (ftyp+mdat χωρίς moov). Εξάγει playable MP4 μέσω AVAssetWriter.
+/// A05: Remux πραγματικού Annex-B όταν υπάρχουν SPS/PPS· αλλιώς Stage-4 playable placeholder.
+/// A06: Warm-up (μικρότερη πραγματική διάρκεια) · disconnect = νέα generation χωρίς ένωση κενών.
+/// A07: pause/resume χωρίς ψευδή continuous background.
 public actor RollingBufferService: RollingBufferServiceProtocol {
     private var samples: [BufferedSample] = []
     private var isBufferingActive: Bool = false
+    private var isPaused: Bool = false
+    private var isExporting: Bool = false
     private var targetDurationSeconds: Double = 10.0
+    private var currentStreamGeneration: UInt64 = 0
     private let mediaStorage: MediaStorageProtocol
     private let maxMemoryLimitBytes: Int = 25 * 1024 * 1024 // 25 MB
 
@@ -14,7 +20,17 @@ public actor RollingBufferService: RollingBufferServiceProtocol {
         self.mediaStorage = mediaStorage
     }
 
+    public var streamGeneration: UInt64 {
+        currentStreamGeneration
+    }
+
     public var currentState: BufferState {
+        if isExporting {
+            return .exporting(progress: 0.5)
+        }
+        if isPaused {
+            return .paused
+        }
         if !isBufferingActive {
             return .idle
         }
@@ -31,20 +47,80 @@ public actor RollingBufferService: RollingBufferServiceProtocol {
     public func startBuffering(targetSeconds: Double) {
         self.targetDurationSeconds = max(3.0, min(15.0, targetSeconds))
         self.isBufferingActive = true
+        self.isPaused = false
+        // Νέα ροή = νέα generation (A06: μην ενώσεις κενά με προηγούμενο session).
+        self.currentStreamGeneration &+= 1
+        self.samples.removeAll(keepingCapacity: true)
     }
 
     public func stopBuffering() {
         self.isBufferingActive = false
+        self.isPaused = false
+    }
+
+    public func pauseBuffering() {
+        guard isBufferingActive else { return }
+        self.isPaused = true
+    }
+
+    public func resumeBuffering() {
+        guard isBufferingActive else { return }
+        self.isPaused = false
+    }
+
+    public func markStreamInterrupted(reason: String) {
+        _ = reason
+        self.isBufferingActive = false
+        self.isPaused = false
+        self.samples.removeAll(keepingCapacity: true)
+        self.currentStreamGeneration &+= 1
     }
 
     public func clearBuffer() {
         self.samples.removeAll(keepingCapacity: true)
     }
 
-    public func appendSample(sample: BufferedSample) {
-        guard isBufferingActive else { return }
+    /// A11: ομοιόμορφα κατανεμημένα video keyframes από το rolling window (JPEG/sim data).
+    /// Κενό αν δεν υπάρχει buffer — το AppState πέφτει σε `capturePhoto`.
+    public func snapshotVisionKeyframes(
+        maxCount: Int = OpenAIChatRequestBuilder.maxVisionFrames,
+        windowSeconds: Double = 5.0
+    ) -> [Data] {
+        let limit = max(1, min(maxCount, OpenAIChatRequestBuilder.maxVisionFrames))
+        guard let latest = samples.last else { return [] }
 
-        samples.append(sample)
+        let cutoff = latest.timestampSeconds - max(1.0, windowSeconds)
+        let videoKeyframes = samples.filter {
+            !$0.isAudio && $0.isKeyframe && $0.timestampSeconds >= cutoff && !$0.data.isEmpty
+        }
+        guard !videoKeyframes.isEmpty else { return [] }
+
+        if videoKeyframes.count <= limit {
+            return videoKeyframes.map(\.data)
+        }
+
+        var selected: [Data] = []
+        for i in 0..<limit {
+            let idx = Int(Double(i) * Double(videoKeyframes.count - 1) / Double(limit - 1))
+            selected.append(videoKeyframes[idx].data)
+        }
+        return selected
+    }
+
+    public func appendSample(sample: BufferedSample) {
+        guard isBufferingActive, !isPaused else { return }
+        // Αγνόησε samples από παλιό stream generation (A06 gap safety).
+        let gen = sample.streamGeneration == 0 ? currentStreamGeneration : sample.streamGeneration
+        guard gen == currentStreamGeneration else { return }
+
+        let tagged = BufferedSample(
+            timestampSeconds: sample.timestampSeconds,
+            isKeyframe: sample.isKeyframe,
+            isAudio: sample.isAudio,
+            data: sample.data,
+            streamGeneration: currentStreamGeneration
+        )
+        samples.append(tagged)
         trimOldSamples()
     }
 
@@ -53,17 +129,14 @@ public actor RollingBufferService: RollingBufferServiceProtocol {
         guard let latest = samples.last else { return }
         let cutoffTime = latest.timestampSeconds - (targetDurationSeconds + 1.0) // 1.0s safety headroom
 
-        // Βρίσκουμε το παλαιότερο δείγμα που πρέπει να κρατηθεί, προτιμώντας keyframe
         if let firstValidIndex = samples.firstIndex(where: { $0.timestampSeconds >= cutoffTime && $0.isKeyframe }) {
             if firstValidIndex > 0 {
                 samples.removeSubrange(0..<firstValidIndex)
             }
         } else {
-            // Αν δεν υπάρχει keyframe στο όριο, αφαιρούμε αυστηρά ό,τι είναι πριν το cutoff
             samples.removeAll(where: { $0.timestampSeconds < cutoffTime })
         }
 
-        // Έλεγχος συνολικού μεγέθους μνήμης
         var totalBytes = samples.reduce(0) { $0 + $1.data.count }
         while totalBytes > maxMemoryLimitBytes && samples.count > 10 {
             let removed = samples.removeFirst()
@@ -71,8 +144,15 @@ public actor RollingBufferService: RollingBufferServiceProtocol {
         }
     }
 
-    /// Εξαγωγή του κυλιόμενου clip ως playable MP4.
+    /// Εξαγωγή του κυλιόμενου clip ως playable MP4 (A05 + A06 warm-up).
     public func triggerClip(requestedSeconds: Double) async throws -> ClipExportResult {
+        guard !isExporting else {
+            throw NSError(
+                domain: "R0lling.Buffer",
+                code: 3012,
+                userInfo: [NSLocalizedDescriptionKey: "Εξαγωγή clip ήδη σε εξέλιξη — δοκίμασε ξανά σε λίγο."]
+            )
+        }
         guard !samples.isEmpty else {
             throw NSError(
                 domain: "R0lling.Buffer",
@@ -81,22 +161,27 @@ public actor RollingBufferService: RollingBufferServiceProtocol {
             )
         }
 
+        isExporting = true
+        defer { isExporting = false }
+
         let latestTimestamp = samples.last!.timestampSeconds
         let targetDuration = min(requestedSeconds, targetDurationSeconds)
         let requestedStartTime = latestTimestamp - targetDuration
+        let exportGeneration = currentStreamGeneration
 
-        // 1. Keyframe Alignment: Εύρεση του πρώτου Video Keyframe <= requestedStartTime ή του πλησιέστερου
+        // 1. Keyframe Alignment
         let videoKeyframes = samples.filter { !$0.isAudio && $0.isKeyframe }
         let sliceStartTime: Double
         if let matchedKeyframe = videoKeyframes.last(where: { $0.timestampSeconds <= requestedStartTime }) {
             sliceStartTime = matchedKeyframe.timestampSeconds
         } else if let firstKeyframe = videoKeyframes.first {
+            // A06 warm-up: μικρότερη πραγματική διάρκεια από το πρώτο keyframe
             sliceStartTime = firstKeyframe.timestampSeconds
         } else {
             sliceStartTime = samples.first!.timestampSeconds
         }
 
-        // 2. Απομόνωση Snapshot (Ανεξάρτητο αντίγραφο ώστε να μην μπλοκάρεται ο ενεργός buffer)
+        // 2. Snapshot — ανεξάρτητο αντίγραφο ώστε να μην μπλοκάρεται ο ενεργός buffer
         let clipSamples = samples.filter { $0.timestampSeconds >= sliceStartTime && $0.timestampSeconds <= latestTimestamp }
         let actualDuration = max(0.1, latestTimestamp - sliceStartTime)
 
@@ -112,16 +197,35 @@ public actor RollingBufferService: RollingBufferServiceProtocol {
         let frameCount = clipSamples.filter { !$0.isAudio }.count
         let exeiPragmatikoNAL = periexeiH264NAL(samples: clipSamples)
 
-        // 3. R3-002: Playable export μέσω AVAssetWriter.
-        // Πραγματικό remux NAL από Meta DAT θα προστεθεί όταν υπάρχει SDK stream·
-        // μέχρι τότε παράγεται ειλικρινές playable placeholder με σωστή διάρκεια + moov.
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("r0lling_clip_\(UUID().uuidString).mp4")
-        try await PlayableClipExporter.grapsePlayablePlaceholderMP4(
-            durationSeconds: actualDuration,
-            destinationURL: tempURL
-        )
         defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        var isSimulationPlaceholder = true
+
+        if exeiPragmatikoNAL {
+            // A05: απόπειρα πραγματικού remux — σε αποτυχία SPS/PPS πέφτουμε στο Stage-4 placeholder.
+            do {
+                try await H264AnnexBRemuxer.eksagogiPlayableMP4(
+                    samples: clipSamples,
+                    destinationURL: tempURL
+                )
+                isSimulationPlaceholder = false
+            } catch {
+                try await PlayableClipExporter.grapsePlayablePlaceholderMP4(
+                    durationSeconds: actualDuration,
+                    destinationURL: tempURL
+                )
+                isSimulationPlaceholder = true
+            }
+        } else {
+            // R3-002 Stage-4 path: ειλικρινής playable placeholder με σωστή διάρκεια + moov.
+            try await PlayableClipExporter.grapsePlayablePlaceholderMP4(
+                durationSeconds: actualDuration,
+                destinationURL: tempURL
+            )
+            isSimulationPlaceholder = true
+        }
 
         let clipData = try Data(contentsOf: tempURL)
         guard clipData.range(of: Data("moov".utf8)) != nil else {
@@ -139,7 +243,6 @@ public actor RollingBufferService: RollingBufferServiceProtocol {
         )
 
         let fileURL = try await mediaStorage.getMediaFileURL(relativePath: attachment.relativePath)
-        let isSimulationPlaceholder = !exeiPragmatikoNAL
 
         return ClipExportResult(
             fileURL: fileURL,
@@ -150,7 +253,8 @@ public actor RollingBufferService: RollingBufferServiceProtocol {
             timestamp: Date(),
             isPlayable: true,
             isSimulationPlaceholder: isSimulationPlaceholder,
-            byteSize: Int64(clipData.count)
+            byteSize: Int64(clipData.count),
+            streamGeneration: exportGeneration
         )
     }
 
@@ -159,7 +263,6 @@ public actor RollingBufferService: RollingBufferServiceProtocol {
         for sample in samples where !sample.isAudio && sample.isKeyframe {
             let bytes = [UInt8](sample.data.prefix(8))
             if bytes.count >= 4 {
-                // Annex-B start code: 00 00 00 01 ή 00 00 01
                 if bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0x00 && bytes[3] == 0x01 {
                     return true
                 }

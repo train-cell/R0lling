@@ -4,6 +4,7 @@ import Foundation
 /// Αποτρέπει διακοπές (interruptions) όταν ο χρήστης ή ο συνομιλητής του μιλούν.
 /// Επιτρέπει στον Jarvis να αποκρίνεται στα open-ear ηχεία ΜΟΝΟ όταν εντοπιστεί
 /// φυσική παύση ομιλίας (σιωπή > 600ms) με ασφαλή ροή.
+/// Silence-window guard — **ready=false** (χωρίς VAD/mic feed · όχι AppState surface).
 public final class TurnTakingGuard: @unchecked Sendable {
     
     public enum SpeakerState: Sendable, Equatable {

@@ -6,10 +6,11 @@ public struct CalendarView: View {
     @State private var searchQuery: String = ""
     @State private var selectedSourceFilter: EntrySource? = nil
     @State private var displayedEntries: [JournalEntry] = []
+    @State private var entryProsEpeksergasia: JournalEntry?
+    @State private var isSearching: Bool = false
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Header
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Αρχείο & Δραστηριότητα")
@@ -23,7 +24,6 @@ public struct CalendarView: View {
                 }
                 Spacer()
 
-                // Total entries badge
                 Text("\(displayedEntries.count) LOGS")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(R0llingTheme.stravaOrange)
@@ -42,7 +42,6 @@ public struct CalendarView: View {
                 alignment: .bottom
             )
 
-            // Search Bar
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(R0llingTheme.stravaOrange)
@@ -52,17 +51,22 @@ public struct CalendarView: View {
                     .font(.system(size: 14))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .onChange(of: searchQuery) { _ in
-                        filterEntries()
+                        Task { await filterEntries() }
                     }
 
                 if !searchQuery.isEmpty {
                     Button(action: {
                         searchQuery = ""
-                        filterEntries()
+                        Task { await filterEntries() }
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(R0llingTheme.textSecondary)
                     }
+                }
+
+                if isSearching {
+                    ProgressView()
+                        .scaleEffect(0.7)
                 }
             }
             .padding(12)
@@ -75,7 +79,6 @@ public struct CalendarView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
 
-            // Source Filter Chips (Strava style athletic filters)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     FilterChip(
@@ -83,7 +86,7 @@ public struct CalendarView: View {
                         isSelected: selectedSourceFilter == nil,
                         onTap: {
                             selectedSourceFilter = nil
-                            filterEntries()
+                            Task { await filterEntries() }
                         }
                     )
 
@@ -93,7 +96,7 @@ public struct CalendarView: View {
                             isSelected: selectedSourceFilter == source,
                             onTap: {
                                 selectedSourceFilter = (selectedSourceFilter == source) ? nil : source
-                                filterEntries()
+                                Task { await filterEntries() }
                             }
                         )
                     }
@@ -102,7 +105,6 @@ public struct CalendarView: View {
                 .padding(.vertical, 4)
             }
 
-            // Entries List
             ScrollView {
                 LazyVStack(spacing: 14) {
                     if displayedEntries.isEmpty {
@@ -117,17 +119,28 @@ public struct CalendarView: View {
                         }
                     } else {
                         ForEach(displayedEntries) { entry in
-                            TimelineEntryCard(entry: entry, onFavoriteToggle: {
-                                Task {
-                                    await appState.toggleFavorite(entry: entry)
-                                    filterEntries()
+                            TimelineEntryCard(
+                                entry: entry,
+                                einaiObsidianSync: false,
+                                onFavoriteToggle: {
+                                    Task {
+                                        await appState.toggleFavorite(entry: entry)
+                                        await filterEntries()
+                                    }
+                                },
+                                onDelete: {
+                                    Task {
+                                        await appState.deleteEntry(id: entry.id)
+                                        await filterEntries()
+                                    }
+                                },
+                                onEdit: {
+                                    entryProsEpeksergasia = entry
+                                },
+                                resolveMediaURL: { relativePath in
+                                    await appState.resolveMediaURL(relativePath: relativePath)
                                 }
-                            }, onDelete: {
-                                Task {
-                                    await appState.deleteEntry(id: entry.id)
-                                    filterEntries()
-                                }
-                            })
+                            )
                         }
                     }
                 }
@@ -135,27 +148,38 @@ public struct CalendarView: View {
             }
         }
         .background(R0llingTheme.bgPrimary.ignoresSafeArea())
-        .onAppear {
-            filterEntries()
+        .sheet(item: $entryProsEpeksergasia) { entry in
+            EntryEditorSheet(
+                entry: entry,
+                onSave: { updated in
+                    entryProsEpeksergasia = nil
+                    Task {
+                        await appState.updateEntry(updated)
+                        await filterEntries()
+                    }
+                },
+                onCancel: { entryProsEpeksergasia = nil }
+            )
+        }
+        .task {
+            await filterEntries()
+        }
+        .onChange(of: appState.allEntries.count) { _ in
+            Task { await filterEntries() }
         }
     }
 
-    private func filterEntries() {
-        let all = appState.allEntries
-        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    /// A02: search μέσω `storage.searchEntries` (title + content + tags), όχι μόνο client content.
+    private func filterEntries() async {
+        isSearching = true
+        defer { isSearching = false }
 
-        displayedEntries = all.filter { entry in
-            var matches = true
-            if !q.isEmpty {
-                let inContent = entry.content.lowercased().contains(q)
-                let inTags = entry.tags.contains { $0.lowercased().contains(q) }
-                matches = matches && (inContent || inTags)
-            }
-            if let src = selectedSourceFilter {
-                matches = matches && (entry.source == src)
-            }
-            return matches
-        }
+        let results = await appState.searchJournal(
+            query: searchQuery,
+            tag: nil,
+            source: selectedSourceFilter
+        )
+        displayedEntries = results
     }
 }
 

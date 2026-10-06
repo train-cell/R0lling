@@ -2,6 +2,11 @@ import Foundation
 
 /// Διαχείριση των αρχείων μνήμης του προσωπικού AI Agent (`Agent/` υποφάκελος)
 public actor AgentFolderManager {
+    private static let agentFolderName = "Agent"
+    private static let memoryFileName = "Memory.md"
+    private static let preferencesFileName = "Preferences.md"
+    private static let openLoopsFileName = "Open-loops.md"
+
     private var baseVaultURL: URL?
 
     public init(vaultURL: URL? = nil) {
@@ -19,21 +24,49 @@ public actor AgentFolderManager {
         self.baseVaultURL = url
     }
 
-    private var agentDirectoryURL: URL? {
-        return baseVaultURL?.appendingPathComponent("Agent", isDirectory: true)
+    public var currentVaultURL: URL? {
+        baseVaultURL
+    }
+
+    /// SEC-002: ασφαλή URL για Agent/*.md μέσω PathAsfaleia.
+    private func asfales_agent_file_url(_ fileName: String) throws -> URL {
+        guard let vault = baseVaultURL else {
+            throw NSError(
+                domain: "R0lling.Agent",
+                code: 6101,
+                userInfo: [NSLocalizedDescriptionKey: "Δεν έχει οριστεί Obsidian vault για Agent."]
+            )
+        }
+        let relative = "\(Self.agentFolderName)/\(fileName)"
+        return try PathAsfaleia.asfalhs_resolved_url(relativePath: relative, baseDirectory: vault)
+    }
+
+    private func asfales_agent_directory_url() throws -> URL {
+        guard let vault = baseVaultURL else {
+            throw NSError(
+                domain: "R0lling.Agent",
+                code: 6101,
+                userInfo: [NSLocalizedDescriptionKey: "Δεν έχει οριστεί Obsidian vault για Agent."]
+            )
+        }
+        return try PathAsfaleia.asfalhs_resolved_url(
+            relativePath: Self.agentFolderName,
+            baseDirectory: vault
+        )
     }
 
     /// Φόρτωση του AgentMemory από τα Markdown αρχεία
     public func loadAgentMemory() throws -> AgentMemory {
-        guard let agentDir = agentDirectoryURL else {
+        guard baseVaultURL != nil else {
             return AgentMemory()
         }
 
+        let agentDir = try asfales_agent_directory_url()
         try FileManager.default.createDirectory(at: agentDir, withIntermediateDirectories: true)
 
-        let memURL = agentDir.appendingPathComponent("Memory.md")
-        let prefURL = agentDir.appendingPathComponent("Preferences.md")
-        let loopsURL = agentDir.appendingPathComponent("Open-loops.md")
+        let memURL = try asfales_agent_file_url(Self.memoryFileName)
+        let prefURL = try asfales_agent_file_url(Self.preferencesFileName)
+        let loopsURL = try asfales_agent_file_url(Self.openLoopsFileName)
 
         // CQ-P0-001: άδεια templates — όχι εφευρεμένα persona facts (fake memory poisoning).
         let memoryText = (try? String(contentsOf: memURL, encoding: .utf8))
@@ -51,15 +84,22 @@ public actor AgentFolderManager {
         )
     }
 
-    /// Αποθήκευση του AgentMemory στα Markdown αρχεία
+    /// Αποθήκευση του AgentMemory στα Markdown αρχεία (fail-closed — CQ-P0-005).
     public func saveAgentMemory(_ memory: AgentMemory) throws {
-        guard let agentDir = agentDirectoryURL else { return }
+        guard baseVaultURL != nil else {
+            throw NSError(
+                domain: "R0lling.Agent",
+                code: 6101,
+                userInfo: [NSLocalizedDescriptionKey: "Δεν έχει οριστεί Obsidian vault για Agent."]
+            )
+        }
 
+        let agentDir = try asfales_agent_directory_url()
         try FileManager.default.createDirectory(at: agentDir, withIntermediateDirectories: true)
 
-        let memURL = agentDir.appendingPathComponent("Memory.md")
-        let prefURL = agentDir.appendingPathComponent("Preferences.md")
-        let loopsURL = agentDir.appendingPathComponent("Open-loops.md")
+        let memURL = try asfales_agent_file_url(Self.memoryFileName)
+        let prefURL = try asfales_agent_file_url(Self.preferencesFileName)
+        let loopsURL = try asfales_agent_file_url(Self.openLoopsFileName)
 
         try memory.memoryNotes.write(to: memURL, atomically: true, encoding: .utf8)
         try memory.userPreferences.write(to: prefURL, atomically: true, encoding: .utf8)

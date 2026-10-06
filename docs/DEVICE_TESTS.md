@@ -38,3 +38,42 @@ Project checkpoint ή build: [v1.0.0-rc1]
 Πραγματικό αποτέλεσμα: [...]
 Σχετικό error/log: [...]
 ```
+
+---
+
+## 3. Mac / `swift test` checklist (P0-01 — honest blocker)
+
+> **Status:** 🚫 BLOCKED σε Windows host · **χωρίς** fake PASS.  
+> Proof artifact: πράσινο GHA log **ή** τοπικό `swift-test.log` → γραμμή στο `docs/HANDOFF.md`.
+
+### 3.1 GitHub Actions (προτιμητέο)
+
+| # | Βήμα | Πού | Done? |
+|---|---|---|---|
+| 1 | Push/PR στο `main` **ή** Actions → `R0lling CI (Cloud macOS)` → **Run workflow** | GitHub → Actions | ☐ |
+| 2 | Job `python-verify` = πράσινο (stage3→5 + verify_all) | Actions run | ☐ |
+| 3 | Job `build-and-test` = πράσινο (`swift build` + `swift test --parallel`) | Actions run | ☐ |
+| 4 | Κατέβασε artifact `swift-test-log` | Actions → Artifacts | ☐ |
+| 5 | Επικόλλησε στο HANDOFF: `GHA run <URL> · swift test PASS · <timestamp>` | `docs/HANDOFF.md` | ☐ |
+| 6 | (Optional) `AVAsset.isPlayable` smoke για placeholder clip — DEV-05 | Mac XCTest / device | ☐ |
+
+Workflow file: `.github/workflows/swift-ci.yml`
+
+### 3.2 Τοπικό Mac (εναλλακτικό)
+
+| # | Βήμα | Εντολή / σημείωση | Done? |
+|---|---|---|---|
+| 1 | Clone + Xcode 16+ | `cd R0lling` | ☐ |
+| 2 | Build | `swift build` | ☐ |
+| 3 | Tests | `swift test --parallel 2>&1 \| tee swift-test.log` | ☐ |
+| 4 | App shell | `Apps/R0llingApp/README.md` (XcodeGen ή manual target) | ☐ |
+| 5 | HANDOFF proof | ίδια γραμμή με 3.1 §5 | ☐ |
+
+DAT flip (όχι SW blocker · v1 sim-only): `docs/LANE_CLIP_META.md` §3 + `docs/DECISIONS.md` §2.
+
+---
+
+## 4. Device A-ID checklist (0/16 proven — όχι SW)
+
+Κάθε γραμμή DEV-01…DEV-10 παραπάνω παραμένει ☐ μέχρι **πραγματικό** αποτέλεσμα στη στήλη «Πραγματικό Αποτέλεσμα».  
+Μην αλλάξεις σε ✅ χωρίς screenshot/log στο HANDOFF.

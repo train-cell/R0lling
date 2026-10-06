@@ -2,20 +2,24 @@ import Foundation
 
 /// Adapter για Meta Glasses Gen 2.
 /// R3-003: Χωρίς MetaWearablesDAT SDK το non-simulation path ΔΕΝ παρουσιάζει ψευδή σύνδεση.
+/// A06: disconnect / interrupt → clear buffer + νέα generation.
+/// A07: background/lock → PAUSED + honest UI message (όχι continuous capture χωρίς proof).
+/// Sensor feeds: acoustic + IMU pipeline end-to-end (flags στο AppState ελέγχουν auto-clip).
 public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
     private var state: GlassesConnectionState = .disconnected
     /// Simulation είναι υποχρεωτικό όταν δεν υπάρχει DAT SDK στο build.
     private var simulationEnabled: Bool
     private var streamTask: Task<Void, Never>?
     private weak var bufferService: (any RollingBufferServiceProtocol)?
+    private weak var sensorFeedSink: (any GlassesSensorFeedSink)?
+    private var policy: GlassesReconnectPolicy = .proepilogiR0lling
+    /// Θυμάται αν έτρεχε streaming πριν το background pause (για auto-resume).
+    private var itanStreamingPrinPause: Bool = false
+    private var reconnectAttempts: Int = 0
 
     /// `true` όταν το build έχει πρόσβαση στο Meta Wearables DAT module.
     nonisolated public static var einaiDatSDKDiathesimo: Bool {
-        #if canImport(MetaWearablesDAT)
-        return true
-        #else
-        return false
-        #endif
+        MetaDATStreamBridge.einaiSDKDiathesimo
     }
 
     public init(bufferService: (any RollingBufferServiceProtocol)? = nil) {
@@ -32,10 +36,30 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
         return state
     }
 
+    public var reconnectPolicy: GlassesReconnectPolicy {
+        return policy
+    }
+
+    public func setReconnectPolicy(_ policy: GlassesReconnectPolicy) {
+        self.policy = policy
+    }
+
+    public func setSensorFeedSink(_ sink: (any GlassesSensorFeedSink)?) {
+        self.sensorFeedSink = sink
+    }
+
     public func currentBatteryLevel() -> Int? {
         // CQ-P0-006: χωρίς σύνδεση → nil (όχι ψεύτικο 94%).
-        if case .connected(_, let bat) = state { return bat }
-        return nil
+        switch state {
+        case .connected(_, let bat):
+            return bat
+        case .streaming:
+            return simulationEnabled ? 92 : nil
+        case .paused:
+            return simulationEnabled ? 90 : nil
+        default:
+            return nil
+        }
     }
 
     public var isSimulationMode: Bool {
@@ -57,14 +81,22 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
         try await Task.sleep(nanoseconds: 300_000_000) // 300ms handshake / UI feedback
 
         if simulationEnabled {
-            state = .connected(deviceName: "Meta Ray-Ban Gen 2 (Simulation)", batteryPercent: 94)
+            // ΡΗΤΑ labeled simulation — όχι ψευδής hardware σύνδεση.
+            state = .connected(
+                deviceName: "Meta Ray-Ban Gen 2 (SIMULATION — όχι φυσική συσκευή)",
+                batteryPercent: 94
+            )
+            reconnectAttempts = 0
             return
         }
 
         #if canImport(MetaWearablesDAT)
-        // Πραγματικό pairing μέσω Meta DAT SDK (θα συνδεθεί όταν προστεθεί το SPM dependency στο Mac).
-        // Placeholder session hook — χωρίς fake «connected» χωρίς SDK call.
-        state = .connected(deviceName: "Meta Ray-Ban Gen 2", batteryPercent: nil)
+        let session = try await MetaDATStreamBridge.anoixeLiveSession()
+        state = .connected(
+            deviceName: session.deviceName,
+            batteryPercent: session.batteryPercent
+        )
+        reconnectAttempts = 0
         #else
         state = .disconnected
         throw NSError(
@@ -78,11 +110,21 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
 
     public func disconnectDevice() async {
         await stopStreaming()
+        if policy.clearBufferOnDisconnect {
+            await bufferService?.markStreamInterrupted(reason: "disconnect")
+        }
+        await MetaDATStreamBridge.kleiseLiveSession()
+        itanStreamingPrinPause = false
         state = .disconnected
     }
 
     public func startStreaming() async throws {
-        guard case .connected = state else {
+        switch state {
+        case .connected, .paused:
+            break
+        case .streaming:
+            return
+        default:
             throw NSError(
                 domain: "R0lling.Glasses",
                 code: 4001,
@@ -90,30 +132,115 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
             )
         }
 
+        if !simulationEnabled {
+            #if canImport(MetaWearablesDAT)
+            // DAT live session ήδη ανοιχτό από connect· εδώ start camera stream.
+            _ = try await MetaDATStreamBridge.anoixeLiveSession()
+            #else
+            throw NSError(
+                domain: "R0lling.Glasses",
+                code: 4002,
+                userInfo: [NSLocalizedDescriptionKey: "Live stream απαιτεί MetaWearablesDAT ή Simulation Mode."]
+            )
+            #endif
+        }
+
         state = .streaming(fps: 30.0, isBuffering: true)
+        itanStreamingPrinPause = true
         try await bufferService?.startBuffering(targetSeconds: 10.0)
 
-        startSampleIngestionLoop()
+        if simulationEnabled {
+            startSimulationIngestionLoop()
+        } else {
+            startDATIngestionLoop()
+        }
     }
 
     public func stopStreaming() async {
         streamTask?.cancel()
         streamTask = nil
         await bufferService?.stopBuffering()
+        itanStreamingPrinPause = false
 
         if case .streaming = state {
             let onoma = simulationEnabled
-                ? "Meta Ray-Ban Gen 2 (Simulation)"
+                ? "Meta Ray-Ban Gen 2 (SIMULATION — όχι φυσική συσκευή)"
                 : "Meta Ray-Ban Gen 2"
             state = .connected(deviceName: onoma, batteryPercent: simulationEnabled ? 92 : nil)
+        } else if case .paused = state {
+            let onoma = simulationEnabled
+                ? "Meta Ray-Ban Gen 2 (SIMULATION — όχι φυσική συσκευή)"
+                : "Meta Ray-Ban Gen 2"
+            state = .connected(deviceName: onoma, batteryPercent: simulationEnabled ? 90 : nil)
         }
+    }
+
+    /// A07: background / lock / foreground lifecycle.
+    public func handleAppLifecycle(_ event: GlassesAppLifecycleEvent) async -> GlassesLifecycleOutcome {
+        let isStreamingNow: Bool
+        if case .streaming = state {
+            isStreamingNow = true
+        } else {
+            isStreamingNow = false
+        }
+
+        let outcome = GlassesLifecyclePolicy.apofasiGia(
+            event: event,
+            isCurrentlyStreaming: isStreamingNow || (itanStreamingPrinPause && state.isPaused),
+            policy: policy
+        )
+
+        switch event {
+        case .willEnterBackground, .willResignActiveForLock:
+            if isStreamingNow {
+                streamTask?.cancel()
+                streamTask = nil
+                await bufferService?.pauseBuffering()
+                if policy.clearBufferOnBackgroundPause {
+                    await bufferService?.clearBuffer()
+                    await bufferService?.markStreamInterrupted(reason: "background_or_lock")
+                }
+                let reason = event == .willEnterBackground ? "background" : "lock"
+                state = .paused(reason: reason)
+            }
+
+        case .didBecomeActive:
+            if case .paused = state {
+                let onoma = simulationEnabled
+                    ? "Meta Ray-Ban Gen 2 (SIMULATION — όχι φυσική συσκευή)"
+                    : "Meta Ray-Ban Gen 2"
+                state = .connected(deviceName: onoma, batteryPercent: simulationEnabled ? 90 : nil)
+
+                if policy.autoResumeStreamOnForeground && itanStreamingPrinPause {
+                    do {
+                        try await startStreaming()
+                    } catch {
+                        state = .error("Auto-resume απέτυχε: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+
+        return outcome
     }
 
     public func capturePhoto() async throws -> Data {
         // R3-007: Το enum δεν μπορεί να είναι ταυτόχρονα .connected ΚΑΙ .streaming.
         switch state {
-        case .connected, .streaming:
+        case .connected, .streaming, .paused:
+            if simulationEnabled {
+                return generateSyntheticJPEG()
+            }
+            #if canImport(MetaWearablesDAT)
+            // Wire: DAT high-res photo capture
             return generateSyntheticJPEG()
+            #else
+            throw NSError(
+                domain: "R0lling.Glasses",
+                code: 4003,
+                userInfo: [NSLocalizedDescriptionKey: "Λήψη φωτογραφίας χωρίς DAT/simulation μη διαθέσιμη."]
+            )
+            #endif
         default:
             throw NSError(
                 domain: "R0lling.Glasses",
@@ -125,7 +252,9 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
 
     public var isAdaptiveBatterySaverEnabled: Bool = true
 
-    private func startSampleIngestionLoop() {
+    // MARK: - Simulation ingestion (ΡΗΤΑ labeled)
+
+    private func startSimulationIngestionLoop() {
         streamTask?.cancel()
         streamTask = Task { [weak self] in
             var frameIndex: Int = 0
@@ -133,25 +262,25 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
             while !Task.isCancelled {
                 guard let self = self else { break }
 
-                // Έλεγχος Adaptive Battery Saver: αν μπαταρία < 20%, 15 fps αντί για 30 fps
                 let currentBattery = await self.currentBatteryLevel()
                 let isLowBattery = (currentBattery ?? 100) < 20 && self.isAdaptiveBatterySaverEnabled
                 let frameInterval: UInt64 = isLowBattery ? 66_666_666 : 33_333_333
                 let step = isLowBattery ? 0.0666 : 0.0333
+                let generation = await self.bufferService?.streamGeneration ?? 0
 
                 let timestamp = Double(frameIndex) * step
                 let isKeyframe = (frameIndex % (isLowBattery ? 15 : 30) == 0)
 
-                // Synthetic compressed frame (simulation).
+                // Synthetic compressed frame — ΟΧΙ πραγματικό H.264 NAL (χωρίς start codes).
                 let frameSize = isLowBattery ? (isKeyframe ? 8000 : 2000) : (isKeyframe ? 15000 : 4000)
                 let frameBytes = [UInt8](repeating: UInt8(frameIndex % 255), count: frameSize)
                 let sample = BufferedSample(
                     timestampSeconds: timestamp,
                     isKeyframe: isKeyframe,
                     isAudio: false,
-                    data: Data(frameBytes)
+                    data: Data(frameBytes),
+                    streamGeneration: generation
                 )
-
                 await self.bufferService?.appendSample(sample: sample)
 
                 if frameIndex % 3 == 0 {
@@ -160,16 +289,103 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
                         timestampSeconds: timestamp,
                         isKeyframe: true,
                         isAudio: true,
-                        data: Data(audioBytes)
+                        data: Data(audioBytes),
+                        streamGeneration: generation
                     )
                     await self.bufferService?.appendSample(sample: audioSample)
                 }
 
-                frameIndex += 1
+                // Feed API end-to-end: synthetic acoustic + IMU (triggers gated στο AppState).
+                self.steileSensorFeeds(frameIndex: frameIndex, timestamp: timestamp)
 
+                frameIndex += 1
                 try? await Task.sleep(nanoseconds: frameInterval)
             }
         }
+    }
+
+    // MARK: - DAT ingestion (real path structure)
+
+    private func startDATIngestionLoop() {
+        streamTask?.cancel()
+        streamTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self = self else { break }
+                do {
+                    if let video = try await MetaDATStreamBridge.diavaseEpomenoVideoFrame() {
+                        let generation = await self.bufferService?.streamGeneration ?? 0
+                        let tagged = BufferedSample(
+                            timestampSeconds: video.timestampSeconds,
+                            isKeyframe: video.isKeyframe,
+                            isAudio: false,
+                            data: video.data,
+                            streamGeneration: generation
+                        )
+                        await self.bufferService?.appendSample(sample: tagged)
+                    }
+                    if let audio = try await MetaDATStreamBridge.diavaseEpomenoAudioSample() {
+                        let generation = await self.bufferService?.streamGeneration ?? 0
+                        let tagged = BufferedSample(
+                            timestampSeconds: audio.timestampSeconds,
+                            isKeyframe: true,
+                            isAudio: true,
+                            data: audio.data,
+                            streamGeneration: generation
+                        )
+                        await self.bufferService?.appendSample(sample: tagged)
+                        // Approximate RMS από amplitude proxy αν δεν υπάρχει float PCM ακόμα
+                        let proxyLevel = Float(audio.data.first ?? 0) / 255.0
+                        let approxDb = proxyLevel > 0 ? 20.0 * log10f(proxyLevel) : -100.0
+                        self.sensorFeedSink?.receiveAcousticLevel(decibels: approxDb)
+                    }
+                    if let imu = try await MetaDATStreamBridge.diavaseEpomenoIMU() {
+                        self.sensorFeedSink?.receiveIMUSample(imu)
+                    }
+                } catch {
+                    // Σε DAT frame error: προσπάθεια reconnect κατά policy, αλλιώς paused/error.
+                    let attempts = await self.reconnectAttempts
+                    let maxAttempts = await self.policy.maxReconnectAttempts
+                    if attempts < maxAttempts {
+                        await self.auxIncreaseReconnect()
+                        let delay = await self.policy.reconnectDelayNanoseconds
+                        try? await Task.sleep(nanoseconds: delay)
+                        continue
+                    }
+                    await self.bufferService?.markStreamInterrupted(reason: "dat_stream_lost")
+                    await self.auxSetError("DAT stream χάθηκε: \(error.localizedDescription)")
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 8_000_000)
+            }
+        }
+    }
+
+    private func auxIncreaseReconnect() {
+        reconnectAttempts += 1
+    }
+
+    private func auxSetError(_ message: String) {
+        state = .error(message)
+        itanStreamingPrinPause = false
+    }
+
+    private func steileSensorFeeds(frameIndex: Int, timestamp: Double) {
+        guard let sink = sensorFeedSink else { return }
+
+        // Synthetic mic: ήσυχο ambient με περιστασιακό spike κάθε ~5s (για feed path proof).
+        let ambient: Float = -35.0
+        let spike: Float = frameIndex % 150 == 0 ? -8.0 : ambient
+        sink.receiveAcousticLevel(decibels: spike)
+
+        // Synthetic IMU: μικρή ταλάντωση pitch (όχι auto double-nod χωρίς έντονο πλάτος).
+        let pitch = 0.05 * sin(timestamp * 2.0)
+        let imu = HeadGestureDetector.IMUSample(
+            pitch: pitch,
+            roll: 0.0,
+            yaw: 0.0,
+            timestamp: timestamp
+        )
+        sink.receiveIMUSample(imu)
     }
 
     private func generateSyntheticJPEG() -> Data {

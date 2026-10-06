@@ -21,47 +21,35 @@
 
 ## 🏛️ Αναλυτικά Modules & Αρχιτεκτονική
 
-### 1. [#3] On-Device Semantic Vector Search (MobileCLIP)
-- **Αρχείο:** [`Sources/R0lling/AI/MobileCLIPVectorSearchEngine.swift`](file:///c:/Users/skyd3/antigarvity/R0lling/Sources/R0lling/AI/MobileCLIPVectorSearchEngine.swift)
-- **Τύπος:** `public actor MobileCLIPVectorSearchEngine`
-- **Πραγματικότητα:** Index + cosine math · **pseudo embeddings** (όχι bundled MobileCLIP weights).
-- **Ενσωμάτωση:** `AppState.vectorSearchEngine` (held).
+### 1. [#3] Pseudo Lexical Vector Search (πρώην MobileCLIP)
+- **Αρχείο:** [`Sources/R0lling/AI/PseudoLexicalVectorSearchEngine.swift`](Sources/R0lling/AI/PseudoLexicalVectorSearchEngine.swift)
+- **Τύπος:** `public actor PseudoLexicalVectorSearchEngine`
+- **Πραγματικότητα:** Index + cosine math · **FNV pseudo embeddings** (όχι CLIP weights).
+- **Ενσωμάτωση:** `FeatureReadinessRegistry.pseudoVectorSearch.ready == false` · όχι AppState/UI.
 
 ### 2. [#4] Conversational Turn-Taking Guard
-- **Αρχείο:** [`Sources/R0lling/Speech/TurnTakingGuard.swift`](file:///c:/Users/skyd3/antigarvity/R0lling/Sources/R0lling/Speech/TurnTakingGuard.swift)
-- **Τύπος:** `public final class TurnTakingGuard: @unchecked Sendable`
-- **Πραγματικότητα:** Silence-window logic (~600ms) · **χωρίς VAD/mic feed**.
-- **Ενσωμάτωση:** `AppState.turnTakingGuard` (held).
+- **Αρχείο:** `Sources/R0lling/Speech/TurnTakingGuard.swift`
+- **ready=false** · χωρίς VAD · όχι AppState/UI.
 
-### 3. [#8] See-What-I-See Vision Pro / Mac Mirroring Server
-- **Αρχείο:** [`Sources/R0lling/Buffer/RemoteMirrorStreamServer.swift`](file:///c:/Users/skyd3/antigarvity/R0lling/Sources/R0lling/Buffer/RemoteMirrorStreamServer.swift)
-- **Τύπος:** `public final class RemoteMirrorStreamServer: @unchecked Sendable`
-- **Πραγματικότητα:** Bonjour TCP listener + wire framing · **`broadcastFrame` δεν καλείται από glasses stream**.
-- **Ενσωμάτωση:** `AppState.toggleMirrorStreaming()` & UI Mirror button.
+### 3. [#8] See-What-I-See Mirroring Server
+- **Αρχείο:** `Sources/R0lling/Buffer/RemoteMirrorStreamServer.swift`
+- **ready=false** μέχρι TLS + glasses `broadcastFrame` · UI κρυφό.
 
 ### 4. [#11] Associative Knowledge Graph (RDF Triples)
-- **Αρχείο:** [`Sources/R0lling/AI/AssociativeKnowledgeGraphEngine.swift`](file:///c:/Users/skyd3/antigarvity/R0lling/Sources/R0lling/AI/AssociativeKnowledgeGraphEngine.swift)
-- **Τύπος:** `public final class AssociativeKnowledgeGraphEngine: @unchecked Sendable`
-- **Πραγματικότητα:** Heuristic pattern triples + Mermaid/DOT export.
-- **Ενσωμάτωση:** `AppState.exportKnowledgeGraphToObsidian()` (fail-closed χωρίς vault).
+- **Αρχείο:** `Sources/R0lling/AI/AssociativeKnowledgeGraphEngine.swift`
+- **READY** · Mermaid export via `AppState.exportKnowledgeGraphToObsidian()`.
 
 ### 5. [#12] Hyper-lapse Trip Compressor
-- **Αρχείο:** [`Sources/R0lling/Buffer/HyperlapseTripCompressor.swift`](file:///c:/Users/skyd3/antigarvity/R0lling/Sources/R0lling/Buffer/HyperlapseTripCompressor.swift)
-- **Τύπος:** `public final class HyperlapseTripCompressor: @unchecked Sendable`
-- **Πραγματικότητα:** GPS Haversine frame-select math · **όχι video mux**.
-- **Ενσωμάτωση:** `AppState.hyperlapseCompressor` (held).
+- **Αρχείο:** `Sources/R0lling/Buffer/HyperlapseTripCompressor.swift`
+- **ready=false** · GPS math only · όχι AppState/UI.
 
-### 6. [#13] Local Whisper.cpp Offline Fallback
-- **Αρχείο:** [`Sources/R0lling/Speech/LocalWhisperOfflineService.swift`](file:///c:/Users/skyd3/antigarvity/R0lling/Sources/R0lling/Speech/LocalWhisperOfflineService.swift)
-- **Τύπος:** `public actor LocalWhisperOfflineService`
-- **Πραγματικότητα:** **Stub fail-closed** — χωρίς weights · άδειο transcript + `isStubUnavailable` (όχι fake text).
-- **Ενσωμάτωση:** `AppState.offlineWhisperService` (held · δεν καλείται από UI path ακόμα).
+### 6. [#13] Local Whisper Offline Fallback
+- **Αρχείο:** `Sources/R0lling/Speech/LocalWhisperOfflineService.swift`
+- **ready=false** stub · offline speech = `SpeechTranscriptionService` (Apple Speech).
 
 ### 7. [#16] Meal & Nutrition Visual Logger
-- **Αρχείο:** [`Sources/R0lling/AI/MealNutritionVisionLogger.swift`](file:///c:/Users/skyd3/antigarvity/R0lling/Sources/R0lling/AI/MealNutritionVisionLogger.swift)
-- **Τύπος:** `public final class MealNutritionVisionLogger: @unchecked Sendable`
-- **Πραγματικότητα:** Token→macro **heuristic estimate** · όχι HealthKit / measured kcal.
-- **Ενσωμάτωση:** `AppState.logMealFromDetectedTokens()` (toast με label heuristic).
+- **Αρχείο:** `Sources/R0lling/AI/MealNutritionVisionLogger.swift`
+- **READY** heuristic · OCR tokens → meal note από `executeWhatAmISeeing` (όχι HealthKit).
 
 ---
 

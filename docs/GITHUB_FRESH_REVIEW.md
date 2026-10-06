@@ -1,7 +1,7 @@
 # R0lling — GitHub Fresh Review
 
 **Ημερομηνία:** 2026-10-06 ~18:10 EEST  
-**Workspace:** `C:\Users\skyd3\antigarvity\R0lling`  
+**Workspace:** `.`  
 **Scope:** Fresh pass μετά το άνοιγμα σε κανονικό GitHub — όχι copy-paste παλιού audit  
 **Git commit αυτού του review:** ΟΧΙ (μόνο docs write · review only)
 
@@ -12,7 +12,7 @@
 | Item | Value |
 |---|---|
 | Local `.git` μέσα στο R0lling | **ΝΑΙ** (ανεξάρτητο repo) |
-| `git rev-parse --show-toplevel` | `C:/Users/skyd3/antigarvity/R0lling` |
+| `git rev-parse --show-toplevel` | `.` |
 | Remote | `origin` → `https://github.com/train-cell/R0lling.git` |
 | Branch | `main` tracking `origin/main` · **up to date** |
 | HEAD | `016d8b90b31c8e4f872b74f42788e5a65ecf7809` |

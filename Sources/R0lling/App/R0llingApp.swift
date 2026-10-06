@@ -20,6 +20,7 @@ public struct R0llingApp: App {
 
 public struct MainTabView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.scenePhase) private var scenePhase
 
     public var body: some View {
         ZStack(alignment: .top) {
@@ -45,6 +46,12 @@ public struct MainTabView: View {
                     }
             }
             .accentColor(R0llingTheme.accentPurple)
+            .onChange(of: scenePhase) { _, newPhase in
+                // A07: background / lock / foreground → honest pause/resume policy.
+                Task {
+                    await appState.handleScenePhaseChange(newPhase)
+                }
+            }
 
             // Global Toast Overlay
             if let toast = appState.toastMessage {

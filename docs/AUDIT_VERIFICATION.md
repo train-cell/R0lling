@@ -2,7 +2,7 @@
 
 **Lane:** Verification · ECC · Honesty  
 **Host:** Windows 10 (`win32 10.0.26200`) · Python `3.11.9`  
-**Root:** `C:\Users\skyd3\antigarvity\R0lling`  
+**Root:** `.`  
 **Ημερομηνία εκτέλεσης:** 2026-10-06  
 **Scope:** prove-and-stop · **χωρίς** device proof · **χωρίς** git commit · **χωρίς** product-code edits  
 

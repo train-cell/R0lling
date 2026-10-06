@@ -1,6 +1,7 @@
 import Foundation
 
-/// Άμεσος connector για OpenAI-compatible cloud APIs (OpenAI, Gemini via proxy, Groq κ.λπ.)
+/// Άμεσος connector για OpenAI-compatible cloud APIs (OpenAI, Gemini via proxy, Groq κ.λπ.).
+/// R3-012 empty-key · SEC-005 status-only · υποχρεωτικό HTTPS.
 public final class DirectAPIConnector: AIConnectorProtocol, @unchecked Sendable {
     public let providerType: AIProviderType = .directAPI
     private let baseURLString: String
@@ -17,86 +18,66 @@ public final class DirectAPIConnector: AIConnectorProtocol, @unchecked Sendable 
         // R3-012: άδειο API key → typed error πριν το network (όχι ασαφές 401).
         let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedKey.isEmpty else {
-            throw NSError(
-                domain: "R0lling.AI",
-                code: 7004,
-                userInfo: [NSLocalizedDescriptionKey: "Λείπει Direct API key. Αποθήκευσέ το στο Keychain από τις Ρυθμίσεις."]
+            throw AIErrorTaxonomy.makeError(
+                domain: AIErrorTaxonomy.directDomain,
+                code: AIErrorTaxonomy.directEmptyKey,
+                message: "Λείπει Direct API key. Αποθήκευσέ το στο Keychain από τις Ρυθμίσεις."
             )
         }
 
-        guard let endpointURL = URL(string: "\(baseURLString)/chat/completions") else {
-            throw NSError(domain: "R0lling.AI", code: 7001, userInfo: [NSLocalizedDescriptionKey: "Μη έγκυρο Base URL για Direct AI."])
-        }
+        let baseURL = try HermesEndpointAsfaleia.epikyroseDirectBaseURL(baseURLString)
+        let endpointURL = try HermesEndpointAsfaleia.chatCompletionsURL(
+            fromBaseURL: baseURL,
+            errorDomain: AIErrorTaxonomy.directDomain,
+            errorCode: AIErrorTaxonomy.directInvalidURL
+        )
 
         try Task.checkCancellation()
 
-        var messages: [[String: Any]] = []
+        let messages = OpenAIChatRequestBuilder.buildMessages(
+            payload: payload,
+            defaultSystemPrompt: "Είσαι ο προσωπικός βοηθός R0lling στο iPhone του χρήστη. Απαντάς στα Ελληνικά με σαφήνεια, ακρίβεια και φιλικό τόνο.",
+            memoryHeader: "Μνήμη & Προτιμήσεις Χρήστη:"
+        )
 
-        // System Prompt
-        var sysContent = payload.systemPrompt ?? "Είσαι ο προσωπικός βοηθός R0lling στο iPhone του χρήστη. Απαντάς στα Ελληνικά με σαφήνεια, ακρίβεια και φιλικό τόνο."
-        if let memory = payload.agentMemoryContext, !memory.isEmpty {
-            sysContent += "\n\nΜνήμη & Προτιμήσεις Χρήστη:\n\(memory)"
-        }
-        messages.append(["role": "system", "content": sysContent])
+        let body = try OpenAIChatRequestBuilder.buildRequestBody(
+            model: modelName,
+            messages: messages,
+            temperature: 0.7
+        )
 
-        // Εισαγωγή προηγούμενων σχετικών εγγραφών
-        for entry in payload.contextEntries.prefix(5) {
-            messages.append([
-                "role": "user",
-                "content": "[Καταγραφή \(entry.formattedTime)] \(entry.content)"
-            ])
-        }
+        let config = AIHTTPClient.RequestConfig(
+            url: endpointURL,
+            bearerToken: trimmedKey,
+            body: body,
+            timeout: AIHTTPClient.defaultTimeoutSeconds,
+            errorDomain: AIErrorTaxonomy.directDomain,
+            httpRejectedCode: AIErrorTaxonomy.directHTTPRejected,
+            transportCode: AIErrorTaxonomy.directTransport,
+            retryExhaustedCode: AIErrorTaxonomy.directRetryExhausted,
+            httpRejectedMessagePrefix: "Direct AI API Σφάλμα",
+            transportMessage: "Αδυναμία σύνδεσης με το Direct AI API. Έλεγξε δίκτυο και Base URL."
+        )
 
-        // Κύριο μήνυμα χρήστη (με ή χωρίς Vision)
-        if let b64 = payload.imageBase64, !b64.isEmpty {
-            let visionUserContent: [[String: Any]] = [
-                ["type": "text", "text": payload.prompt],
-                [
-                    "type": "image_url",
-                    "image_url": ["url": "data:image/jpeg;base64,\(b64)"]
-                ]
-            ]
-            messages.append(["role": "user", "content": visionUserContent])
-        } else {
-            messages.append(["role": "user", "content": payload.prompt])
-        }
-
-        let requestBody: [String: Any] = [
-            "model": modelName,
-            "messages": messages,
-            "temperature": 0.7
-        ]
-
-        var request = URLRequest(url: endpointURL)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(trimmedKey)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 30.0
-        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-
-        try Task.checkCancellation()
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-            // SEC-005: generic user-facing μήνυμα — όχι raw response body.
-            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw NSError(
-                domain: "R0lling.AI",
-                code: 7002,
-                userInfo: [NSLocalizedDescriptionKey: "Direct AI API Σφάλμα (HTTP \(status))."]
+        do {
+            let data = try await AIHTTPClient.postJSON(config)
+            return try OpenAIChatRequestBuilder.parseChatCompletionResponse(
+                data: data,
+                fallbackReply: "Δεν ελήφθη απάντηση από το AI.",
+                referencedEntryIDs: payload.contextEntries.map { $0.id }
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let typed as NSError where typed.domain == AIErrorTaxonomy.directDomain {
+            throw typed
+        } catch {
+            throw AIErrorTaxonomy.makeError(
+                domain: AIErrorTaxonomy.directDomain,
+                code: AIErrorTaxonomy.directTransport,
+                message: "Αδυναμία σύνδεσης με το Direct AI API. Έλεγξε δίκτυο και Base URL.",
+                underlying: error
             )
         }
-
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let choices = json?["choices"] as? [[String: Any]]
-        let firstChoice = choices?.first?["message"] as? [String: Any]
-        let replyText = firstChoice?["content"] as? String ?? "Δεν ελήφθη απάντηση από το AI."
-
-        let usage = json?["usage"] as? [String: Any]
-        let totalTokens = usage?["total_tokens"] as? Int
-
-        let referencedIDs = payload.contextEntries.map { $0.id }
-        return AIResponseResult(reply: replyText, tokensUsed: totalTokens, referencedEntryIDs: referencedIDs)
     }
 
     public func describeImage(imageData: Data, question: String?) async throws -> String {

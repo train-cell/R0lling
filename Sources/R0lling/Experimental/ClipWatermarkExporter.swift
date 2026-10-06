@@ -1,6 +1,7 @@
 import Foundation
 
 /// Εξαγωγέας clips για AirDrop/κοινή χρήση με κομψό overlay υδατογραφήματος (Timestamp & Location)
+/// Watermark metadata schema — **Experimental orphan** · `FeatureReadinessRegistry.watermark.ready=false`.
 public struct ClipWatermarkExporter: Sendable {
     public init() {}
 

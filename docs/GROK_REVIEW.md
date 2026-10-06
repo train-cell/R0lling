@@ -2,7 +2,7 @@
 
 **Στάδιο / ρόλος:** 3 — Ανεξάρτητος έλεγχος υλοποίησης  
 **Ημερομηνία:** 6 Οκτωβρίου 2026  
-**Project root:** `C:\Users\skyd3\antigarvity\R0lling`  
+**Project root:** `.`  
 **Περιβάλλον ελέγχου:** Windows host · Python 3 verification harness · **χωρίς** Swift/Xcode/`swift test`  
 **Κώδικας εφαρμογής:** Δεν τροποποιήθηκε σε αυτό το στάδιο (μόνο review + diagnostics + docs).
 

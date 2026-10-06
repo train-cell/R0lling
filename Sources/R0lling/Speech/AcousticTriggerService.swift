@@ -1,7 +1,7 @@
 import Foundation
 import AVFAudio
 
-/// Υπηρεσία ανίχνευσης ηχητικών εκρήξεων (Acoustic Spikes: γέλια, φωνές, απότομοι ήχοι) για αυτόματο clipping
+/// Acoustic spike auto-clip — **ready=false** μέχρι mic RMS feed (`FeatureReadinessRegistry.acoustic`).
 public final class AcousticTriggerService: @unchecked Sendable {
     public struct Config: Sendable {
         public var thresholdDecibels: Float = -12.0 // dBFS κατώφλι για έντονο ήχο

@@ -12,6 +12,7 @@ final class VoiceCommandParserTests: XCTestCase {
         let result = parser.parse(transcript: "Hey Meta, clip this right now")
         XCTAssertEqual(result, .clip(seconds: 10.0))
 
+        parser.resetDedup()
         let result5s = parser.parse(transcript: "clip 5 seconds please")
         XCTAssertEqual(result5s, .clip(seconds: 5.0))
     }
@@ -20,6 +21,7 @@ final class VoiceCommandParserTests: XCTestCase {
         let result = parser.parse(transcript: "κράτα κλιπ γρήγορα")
         XCTAssertEqual(result, .clip(seconds: 10.0))
 
+        parser.resetDedup()
         let result5s = parser.parse(transcript: "κράτα κλιπ πέντε δευτερόλεπτα")
         XCTAssertEqual(result5s, .clip(seconds: 5.0))
     }
@@ -38,8 +40,24 @@ final class VoiceCommandParserTests: XCTestCase {
         let resultEn = parser.parse(transcript: "What am I seeing?")
         XCTAssertEqual(resultEn, .whatAmISeeing)
 
+        parser.resetDedup()
         let resultEl = parser.parse(transcript: "Τι βλέπω μπροστά μου;")
         XCTAssertEqual(resultEl, .whatAmISeeing)
+    }
+
+    func testObservationGameCommands() {
+        XCTAssertEqual(parser.parse(transcript: "start observation game"), .startObservationGame)
+        parser.resetDedup()
+        XCTAssertEqual(parser.parse(transcript: "ξεκίνα το παιχνίδι"), .startObservationGame)
+        parser.resetDedup()
+        XCTAssertEqual(parser.parse(transcript: "next mission please"), .nextMission)
+        parser.resetDedup()
+        XCTAssertEqual(parser.parse(transcript: "επόμενη αποστολή"), .nextMission)
+    }
+
+    func testUnknownDictation() {
+        let result = parser.parse(transcript: "Καλημέρα πώς είσαι;")
+        XCTAssertEqual(result, .unknown(raw: "Καλημέρα πώς είσαι;"))
     }
 
     /// R3-006: Δύο ίδια final transcripts → μία εντολή μέσα στο dedup window.
@@ -53,5 +71,9 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let different = parser.parse(transcript: "σημείωσε αγόρασε γάλα")
         XCTAssertEqual(different, .note(text: "Αγόρασε γάλα"))
+    }
+
+    func testScrubGreekAndEnglish() {
+        XCTAssertEqual(parser.scrubGreekAndEnglish(raw: "να πάρω γάλα"), "Να πάρω γάλα")
     }
 }

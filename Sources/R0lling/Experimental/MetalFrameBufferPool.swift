@@ -1,6 +1,7 @@
 import Foundation
 
 /// Δεξαμενή μνήμης (Buffer Pool) και διαχείριση επιταχυνόμενων καρέ στη GPU για μηδενικό CPU overhead
+/// Circular buffer pool — **Experimental orphan** · `FeatureReadinessRegistry.metalPool.ready=false` (όχι MetalKit).
 public final class MetalFrameBufferPool: @unchecked Sendable {
     public static let shared = MetalFrameBufferPool()
 

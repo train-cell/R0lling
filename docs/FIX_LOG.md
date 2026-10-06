@@ -33,9 +33,14 @@
 | **CQ-P0-007** | P0 | `AppState.swift` | Gated acoustic/IMU hooks · flags false | stage5 + static | **ΔΙΟΡΘΩΘΗΚΕ** |
 | **CQ-P1-012** | P1 | `AppState.swift` | `exportEntryToObsidianIfConfigured` | static | **ΔΙΟΡΘΩΘΗΚΕ** |
 | **SEC-002** | HIGH | `Extensions.swift` (`PathAsfaleia`), `MediaStorageService`, `BackupRestoreEngine`, `ObsidianVaultBridge`, callers | `asfalhs_resolved_url` — reject `..`/absolute/null · canonicalize + prefix check | `diagnose_stage5` SEC suite + path mirror | **ΔΙΟΡΘΩΘΗΚΕ** |
-| **SEC-001** | HIGH | `RemoteMirrorStreamServer.swift`, `AppState.toggleMirrorStreaming` | Pairing token υποχρεωτικό · `AUTH <token>` πριν broadcast pool · `broadcastFrame` fail-closed | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** (TLS ακόμα OPEN · stub auth) |
-| **SEC-003** | HIGH | `WatchConnectivityCoordinator.swift` | `schemaVersion==1` · allowlist actions · max note 2KB | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** (latent χωρίς Watch target) |
-| **SEC-005** | MEDIUM | `HermesConnector`, `DirectAPIConnector` | User-facing errors = HTTP status only · όχι raw body | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** |
+| **SEC-001** | HIGH | `RemoteMirrorStreamServer.swift`, `AppState.toggleMirrorStreaming` | Pairing token υποχρεωτικό · `AUTH <token>` πριν broadcast pool · `broadcastFrame` fail-closed | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** |
+| **SEC-001-TLS** | HIGH | `RemoteMirrorStreamServer`, `FeatureReadinessRegistry.mirror` | Release: listener throw 8402 + `broadcastFrame` no-op · UI gated `ready=false` · DEBUG cleartext+AUTH only | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** |
+| **SEC-003** | HIGH | `WatchConnectivityCoordinator.swift` | schema + `epitrepomenesEnergies` · max 2KB · trim/null/empty reject | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** (latent χωρίς Watch target) |
+| **SEC-004** | MEDIUM | `HermesEndpointAsfaleia`, `HermesConnector`, defaults | HTTPS default · HTTP μόνο allowlisted private/Tailscale | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** |
+| **SEC-005** | MEDIUM | `AIHTTPClient`, connectors | User-facing errors = HTTP status / host-only · όχι raw body | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** |
+| **SEC-007** | MEDIUM | `HermesEndpointAsfaleia`, `SettingsView`, `AIRouter` | Direct HTTPS-only · Hermes allowlist · validate πριν persist | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** |
+| **SEC-008** | LOW | `docs/SETUP_AI_HERMES.md` | Bind loopback · HTTPS pref · όχι `0.0.0.0` | doc | **ΔΙΟΡΘΩΘΗΚΕ** |
+| **SEC-009** | LOW | Mirror toast, Keychain, AI errors | Όχι pairing prefix σε toast · Keychain UserDefaults DEBUG-only · host-only errors | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** |
 | **CQ-P2-020** | P2 | `DailyPodcastGenerator.swift` | `completion` στο `didFinish` (όχι αμέσως) | stage5 SEC | **ΔΙΟΡΘΩΘΗΚΕ** |
 | **CQ-P2-024** | P2 | `ScavengerHuntStreakManager`, `AssistantView` | `didPersist` + toast αν encode fail | static | **ΔΙΟΡΘΩΘΗΚΕ** |
 | **CQ-P2-forceunwrap** | P2 | Media/Agent/JSON/Obsidian inits | `.first!` → guard / temp fallback | static | **ΔΙΟΡΘΩΘΗΚΕ** |

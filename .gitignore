@@ -21,3 +21,13 @@ Thumbs.db
 .idea/
 *.swp
 *.bak
+
+# Secrets & Environment
+.env
+.env.*
+*.pem
+*.key
+*.cer
+*.p12
+*.mobileprovision
+

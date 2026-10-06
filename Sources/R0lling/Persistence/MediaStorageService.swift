@@ -3,8 +3,11 @@ import Foundation
 /// Διαχείριση αποθήκευσης αρχείων πολυμέσων (Photos, Videos, Clips, Audio)
 public actor MediaStorageService: MediaStorageProtocol {
     private let baseMediaDirectory: URL
+    /// Αν `true`, αγνοεί τον έλεγχο δίσκου (μόνο unit tests).
+    private let paradekampseElegxoXorou: Bool
 
-    public init(baseDirectory: URL? = nil) {
+    public init(baseDirectory: URL? = nil, paradekampseElegxoXorou: Bool = false) {
+        self.paradekampseElegxoXorou = paradekampseElegxoXorou
         if let dir = baseDirectory {
             self.baseMediaDirectory = dir
         } else if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
@@ -25,12 +28,20 @@ public actor MediaStorageService: MediaStorageProtocol {
     }
 
     public func saveMediaFile(data: Data, originalFilename: String, mediaType: MediaType) throws -> MediaAttachment {
+        guard !data.isEmpty else {
+            throw MediaApothikeusiError.kenoDedomena
+        }
+
         createSubdirectoriesIfNeeded()
 
-        // Έλεγχος διαθέσιμου χώρου (τουλάχιστον 50MB ελεύθερα)
-        let minSpace: Int64 = 50 * 1024 * 1024
-        guard availableFreeDiskSpace() > minSpace else {
-            throw NSError(domain: "R0lling.MediaStorage", code: 1001, userInfo: [NSLocalizedDescriptionKey: "Ανεπαρκής ελεύθερος χώρος αποθήκευσης στη συσκευή."])
+        if !paradekampseElegxoXorou {
+            let diathesima = availableFreeDiskSpace()
+            guard diathesima > ELAXISTOS_ELEUTHEROS_XOROS_BYTES else {
+                throw MediaApothikeusiError.anepikisXoros(
+                    diathesima: diathesima,
+                    apaitoumena: ELAXISTOS_ELEUTHEROS_XOROS_BYTES
+                )
+            }
         }
 
         let id = UUID()
@@ -40,7 +51,16 @@ public actor MediaStorageService: MediaStorageProtocol {
         let relativePath = "\(mediaType.folderName)/\(filename)"
         let destinationURL = baseMediaDirectory.appendingPathComponent(relativePath)
 
-        try data.write(to: destinationURL, options: .atomic)
+        do {
+            try data.write(to: destinationURL, options: .atomic)
+        } catch {
+            throw MediaApothikeusiError.egrafiApetixe(minima: error.localizedDescription)
+        }
+
+        // Verify file exists — no pretend success.
+        guard FileManager.default.fileExists(atPath: destinationURL.path) else {
+            throw MediaApothikeusiError.egrafiApetixe(minima: "Το αρχείο δεν εμφανίστηκε μετά την εγγραφή.")
+        }
 
         let attachment = MediaAttachment(
             id: id,

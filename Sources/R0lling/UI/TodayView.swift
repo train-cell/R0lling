@@ -5,17 +5,15 @@ public struct TodayView: View {
     @EnvironmentObject private var appState: AppState
     @State private var composerText: String = ""
     @State private var selectedTags: String = ""
+    @State private var entryProsEpeksergasia: JournalEntry?
 
     public var body: some View {
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
-                // 1. Top Header: Brand & Hardware Status Chip
                 headerView
 
-                // 2. Main Scrollable Athletic Feed
                 ScrollView {
                     LazyVStack(spacing: 16) {
-                        // Hero 3-Ring Telemetry Card (Bevel Style)
                         BevelTelemetryCard(
                             bufferDuration: appState.bufferDuration,
                             todayClipsCount: appState.todayEntries.filter { !$0.attachments.isEmpty }.count,
@@ -23,12 +21,10 @@ public struct TodayView: View {
                             glassesStatus: appState.glassesState.statusDescription
                         )
 
-                        // «Σαν Σήμερα» Time Capsule Banner
                         if !appState.timeCapsuleMemories.isEmpty {
                             timeCapsuleBanner
                         }
 
-                        // Activity Feed List
                         if appState.todayEntries.isEmpty {
                             emptyStateView
                         } else {
@@ -46,15 +42,22 @@ public struct TodayView: View {
                                 .padding(.horizontal, 4)
 
                                 ForEach(appState.todayEntries) { entry in
-                                    TimelineEntryCard(entry: entry, onFavoriteToggle: {
-                                        Task {
-                                            await appState.toggleFavorite(entry: entry)
+                                    TimelineEntryCard(
+                                        entry: entry,
+                                        einaiObsidianSync: false,
+                                        onFavoriteToggle: {
+                                            Task { await appState.toggleFavorite(entry: entry) }
+                                        },
+                                        onDelete: {
+                                            Task { await appState.deleteEntry(id: entry.id) }
+                                        },
+                                        onEdit: {
+                                            entryProsEpeksergasia = entry
+                                        },
+                                        resolveMediaURL: { relativePath in
+                                            await appState.resolveMediaURL(relativePath: relativePath)
                                         }
-                                    }, onDelete: {
-                                        Task {
-                                            await appState.deleteEntry(id: entry.id)
-                                        }
-                                    })
+                                    )
                                 }
                             }
                         }
@@ -64,11 +67,9 @@ public struct TodayView: View {
                     .padding(.bottom, appState.isStreaming ? 150 : 90)
                 }
 
-                // 3. Bottom Composer Bar
                 composerBar
             }
 
-            // 4. Floating Clip Bar (Strava Workout Capture Style)
             if appState.isStreaming {
                 FloatingClipBar(
                     bufferDuration: appState.bufferDuration,
@@ -85,6 +86,16 @@ public struct TodayView: View {
             }
         }
         .background(R0llingTheme.bgPrimary.ignoresSafeArea())
+        .sheet(item: $entryProsEpeksergasia) { entry in
+            EntryEditorSheet(
+                entry: entry,
+                onSave: { updated in
+                    entryProsEpeksergasia = nil
+                    Task { await appState.updateEntry(updated) }
+                },
+                onCancel: { entryProsEpeksergasia = nil }
+            )
+        }
     }
 
     private var headerView: some View {
@@ -95,7 +106,6 @@ public struct TodayView: View {
                         .font(.system(size: 24, weight: .black, design: .rounded))
                         .foregroundColor(R0llingTheme.textPrimary)
 
-                    // Strava Badge
                     Text("POV LAB")
                         .font(.system(size: 9, weight: .black, design: .monospaced))
                         .foregroundColor(R0llingTheme.stravaOrange)
@@ -113,7 +123,6 @@ public struct TodayView: View {
 
             Spacer()
 
-            // Glasses Connection & Streaming Badge
             Button(action: {
                 Task {
                     if appState.glassesState.isLive {
@@ -205,7 +214,7 @@ public struct TodayView: View {
                 .foregroundColor(R0llingTheme.textPrimary)
                 .tracking(1.2)
 
-            Text("Ξεκίνα τη ροή από τα Meta Glasses για συνεχή κυκλικό buffer 10 δευτερολέπτων ή σημείωσε μια σκέψη με φωνή.")
+            Text("Ξεκίνα τη ροή από τα Meta Glasses, σημείωσε μια σκέψη, ή επισύναψε φωτογραφία/βίντεο από Photos.")
                 .font(.system(size: 13, weight: .regular))
                 .foregroundColor(R0llingTheme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -216,7 +225,6 @@ public struct TodayView: View {
 
     private var composerBar: some View {
         HStack(spacing: 10) {
-            // Dictation button (Strava athletic mic button)
             Button(action: {
                 R0llingTheme.triggerHapticFeedback()
                 appState.toggleSpeechDictation()
@@ -233,7 +241,24 @@ public struct TodayView: View {
                     )
             }
 
-            // Input field
+            PhotosMediaPickerButton(
+                onImport: { data, filename, mediaType in
+                    let note = composerText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    await appState.attachMediaData(
+                        data: data,
+                        originalFilename: filename,
+                        mediaType: mediaType,
+                        noteText: note.isEmpty ? nil : note
+                    )
+                    if !note.isEmpty {
+                        composerText = ""
+                    }
+                },
+                onError: { minima in
+                    appState.showToast(minima)
+                }
+            )
+
             TextField("Σημείωση δραστηριότητας...", text: $composerText)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(R0llingTheme.textPrimary)
@@ -246,7 +271,6 @@ public struct TodayView: View {
                         .stroke(R0llingTheme.borderSubtle, lineWidth: 1)
                 )
 
-            // Send button
             Button(action: {
                 let text = composerText
                 composerText = ""

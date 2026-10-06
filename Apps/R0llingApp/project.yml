@@ -1,0 +1,32 @@
+# XcodeGen scaffold — optional. Generate with: xcodegen generate
+name: R0llingApp
+options:
+  bundleIdPrefix: com.personal
+  deploymentTarget:
+    iOS: "17.2"
+  createIntermediateGroups: true
+settings:
+  BASE_SDK: iphoneos
+  SWIFT_VERSION: "6.0"
+packages:
+  R0lling:
+    path: ../..
+targets:
+  R0llingApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: Host
+        optional: true
+    dependencies:
+      - package: R0lling
+        product: R0lling
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.personal.r0lling
+      INFOPLIST_FILE: Info.plist
+      TARGETED_DEVICE_FAMILY: "1,2"
+      GENERATE_INFOPLIST_FILE: NO
+    info:
+      path: Info.plist
+      properties:
+        UILaunchScreen: {}

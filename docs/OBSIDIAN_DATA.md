@@ -58,8 +58,11 @@ Rolling Clip (10.0s) από τα Meta Glasses.
 ## 3. Κανόνες Συγχώνευσης & Ανίχνευσης Συγκρούσεων
 
 1. **Κύρια Πηγή (Single Source of Truth):** Η τοπική βάση του R0lling (`Application Support/R0lling/journal_v1.json`) είναι η κύρια αξιόπιστη πηγή των καταγραφών.
-2. **Idempotent Export:** Επανεξαγωγή μιας ημέρας ενημερώνει τις υπάρχουσες εγγραφές βάσει του αναγνωριστικού `r0lling:id:UUID` χωρίς να διπλασιάζει γραμμές.
-3. **Ανίχνευση Εξωτερικών Αλλαγών:** Το σύστημα υπολογίζει το SHA256 hash του αρχείου. Αν ο χρήστης πρόσθεσε δικές του σημειώσεις στο τέλος του Markdown μέσα στο Obsidian, οι σημειώσεις αυτές διατηρούνται ακέραιες!
+2. **Idempotent Export (A08):** Επανεξαγωγή μιας ημέρας ενημερώνει τις υπάρχουσες εγγραφές βάσει του αναγνωριστικού `r0lling:id:UUID` χωρίς να διπλασιάζει γραμμές.
+3. **Ανίχνευση Εξωτερικών Αλλαγών (A09):** SHA256 ανά ημερήσιο αρχείο. Hash mismatch → sidecar `YYYY-MM-DD.r0lling-conflict.md` · το πρωτότυπο **δεν** υπεργράφεται.
+4. **Hash Persistence:** Τα hashes αποθηκεύονται στο `R0llingMeta/export-hashes.json` μέσα στο vault ώστε το conflict detection να επιβιώνει μετά από restart.
+5. **PathAsfaleia (SEC-002):** Όλα τα relative paths (notes, sidecar, Attachments, Agent, canvas/KG) περνούν από `PathAsfaleia.asfalhs_resolved_url`.
+6. **Vault Selection:** Default `Documents/R0lling/ObsidianVault` ή εξωτερικός φάκελος μέσω iOS Files picker + security-scoped bookmark (`VaultBookmarkStore`).
 
 ---
 

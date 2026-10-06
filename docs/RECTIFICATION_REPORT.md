@@ -1,7 +1,7 @@
 # R0lling — Rectification Report (Plan · Docs · Code)
 
 **Ημερομηνία:** 2026-10-06 ~18:00 EEST  
-**Workspace:** `C:\Users\skyd3\antigarvity\R0lling`  
+**Workspace:** `.`  
 **Git:** χωρίς commit (όπως ζητήθηκε)  
 **Inputs:** `R0lling-Project-Plan.md` (Codex) · `docs/*` · `Sources/` · `verification/*.py` · `AUDIT_CODE_QUALITY.md` · `GEMINI_AUDIT.md`
 

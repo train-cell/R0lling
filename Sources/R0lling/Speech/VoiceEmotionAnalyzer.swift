@@ -1,6 +1,6 @@
 import Foundation
 
-/// Αναλυτής συναισθηματικού τόνου φωνητικών σημειώσεων
+/// Keyword emotion tags από transcript κείμενο (όχι F0/prosody audio analysis).
 public struct VoiceEmotionAnalyzer: Sendable {
     public init() {}
 

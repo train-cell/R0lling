@@ -54,4 +54,10 @@
 - **Foreground (Εφαρμογή ανοιχτή):** Πλήρης ροή βίντεο 1080p @ 30fps, συνεχής ανανέωση του 10s ring buffer.
 - **Background (Ελαχιστοποίηση εφαρμογής):** Το επίσημο Meta CameraAccess sample αναστέλλει τη συνεδρία ροής κατά την είσοδο στο background για προστασία της μπαταρίας. Το R0lling αποθηκεύει με ασφάλεια τα δείγματα μέχρι εκείνο το σημείο και θέτει την ένδειξη σε `PAUSED`.
 - **Lock Screen (Κλειδωμένη οθόνη):** Η ροή διακόπτεται πλήρως. Μετά το ξεκλείδωμα, επανασυνδέεται αυτόματα εντός 1 δευτερολέπτου.
-- **Simulation Fallback:** Σε περιβάλλον ανάπτυξης χωρίς τα φυσικά γυαλιά, ενεργοποιήστε το διακόπτη `Simulation Mode` στις Ρυθμίσεις για να παράγονται τεχνητά καρέ 30fps και να ελέγξετε όλη τη ροή clipping χωρίς hardware.
+- **Simulation Fallback:** Σε περιβάλλον ανάπτυξης χωρίς τα φυσικά γυαλιά, ενεργοποιήστε το διακόπτη `Simulation Mode` στις Ρυθμίσεις για να παράγονται τεχνητά καρέ 30fps και να ελέγξετε όλη τη ροή clipping χωρίς hardware. Η ένδειξη συσκευής περιέχει ρητά `SIMULATION — όχι φυσική συσκευή`.
+
+---
+
+## 5. Mac → 100% Gen 2 path
+
+Οδηγός flip από simulation σε πραγματικό DAT device: **[`docs/LANE_CLIP_META.md`](LANE_CLIP_META.md)** (SPM uncomment, `MetaDATStreamBridge` wire, A05 remux, A06/A07 matrix, acoustic/IMU flag flip).
