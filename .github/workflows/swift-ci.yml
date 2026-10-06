@@ -65,8 +65,19 @@ jobs:
         run: |
           set -o pipefail
           if ! swift build -v 2>&1 | tee swift-build.log; then
-            echo "::error::Swift build failed! Printing error summary:"
-            grep -E "error:" swift-build.log -B 2 -A 5 || tail -n 120 swift-build.log
+            python3 -c "
+import re
+with open('swift-build.log', 'r', encoding='utf-8', errors='ignore') as f:
+    log = f.read()
+errors = re.findall(r'(/[^:\n]+):(\d+):(?:\d+:)?\s*error:\s*(.+)', log)
+if errors:
+    for fpath, lnum, msg in errors[:30]:
+        print(f'::error file={fpath},line={lnum}::{msg}')
+else:
+    for l in log.strip().splitlines()[-25:]:
+        if l.strip():
+            print(f'::error::{l.strip()}')
+"
             exit 1
           fi
 
