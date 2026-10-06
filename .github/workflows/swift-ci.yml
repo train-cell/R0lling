@@ -64,15 +64,18 @@ jobs:
       - name: Build R0lling (macOS target)
         run: |
           set -o pipefail
-          if ! swift build -v 2>&1 | tee swift-build.log; then
-            python3 verification/extract_swift_build_errors.py
+          if ! swift build -v --build-tests 2>&1 | tee swift-build.log; then
+            python3 verification/extract_swift_build_errors.py swift-build.log
             exit 1
           fi
 
       - name: Run Tests (macOS target)
         run: |
           set -o pipefail
-          swift test --parallel 2>&1 | tee swift-test.log
+          if ! swift test 2>&1 | tee swift-test.log; then
+            python3 verification/extract_swift_build_errors.py swift-test.log
+            exit 1
+          fi
 
       - name: Upload swift logs
         if: always()
