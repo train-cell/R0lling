@@ -1,5 +1,5 @@
 import Foundation
-#if canImport(WatchConnectivity)
+#if os(iOS) || os(watchOS)
 import WatchConnectivity
 #endif
 
@@ -20,7 +20,7 @@ public final class WatchConnectivityCoordinator: NSObject, @unchecked Sendable {
 
     public override init() {
         super.init()
-        #if canImport(WatchConnectivity)
+        #if os(iOS) || os(watchOS)
         if WCSession.isSupported() {
             let session = WCSession.default
             session.delegate = self
@@ -31,7 +31,7 @@ public final class WatchConnectivityCoordinator: NSObject, @unchecked Sendable {
 
     /// Αποστολή ενημέρωσης κατάστασης buffer στο Apple Watch
     public func updateWatchBufferState(isStreaming: Bool, bufferSeconds: Double) {
-        #if canImport(WatchConnectivity)
+        #if os(iOS) || os(watchOS)
         guard WCSession.default.activationState == .activated, WCSession.default.isWatchAppInstalled else { return }
         let payload: [String: Any] = [
             "schemaVersion": Self.schemaVersionApaitoumenos,
@@ -44,7 +44,7 @@ public final class WatchConnectivityCoordinator: NSObject, @unchecked Sendable {
     }
 }
 
-#if canImport(WatchConnectivity)
+#if os(iOS) || os(watchOS)
 extension WatchConnectivityCoordinator: WCSessionDelegate {
     public func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
         // Activation handler

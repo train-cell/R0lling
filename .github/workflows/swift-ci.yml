@@ -64,7 +64,11 @@ jobs:
       - name: Build R0lling (macOS target)
         run: |
           set -o pipefail
-          swift build -v 2>&1 | tee swift-build.log
+          if ! swift build -v 2>&1 | tee swift-build.log; then
+            echo "::error::Swift build failed! Printing error summary:"
+            grep -E "error:" swift-build.log -B 2 -A 5 || tail -n 120 swift-build.log
+            exit 1
+          fi
 
       - name: Run Tests (macOS target)
         run: |
