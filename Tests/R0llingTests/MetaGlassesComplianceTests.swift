@@ -46,7 +46,7 @@ final class MetaGlassesComplianceTests: XCTestCase {
 
         // Συμβάν είσοδος στο background
         let outcome = await adapter.handleAppLifecycle(.willEnterBackground)
-        XCTAssertEqual(outcome.finalAction, .pause)
+        XCTAssertTrue(outcome.didPauseStream)
 
         let stateAfter = await adapter.connectionState
         XCTAssertTrue(stateAfter.isPaused)
@@ -64,7 +64,7 @@ final class MetaGlassesComplianceTests: XCTestCase {
 
         // Συμβάν κλείδωμα οθόνης
         let outcome = await adapter.handleAppLifecycle(.willResignActiveForLock)
-        XCTAssertEqual(outcome.finalAction, .pause)
+        XCTAssertTrue(outcome.didPauseStream)
 
         let stateAfter = await adapter.connectionState
         XCTAssertTrue(stateAfter.isPaused)
@@ -99,7 +99,7 @@ final class MetaGlassesComplianceTests: XCTestCase {
         sink.receiveAcousticLevel(decibels: -12.5)
         XCTAssertEqual(sink.receivedAcousticLevel, -12.5)
 
-        let sample = HeadGestureDetector.IMUSample(timestamp: 100.0, pitch: 0.1, roll: 0.0, yaw: 0.0)
+        let sample = HeadGestureDetector.IMUSample(pitch: 0.1, roll: 0.0, yaw: 0.0, timestamp: 100.0)
         sink.receiveIMUSample(sample)
         XCTAssertEqual(sink.receivedIMUSample?.pitch, 0.1)
     }
