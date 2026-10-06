@@ -50,7 +50,7 @@ public struct CalendarView: View {
                 TextField("Αναζήτηση σημειώσεων, #tags, δραστηριοτήτων...", text: $searchQuery)
                     .font(.system(size: 14))
                     .foregroundColor(R0llingTheme.textPrimary)
-                    .onChange(of: searchQuery) { _ in
+                    .onChange(of: searchQuery) {
                         Task { await filterEntries() }
                     }
 
@@ -164,7 +164,7 @@ public struct CalendarView: View {
         .task {
             await filterEntries()
         }
-        .onChange(of: appState.allEntries.count) { _ in
+        .onChange(of: appState.allEntries.count) {
             Task { await filterEntries() }
         }
     }

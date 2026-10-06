@@ -38,7 +38,7 @@ public struct SettingsView: View {
                     }
 
                     Toggle("Simulation Mode (Δοκιμή χωρίς γυαλιά)", isOn: $simulationMode)
-                        .onChange(of: simulationMode) { val in
+                        .onChange(of: simulationMode) { _, val in
                             Task {
                                 await appState.glassesAdapter.toggleSimulationMode(enabled: val)
                                 // R3-003: Αν το SDK λείπει, το adapter επιβάλλει simulation.
@@ -80,7 +80,7 @@ public struct SettingsView: View {
                         Text("Hermes (Home PC)").tag(AIProviderType.hermes)
                     }
                     .pickerStyle(SegmentedPickerStyle())
-                    .onChange(of: selectedAIProvider) { val in
+                    .onChange(of: selectedAIProvider) { _, val in
                         appState.activeProvider = val
                     }
 

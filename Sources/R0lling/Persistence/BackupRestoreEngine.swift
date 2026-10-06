@@ -58,7 +58,7 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
         for entry in entries {
             for attachment in entry.attachments {
                 // SEC-002: skip traversal paths — fail-closed ανά attachment.
-                guard let sourceURL = try? await mediaStorage.getMediaFileURL(relativePath: attachment.relativePath),
+                guard let sourceURL = try? mediaStorage.getMediaFileURL(relativePath: attachment.relativePath),
                       let destURL = try? PathAsfaleia.asfalhs_resolved_url(
                         relativePath: attachment.relativePath,
                         baseDirectory: mediaBundleDir
@@ -134,7 +134,7 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
                         relativePath: attachment.relativePath,
                         baseDirectory: mediaBundleDir
                       ),
-                      let targetMediaURL = try? await mediaStorage.getMediaFileURL(
+                      let targetMediaURL = try? mediaStorage.getMediaFileURL(
                         relativePath: attachment.relativePath
                       ) else {
                     continue

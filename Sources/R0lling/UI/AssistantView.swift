@@ -26,7 +26,7 @@ public struct AssistantView: View {
                     }
                     .padding(16)
                 }
-                .onChange(of: appState.chatMessages.count) { _ in
+                .onChange(of: appState.chatMessages.count) {
                     if let last = appState.chatMessages.last {
                         withAnimation {
                             proxy.scrollTo(last.id, anchor: .bottom)
@@ -368,26 +368,30 @@ public struct AgentMemorySheet: View {
                 }
             }
             .navigationTitle("Μνήμη Agent")
-            .navigationBarItems(
-                leading: Button("Κλείσιμο") { dismiss() },
-                trailing: Button("Αποθήκευση") {
-                    let mem = AgentMemory(
-                        memoryNotes: memoryNotes,
-                        userPreferences: userPreferences,
-                        openLoops: openLoops,
-                        lastUpdated: Date()
-                    )
-                    Task {
-                        // CQ-P0-005: μην dismiss σε αποτυχία αποθήκευσης.
-                        do {
-                            try await appState.agentManager.saveAgentMemory(mem)
-                            dismiss()
-                        } catch {
-                            appState.showToast("Σφάλμα αποθήκευσης μνήμης: \(error.localizedDescription)")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Κλείσιμο") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Αποθήκευση") {
+                        let mem = AgentMemory(
+                            memoryNotes: memoryNotes,
+                            userPreferences: userPreferences,
+                            openLoops: openLoops,
+                            lastUpdated: Date()
+                        )
+                        Task {
+                            // CQ-P0-005: μην dismiss σε αποτυχία αποθήκευσης.
+                            do {
+                                try await appState.agentManager.saveAgentMemory(mem)
+                                dismiss()
+                            } catch {
+                                appState.showToast("Σφάλμα αποθήκευσης μνήμης: \(error.localizedDescription)")
+                            }
                         }
                     }
                 }
-            )
+            }
             .onAppear {
                 Task {
                     if let loaded = try? await appState.agentManager.loadAgentMemory() {
@@ -569,7 +573,11 @@ public struct ObservationGameSheet: View {
             .padding()
             .background(R0llingTheme.bgPrimary.ignoresSafeArea())
             .navigationTitle("Παιχνίδι Παρατήρησης")
-            .navigationBarItems(trailing: Button("Κλείσιμο") { dismiss() })
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Κλείσιμο") { dismiss() }
+                }
+            }
         }
     }
 

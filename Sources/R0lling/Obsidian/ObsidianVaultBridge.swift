@@ -200,7 +200,7 @@ public actor ObsidianVaultBridge {
             }
         }
 
-        try antigrafi_attachments(entry: entry, mediaStorage: mediaStorage, vaultURL: vaultURL)
+        try await antigrafi_attachments(entry: entry, mediaStorage: mediaStorage, vaultURL: vaultURL)
 
         var existingContent = ""
         if FileManager.default.fileExists(atPath: noteURL.path) {
@@ -285,7 +285,7 @@ public actor ObsidianVaultBridge {
 
         for attachment in entry.attachments {
             // SEC-002: reject `..` / absolute — silent skip ανά attachment.
-            guard let sourceURL = try? await mediaStorage.getMediaFileURL(relativePath: attachment.relativePath),
+            guard let sourceURL = try? mediaStorage.getMediaFileURL(relativePath: attachment.relativePath),
                   let destURL = try? PathAsfaleia.asfalhs_resolved_url(
                     relativePath: attachment.relativePath,
                     baseDirectory: attachmentsDir

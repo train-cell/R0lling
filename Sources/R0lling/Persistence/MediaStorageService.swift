@@ -20,7 +20,7 @@ public actor MediaStorageService: MediaStorageProtocol {
         createSubdirectoriesIfNeeded()
     }
 
-    private func createSubdirectoriesIfNeeded() {
+    private nonisolated func createSubdirectoriesIfNeeded() {
         for type in MediaType.allCases {
             let subDir = baseMediaDirectory.appendingPathComponent(type.folderName, isDirectory: true)
             try? FileManager.default.createDirectory(at: subDir, withIntermediateDirectories: true)
@@ -77,7 +77,7 @@ public actor MediaStorageService: MediaStorageProtocol {
         return attachment
     }
 
-    public func getMediaFileURL(relativePath: String) throws -> URL {
+    public nonisolated func getMediaFileURL(relativePath: String) throws -> URL {
         try PathAsfaleia.asfalhs_resolved_url(
             relativePath: relativePath,
             baseDirectory: baseMediaDirectory
@@ -91,7 +91,7 @@ public actor MediaStorageService: MediaStorageProtocol {
         }
     }
 
-    public func availableFreeDiskSpace() -> Int64 {
+    public nonisolated func availableFreeDiskSpace() -> Int64 {
         do {
             let values = try baseMediaDirectory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
             return values.volumeAvailableCapacityForImportantUsage ?? 1_000_000_000

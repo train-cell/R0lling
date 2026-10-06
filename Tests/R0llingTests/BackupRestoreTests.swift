@@ -112,7 +112,7 @@ final class BackupRestoreTests: XCTestCase {
         XCTAssertEqual(restored?.id, entry.id)
         XCTAssertEqual(restored?.attachments.first?.relativePath, attachment.relativePath)
 
-        let mediaURL = try await cleanMedia.getMediaFileURL(relativePath: attachment.relativePath)
+        let mediaURL = try cleanMedia.getMediaFileURL(relativePath: attachment.relativePath)
         XCTAssertTrue(FileManager.default.fileExists(atPath: mediaURL.path))
 
         let restoredMemory = try await cleanAgent.loadAgentMemory()

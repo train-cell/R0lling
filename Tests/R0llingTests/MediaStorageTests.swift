@@ -34,7 +34,7 @@ final class MediaStorageTests: XCTestCase {
         XCTAssertTrue(attachment.relativePath.hasPrefix("Photos/"))
         XCTAssertTrue(attachment.relativePath.hasSuffix(".jpg"))
 
-        let url = try await mediaStorage.getMediaFileURL(relativePath: attachment.relativePath)
+        let url = try mediaStorage.getMediaFileURL(relativePath: attachment.relativePath)
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
         let loaded = try Data(contentsOf: url)
         XCTAssertEqual(loaded, jpegBytes)
@@ -57,7 +57,7 @@ final class MediaStorageTests: XCTestCase {
 
     func testPathTraversalRejected() async throws {
         do {
-            _ = try await mediaStorage.getMediaFileURL(relativePath: "../Secrets/key.txt")
+            _ = try mediaStorage.getMediaFileURL(relativePath: "../Secrets/key.txt")
             XCTFail("Path traversal πρέπει να απορρίπτεται")
         } catch {
             let ns = error as NSError
@@ -104,11 +104,11 @@ final class MediaStorageTests: XCTestCase {
         )
         XCTAssertGreaterThanOrEqual(removed, 1)
 
-        let urlA = try await mediaStorage.getMediaFileURL(relativePath: a.relativePath)
+        let urlA = try mediaStorage.getMediaFileURL(relativePath: a.relativePath)
         XCTAssertTrue(FileManager.default.fileExists(atPath: urlA.path))
 
         do {
-            let urlB = try await mediaStorage.getMediaFileURL(relativePath: b.relativePath)
+            let urlB = try mediaStorage.getMediaFileURL(relativePath: b.relativePath)
             XCTAssertFalse(FileManager.default.fileExists(atPath: urlB.path))
         } catch {
             // Path may still resolve but file gone — OK either way.

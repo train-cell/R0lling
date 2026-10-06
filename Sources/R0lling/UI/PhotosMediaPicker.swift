@@ -47,7 +47,7 @@ public struct PhotosMediaPickerButton: View {
                     )
             }
             .disabled(isDisabled)
-            .onChange(of: photoSelection) { neoSelection in
+            .onChange(of: photoSelection) { _, neoSelection in
                 Task { await epeksergasiaPhotosPicker(neoSelection) }
             }
             .accessibilityLabel("Εισαγωγή από Photos")

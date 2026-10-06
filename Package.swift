@@ -28,6 +28,7 @@ let package = Package(
                 // Mac: .product(name: "MetaWearablesDAT", package: "meta-wearables-dat-ios")
             ],
             path: "Sources/R0lling",
+            exclude: ["Experimental/README.md"],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),
                 .define("SWIFT_PACKAGE")

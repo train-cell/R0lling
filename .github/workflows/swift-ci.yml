@@ -43,7 +43,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode 15 / 16
+      - name: Select Xcode 16 / 15
         run: |
           if [ -d "/Applications/Xcode_16.1.app" ]; then
             sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
@@ -62,18 +62,80 @@ jobs:
         run: swift --version
 
       - name: Build R0lling (macOS target)
-        run: swift build -v
+        run: |
+          set -o pipefail
+          swift build -v 2>&1 | tee swift-build.log
 
       - name: Run Tests (macOS target)
         run: |
           set -o pipefail
           swift test --parallel 2>&1 | tee swift-test.log
 
-      - name: Upload swift test log
+      - name: Upload swift logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: swift-test-log
-          path: swift-test.log
+          name: swift-build-and-test-logs
+          path: |
+            swift-build.log
+            swift-test.log
           if-no-files-found: warn
           retention-days: 14
+
+  package-ios-app:
+    name: Build & Package iOS App (.ipa)
+    runs-on: macos-14
+    timeout-minutes: 25
+    needs: [build-and-test]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 16 / 15
+        run: |
+          if [ -d "/Applications/Xcode_16.1.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_15.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+          fi
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        working-directory: Apps/R0llingApp
+        run: xcodegen generate
+
+      - name: Build iOS App (Generic iOS Device)
+        working-directory: Apps/R0llingApp
+        run: |
+          xcodebuild clean build \
+            -project R0llingApp.xcodeproj \
+            -scheme R0llingApp \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            BUILD_DIR="${PWD}/build"
+
+      - name: Package .ipa for Sideloadly
+        working-directory: Apps/R0llingApp
+        run: |
+          mkdir -p build/Release-iphoneos/Payload
+          cp -R "build/Release-iphoneos/R0llingApp.app" build/Release-iphoneos/Payload/
+          cd build/Release-iphoneos
+          zip -r R0lling.ipa Payload
+          ls -la R0lling.ipa
+
+      - name: Upload iOS .ipa Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: R0lling-iOS-IPA
+          path: Apps/R0llingApp/build/Release-iphoneos/R0lling.ipa
+          if-no-files-found: error
+          retention-days: 30

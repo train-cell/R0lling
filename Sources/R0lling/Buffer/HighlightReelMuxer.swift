@@ -55,7 +55,7 @@ public actor HighlightReelMuxer {
         var includedCount = 0
 
         for att in clipAttachments {
-            guard let fileURL = try? await mediaStorage.getMediaFileURL(relativePath: att.relativePath) else { continue }
+            guard let fileURL = try? mediaStorage.getMediaFileURL(relativePath: att.relativePath) else { continue }
             guard FileManager.default.fileExists(atPath: fileURL.path) else { continue }
 
             let asset = AVURLAsset(url: fileURL)
@@ -127,7 +127,7 @@ public actor HighlightReelMuxer {
             originalFilename: filename,
             mediaType: .video
         )
-        let targetURL = try await mediaStorage.getMediaFileURL(relativePath: savedAttachment.relativePath)
+        let targetURL = try mediaStorage.getMediaFileURL(relativePath: savedAttachment.relativePath)
 
         return ReelExportResult(
             fileURL: targetURL,

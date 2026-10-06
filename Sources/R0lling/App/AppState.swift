@@ -942,7 +942,7 @@ public final class AppState: ObservableObject {
     /// Ανάλυση relative path σε sandbox URL (για previews) — `nil` σε fail, χωρίς crash.
     public func resolveMediaURL(relativePath: String) async -> URL? {
         do {
-            return try await mediaStorage.getMediaFileURL(relativePath: relativePath)
+            return try mediaStorage.getMediaFileURL(relativePath: relativePath)
         } catch {
             return nil
         }
