@@ -31,3 +31,9 @@ Thumbs.db
 *.p12
 *.mobileprovision
 
+# Build Artifacts & IPAs
+build_artifacts/
+*.ipa
+*.zip
+job_log.txt
+

@@ -7,6 +7,7 @@ public enum AppErrorTaxonomy {
     public static let permissionDomain = "R0lling.Permissions"
     public static let diskDomain = "R0lling.Disk"
     public static let mediaDomain = "R0lling.Media"
+    public static let metaGlassesDomain = "R0lling.Glasses.Meta"
 
     // Backup (A15)
     public static let backupMissingManifest = 2001
@@ -25,6 +26,12 @@ public enum AppErrorTaxonomy {
     // Disk (A16)
     public static let diskFull = 8101
     public static let diskWriteFailed = 8102
+
+    // Meta Wearables Hardware Safety & Compliance
+    public static let metaCameraPrivacyIndicatorObscured = 8201
+    public static let metaThermalThrottleExceeded = 8202
+    public static let metaBatteryDepleted = 8203
+    public static let metaBackgroundCaptureRestricted = 8204
 
     /// Δημιουργεί typed NSError χωρίς leak secrets/paths.
     public static func makeError(
@@ -74,18 +81,20 @@ public enum AppErrorTaxonomy {
             || ns.domain == permissionDomain
             || ns.domain == diskDomain
             || ns.domain == mediaDomain
+            || ns.domain == metaGlassesDomain
             || AIErrorTaxonomy.isTypedAIError(error) {
             return ns.localizedDescription
         }
         return "Προέκυψε σφάλμα. Τα δεδομένα παρέμειναν ασφαλή."
     }
 
-    /// True αν το error ανήκει σε γνωστό app domain (backup/permission/disk/media).
+    /// True αν το error ανήκει σε γνωστό app domain (backup/permission/disk/media/meta).
     public static func isTypedAppError(_ error: Error) -> Bool {
         let ns = error as NSError
         return ns.domain == backupDomain
             || ns.domain == permissionDomain
             || ns.domain == diskDomain
             || ns.domain == mediaDomain
+            || ns.domain == metaGlassesDomain
     }
 }

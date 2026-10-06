@@ -4,52 +4,56 @@ import SwiftUI
 import UIKit
 #endif
 
-/// Χρωματικά tokens και στυλ Strava × Bevel × Discord
+/// Χρωματικά tokens και στυλ Discord × Twitch
 public struct R0llingTheme {
-    // Athletic Dark Palette (Bevel Charcoal & Midnight Navy)
-    public static let bgPrimary = Color(hex: 0x0B0F17)
-    public static let bgSurface = Color(hex: 0x141A24)
-    public static let bgElevated = Color(hex: 0x1C2433)
-    public static let borderSubtle = Color(white: 1.0, opacity: 0.08)
-    public static let borderFocus = Color(hex: 0xFC5200).opacity(0.4)
+    // Discord Dark Cold Palette (Dark Charcoal & Deep Slate)
+    public static let bgPrimary = Color(hex: 0x16161D)
+    public static let bgSurface = Color(hex: 0x22232D)
+    public static let bgElevated = Color(hex: 0x2C2D39)
+    public static let borderSubtle = Color(hex: 0x373948)
+    public static let borderFocus = Color(hex: 0x7742DC).opacity(0.6)
 
     // Typography Colors
-    public static let textPrimary = Color(hex: 0xF8FAFC)
-    public static let textSecondary = Color(hex: 0x94A3B8)
-    public static let textMuted = Color(hex: 0x64748B)
+    public static let textPrimary = Color(hex: 0xF4F4F8)
+    public static let textSecondary = Color(hex: 0xB4B5C5)
+    public static let textMuted = Color(hex: 0x787A91)
 
-    // Strava & Bevel Brand Accents
-    public static let stravaOrange = Color(hex: 0xFC5200)
-    public static let stravaFlame = Color(hex: 0xFF7322)
-    public static let bevelCyan = Color(hex: 0x00E5FF)
-    public static let bevelEmerald = Color(hex: 0x10B981)
-    public static let bevelAmber = Color(hex: 0xF59E0B)
-
-    // Secondary Lavender Accents
+    // Twitch & Discord Brand Accents (Strictly Cold / Purple / Cyan - Zero Orange / Red in regular states)
     public static let accentPurple = Color(hex: 0x7742DC)
+    public static let accentTwitch = Color(hex: 0x9146FF)
     public static let accentLavender = Color(hex: 0xA78BFA)
-    public static let accentGlow = Color(hex: 0xFC5200).opacity(0.35)
+    public static let accentCyan = Color(hex: 0x00E5FF)
+    public static let accentGlow = Color(hex: 0x7742DC).opacity(0.35)
+
+    // Backward compatibility aliases (re-routed to Twitch Purple / Lavender to ensure zero orange)
+    public static let stravaOrange = Color(hex: 0x7742DC)
+    public static let stravaFlame = Color(hex: 0xA78BFA)
+    public static let bevelCyan = Color(hex: 0x00E5FF)
+    public static let bevelEmerald = Color(hex: 0x55D6A4)
+    public static let bevelAmber = Color(hex: 0xA78BFA)
 
     // Status Badges
-    public static let statusLive = Color(hex: 0xFC5200) // Strava Active Pulse
-    public static let statusSuccess = Color(hex: 0x10B981) // Bevel High Recovery
-    public static let statusWarning = Color(hex: 0xF59E0B) // Amber Strain Target
-    public static let statusError = Color(hex: 0xEF4444)
+    public static let statusLive = Color(hex: 0x7742DC) // Twitch Active Stream Pulse
+    public static let statusSuccess = Color(hex: 0x55D6A4) // Verified Success
+    public static let statusWarning = Color(hex: 0xA78BFA) // Attention / Notice (Cold Lavender)
+    public static let statusError = Color(hex: 0xFF6B7A) // Strictly for runtime errors
 
     // Gradients
-    public static let stravaButtonGradient = LinearGradient(
-        colors: [Color(hex: 0xFC5200), Color(hex: 0xFF6519)],
+    public static let primaryButtonGradient = LinearGradient(
+        colors: [Color(hex: 0x7742DC), Color(hex: 0x9146FF)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
+    public static let stravaButtonGradient = primaryButtonGradient
 
-    public static let bevelRingGradient = AngularGradient(
-        gradient: Gradient(colors: [Color(hex: 0x00E5FF), Color(hex: 0x10B981), Color(hex: 0xFC5200), Color(hex: 0x00E5FF)]),
+    public static let twitchRingGradient = AngularGradient(
+        gradient: Gradient(colors: [Color(hex: 0x00E5FF), Color(hex: 0x7742DC), Color(hex: 0xA78BFA), Color(hex: 0x00E5FF)]),
         center: .center
     )
+    public static let bevelRingGradient = twitchRingGradient
 
     public static let heroCardGradient = LinearGradient(
-        colors: [Color(hex: 0x172030), Color(hex: 0x111622)],
+        colors: [Color(hex: 0x22232D), Color(hex: 0x1B1B24)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )

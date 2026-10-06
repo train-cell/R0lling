@@ -9,7 +9,7 @@ import AppKit
 /// Bevel-style Concentric 3-Ring Visualization (Buffer, Captures Target, Vault Status)
 public struct BevelConcentricRingsView: View {
     public let bufferRatio: Double    // 0.0 ... 1.0 (Ring 1: Outer Cyan)
-    public let clipsRatio: Double     // 0.0 ... 1.0 (Ring 2: Middle Orange)
+    public let clipsRatio: Double     // 0.0 ... 1.0 (Ring 2: Middle Purple)
     public let batteryRatio: Double   // 0.0 ... 1.0 (Ring 3: Inner Emerald)
 
     public init(bufferRatio: Double = 1.0, clipsRatio: Double = 0.6, batteryRatio: Double = 0.85) {
@@ -36,14 +36,14 @@ public struct BevelConcentricRingsView: View {
                 .rotationEffect(.degrees(-90))
                 .frame(width: 96, height: 96)
 
-            // Ring 2: Clips Target (Middle - Strava Orange)
+            // Ring 2: Clips Target (Middle - Twitch Purple)
             Circle()
-                .stroke(R0llingTheme.stravaOrange.opacity(0.18), lineWidth: 8)
+                .stroke(R0llingTheme.accentPurple.opacity(0.18), lineWidth: 8)
                 .frame(width: 74, height: 74)
             Circle()
                 .trim(from: 0.0, to: CGFloat(clipsRatio))
                 .stroke(
-                    R0llingTheme.stravaOrange,
+                    R0llingTheme.accentPurple,
                     style: StrokeStyle(lineWidth: 8, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
@@ -65,7 +65,7 @@ public struct BevelConcentricRingsView: View {
             // Central Icon
             Image(systemName: "bolt.fill")
                 .font(.system(size: 14, weight: .black))
-                .foregroundColor(R0llingTheme.stravaOrange)
+                .foregroundColor(R0llingTheme.accentLavender)
         }
         .frame(width: 104, height: 104)
     }
@@ -96,7 +96,7 @@ public struct BevelTelemetryCard: View {
             HStack {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(isStreaming ? R0llingTheme.stravaOrange : R0llingTheme.bevelEmerald)
+                        .fill(isStreaming ? R0llingTheme.accentPurple : R0llingTheme.bevelEmerald)
                         .frame(width: 8, height: 8)
                     Text(glassesStatus.uppercased())
                         .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -145,7 +145,7 @@ public struct BevelTelemetryCard: View {
                     // Metric 2: Today Clips
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(R0llingTheme.stravaOrange)
+                            .fill(R0llingTheme.accentPurple)
                             .frame(width: 6, height: 6)
                         VStack(alignment: .leading, spacing: 1) {
                             Text("TODAY'S CLIPS")
@@ -178,8 +178,8 @@ public struct BevelTelemetryCard: View {
 
             // Coaching Target Strip (Bevel-style target range)
             HStack {
-                Image(systemName: "flame.fill")
-                    .foregroundColor(R0llingTheme.stravaOrange)
+                Image(systemName: "sparkles")
+                    .foregroundColor(R0llingTheme.accentLavender)
                     .font(.system(size: 12))
                 Text("Rolling Target: 10s Circular Ring actively caching keyframes in RAM.")
                     .font(.system(size: 11, weight: .medium))
@@ -238,7 +238,7 @@ public struct TimelineEntryCard: View {
                         .frame(width: 40, height: 40)
                     Image(systemName: entry.source.iconName)
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(R0llingTheme.stravaOrange)
+                        .foregroundColor(R0llingTheme.accentPurple)
 
                     Circle()
                         .fill(R0llingTheme.bevelEmerald)
@@ -281,7 +281,7 @@ public struct TimelineEntryCard: View {
                         icon: "stopwatch.fill",
                         value: String(format: "%.1fs", dur),
                         label: "DURATION",
-                        accentColor: R0llingTheme.stravaOrange
+                        accentColor: R0llingTheme.accentPurple
                     )
                 } else {
                     BevelStatPill(
@@ -362,10 +362,10 @@ public struct TimelineEntryCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: entry.isFavorite ? "heart.fill" : "heart")
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(entry.isFavorite ? R0llingTheme.stravaOrange : R0llingTheme.textMuted)
+                            .foregroundColor(entry.isFavorite ? R0llingTheme.accentPurple : R0llingTheme.textMuted)
                         Text(entry.isFavorite ? "Favorited" : "Kudos")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(entry.isFavorite ? R0llingTheme.stravaOrange : R0llingTheme.textMuted)
+                            .foregroundColor(entry.isFavorite ? R0llingTheme.accentPurple : R0llingTheme.textMuted)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
@@ -463,7 +463,7 @@ public struct MediaPreviewCard: View {
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(R0llingTheme.stravaOrange)
+                        .background(R0llingTheme.accentPurple)
                         .clipShape(Capsule())
                     }
                 }
@@ -511,7 +511,7 @@ public struct MediaPreviewCard: View {
 
                 Text(katastasiArxeiou)
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(loadError == nil ? R0llingTheme.bevelEmerald : R0llingTheme.stravaOrange)
+                    .foregroundColor(loadError == nil ? R0llingTheme.bevelEmerald : R0llingTheme.statusError)
             }
             .padding(10)
             .background(
@@ -548,7 +548,7 @@ public struct MediaPreviewCard: View {
             VStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: 28))
-                    .foregroundColor(R0llingTheme.stravaOrange)
+                    .foregroundColor(R0llingTheme.statusError)
                 Text(loadError)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(R0llingTheme.textSecondary)
@@ -637,18 +637,18 @@ public struct LiveStreamBadge: View {
     public var body: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(R0llingTheme.stravaOrange)
+                .fill(R0llingTheme.accentPurple)
                 .frame(width: 8, height: 8)
                 .scaleEffect(isPulsing ? 1.35 : 1.0)
                 .opacity(isPulsing ? 0.6 : 1.0)
 
             Text("REC LIVE")
                 .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                .foregroundColor(R0llingTheme.stravaOrange)
+                .foregroundColor(R0llingTheme.accentPurple)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(R0llingTheme.stravaOrange.opacity(0.15))
+        .background(R0llingTheme.accentPurple.opacity(0.15))
         .clipShape(Capsule())
         .onAppear {
             withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
@@ -696,9 +696,9 @@ public struct FloatingClipBar: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
-                .background(R0llingTheme.stravaButtonGradient)
+                .background(R0llingTheme.primaryButtonGradient)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadow(color: R0llingTheme.stravaOrange.opacity(0.45), radius: 10, x: 0, y: 4)
+                .shadow(color: R0llingTheme.accentPurple.opacity(0.45), radius: 10, x: 0, y: 4)
             }
             .disabled(!isStreaming || bufferDuration < 0.5)
         }
@@ -720,10 +720,10 @@ public struct TagChip: View {
     public var body: some View {
         Text(text)
             .font(.system(size: 11, weight: .bold, design: .rounded))
-            .foregroundColor(R0llingTheme.stravaFlame)
+            .foregroundColor(R0llingTheme.accentLavender)
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
-            .background(R0llingTheme.stravaOrange.opacity(0.12))
+            .background(R0llingTheme.accentPurple.opacity(0.15))
             .clipShape(Capsule())
     }
 }

@@ -93,9 +93,9 @@ public struct AssistantView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(R0llingTheme.stravaButtonGradient)
+                        .background(R0llingTheme.primaryButtonGradient)
                         .clipShape(Capsule())
-                        .shadow(color: R0llingTheme.stravaOrange.opacity(0.3), radius: 6, x: 0, y: 2)
+                        .shadow(color: R0llingTheme.accentPurple.opacity(0.3), radius: 6, x: 0, y: 2)
                     }
 
                     Button(action: {
@@ -121,7 +121,7 @@ public struct AssistantView: View {
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "xmark.circle")
-                                .foregroundColor(R0llingTheme.stravaFlame)
+                                .foregroundColor(R0llingTheme.statusError)
                             Text("Άκυρο")
                         }
                         .font(.system(size: 13, weight: .semibold))
@@ -172,7 +172,7 @@ public struct AssistantView: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "film.fill")
-                            .foregroundColor(R0llingTheme.stravaOrange)
+                            .foregroundColor(R0llingTheme.accentPurple)
                         Text("🎬 Highlight Reel")
                     }
                     .font(.system(size: 13, weight: .semibold))
@@ -226,7 +226,7 @@ public struct AssistantView: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "point.3.connected.trianglepath.dotted")
-                            .foregroundColor(R0llingTheme.stravaFlame)
+                            .foregroundColor(R0llingTheme.accentLavender)
                         Text("🧠 Graph")
                     }
                     .font(.system(size: 13, weight: .semibold))
@@ -299,13 +299,13 @@ public struct AssistantView: View {
                     .background(
                         inputPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                             ? LinearGradient(colors: [R0llingTheme.bgElevated, R0llingTheme.bgElevated], startPoint: .top, endPoint: .bottom)
-                            : R0llingTheme.stravaButtonGradient
+                            : R0llingTheme.primaryButtonGradient
                     )
                     .clipShape(Circle())
                     .shadow(
                         color: inputPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                             ? Color.clear
-                            : R0llingTheme.stravaOrange.opacity(0.35),
+                            : R0llingTheme.accentPurple.opacity(0.35),
                         radius: 6, x: 0, y: 2
                     )
             }
@@ -331,7 +331,7 @@ public struct ChatMessageBubble: View {
                     .font(.system(size: 15))
                     .foregroundColor(.white)
                     .padding(12)
-                    .background(isUser ? R0llingTheme.stravaOrange : R0llingTheme.bgSurface)
+                    .background(isUser ? R0llingTheme.accentPurple : R0llingTheme.bgSurface)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -416,9 +416,9 @@ public struct ObservationGameSheet: View {
             VStack(spacing: 20) {
                 // Score & Streak
                 HStack(spacing: 16) {
-                    Label("\(appState.scavengerStreak)d Σερί", systemImage: "flame.fill")
+                    Label("\(appState.scavengerStreak)d Σερί", systemImage: "sparkles")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.orange)
+                        .foregroundColor(R0llingTheme.accentCyan)
 
                     Label("\(appState.gameScore) πόντοι", systemImage: "star.fill")
                         .font(.system(size: 16, weight: .bold))

@@ -34,7 +34,7 @@ public struct SettingsView: View {
                         }
                     }) {
                         Text(appState.glassesState == .disconnected ? "Σύνδεση Γυαλιών" : "Αποσύνδεση")
-                            .foregroundColor(R0llingTheme.stravaOrange)
+                            .foregroundColor(R0llingTheme.accentPurple)
                     }
 
                     Toggle("Simulation Mode (Δοκιμή χωρίς γυαλιά)", isOn: $simulationMode)
@@ -128,7 +128,7 @@ public struct SettingsView: View {
                             }
                         }
                     }
-                    .foregroundColor(R0llingTheme.stravaOrange)
+                    .foregroundColor(R0llingTheme.accentPurple)
                 }
 
                 // Section 4: Obsidian Vault (A08 Files picker + A09 conflict UI)
@@ -163,7 +163,7 @@ public struct SettingsView: View {
                             }
                         }
                     }
-                    .foregroundColor(R0llingTheme.stravaOrange)
+                    .foregroundColor(R0llingTheme.accentPurple)
 
                     if !appState.teleutaiaObsidianConflicts.isEmpty {
                         Text("Conflicts:")
@@ -171,7 +171,7 @@ public struct SettingsView: View {
                         ForEach(appState.teleutaiaObsidianConflicts, id: \.self) { path in
                             Text("• \(path)")
                                 .font(.system(size: 11, design: .monospaced))
-                                .foregroundColor(R0llingTheme.statusLive)
+                                .foregroundColor(R0llingTheme.statusError)
                         }
                     }
                 }

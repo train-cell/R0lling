@@ -33,6 +33,9 @@ jobs:
       - name: Verify all subsystems
         run: python verification/verify_all_subsystems.py
 
+      - name: Verify theme, Apple & Meta compliance
+        run: python verification/verify_theme_apple_meta_compliance.py
+
   build-and-test:
     name: Swift build + test (macOS)
     runs-on: macos-14

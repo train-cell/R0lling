@@ -26,10 +26,10 @@ public struct CalendarView: View {
 
                 Text("\(displayedEntries.count) LOGS")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(R0llingTheme.stravaOrange)
+                    .foregroundColor(R0llingTheme.accentPurple)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(R0llingTheme.stravaOrange.opacity(0.12))
+                    .background(R0llingTheme.accentPurple.opacity(0.15))
                     .clipShape(Capsule())
             }
             .padding(.horizontal, 16)
@@ -44,7 +44,7 @@ public struct CalendarView: View {
 
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(R0llingTheme.stravaOrange)
+                    .foregroundColor(R0llingTheme.accentPurple)
                     .font(.system(size: 14, weight: .bold))
 
                 TextField("Αναζήτηση σημειώσεων, #tags, δραστηριοτήτων...", text: $searchQuery)
@@ -198,13 +198,13 @@ public struct FilterChip: View {
                 .foregroundColor(isSelected ? .white : R0llingTheme.textSecondary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .background(isSelected ? R0llingTheme.stravaOrange : R0llingTheme.bgElevated)
+                .background(isSelected ? R0llingTheme.accentPurple : R0llingTheme.bgElevated)
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
-                        .stroke(isSelected ? R0llingTheme.stravaFlame : R0llingTheme.borderSubtle, lineWidth: 1)
+                        .stroke(isSelected ? R0llingTheme.accentLavender : R0llingTheme.borderSubtle, lineWidth: 1)
                 )
-                .shadow(color: isSelected ? R0llingTheme.stravaOrange.opacity(0.35) : Color.clear, radius: 6, x: 0, y: 2)
+                .shadow(color: isSelected ? R0llingTheme.accentPurple.opacity(0.35) : Color.clear, radius: 6, x: 0, y: 2)
         }
     }
 }

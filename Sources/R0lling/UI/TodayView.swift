@@ -37,7 +37,7 @@ public struct TodayView: View {
                                     Spacer()
                                     Text("\(appState.todayEntries.count) ENTRIES")
                                         .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(R0llingTheme.stravaOrange)
+                                        .foregroundColor(R0llingTheme.accentPurple)
                                 }
                                 .padding(.horizontal, 4)
 
@@ -108,10 +108,10 @@ public struct TodayView: View {
 
                     Text("POV LAB")
                         .font(.system(size: 9, weight: .black, design: .monospaced))
-                        .foregroundColor(R0llingTheme.stravaOrange)
+                        .foregroundColor(R0llingTheme.accentPurple)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(R0llingTheme.stravaOrange.opacity(0.15))
+                        .background(R0llingTheme.accentPurple.opacity(0.15))
                         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 }
 
@@ -145,7 +145,7 @@ public struct TodayView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
-                    appState.isStreaming ? R0llingTheme.stravaButtonGradient : LinearGradient(
+                    appState.isStreaming ? R0llingTheme.primaryButtonGradient : LinearGradient(
                         colors: [R0llingTheme.bgElevated, R0llingTheme.bgElevated],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -154,9 +154,9 @@ public struct TodayView: View {
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
-                        .stroke(appState.isStreaming ? R0llingTheme.stravaOrange : R0llingTheme.borderSubtle, lineWidth: 1)
+                        .stroke(appState.isStreaming ? R0llingTheme.accentPurple : R0llingTheme.borderSubtle, lineWidth: 1)
                 )
-                .shadow(color: appState.isStreaming ? R0llingTheme.stravaOrange.opacity(0.35) : Color.clear, radius: 8, x: 0, y: 2)
+                .shadow(color: appState.isStreaming ? R0llingTheme.accentPurple.opacity(0.35) : Color.clear, radius: 8, x: 0, y: 2)
             }
         }
         .padding(.horizontal, 16)
@@ -205,7 +205,7 @@ public struct TodayView: View {
                     .frame(width: 80, height: 80)
                 Image(systemName: "video.badge.plus")
                     .font(.system(size: 34, weight: .semibold))
-                    .foregroundColor(R0llingTheme.stravaOrange)
+                    .foregroundColor(R0llingTheme.accentPurple)
             }
             .padding(.top, 30)
 
@@ -231,13 +231,13 @@ public struct TodayView: View {
             }) {
                 Image(systemName: appState.isListeningSpeech ? "waveform" : "mic.fill")
                     .font(.system(size: 17, weight: .bold))
-                    .foregroundColor(appState.isListeningSpeech ? .white : R0llingTheme.stravaOrange)
+                    .foregroundColor(appState.isListeningSpeech ? .white : R0llingTheme.accentPurple)
                     .frame(width: 44, height: 44)
-                    .background(appState.isListeningSpeech ? R0llingTheme.stravaOrange : R0llingTheme.bgElevated)
+                    .background(appState.isListeningSpeech ? R0llingTheme.accentPurple : R0llingTheme.bgElevated)
                     .clipShape(Circle())
                     .overlay(
                         Circle()
-                            .stroke(appState.isListeningSpeech ? R0llingTheme.stravaFlame : R0llingTheme.borderSubtle, lineWidth: 1)
+                            .stroke(appState.isListeningSpeech ? R0llingTheme.accentLavender : R0llingTheme.borderSubtle, lineWidth: 1)
                     )
             }
 
@@ -285,13 +285,13 @@ public struct TodayView: View {
                     .background(
                         composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                             ? LinearGradient(colors: [R0llingTheme.bgElevated, R0llingTheme.bgElevated], startPoint: .top, endPoint: .bottom)
-                            : R0llingTheme.stravaButtonGradient
+                            : R0llingTheme.primaryButtonGradient
                     )
                     .clipShape(Circle())
                     .shadow(
                         color: composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                             ? Color.clear
-                            : R0llingTheme.stravaOrange.opacity(0.4),
+                            : R0llingTheme.accentPurple.opacity(0.4),
                         radius: 6, x: 0, y: 2
                     )
             }

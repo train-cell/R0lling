@@ -23,14 +23,16 @@
 
   /* Brand Accents (Discord & Twitch Infused) */
   --accent-purple: #7742DC;     /* Βασικό χρώμα κουμπιών & επιλογής (Twitch vibe) */
+  --accent-twitch: #9146FF;     /* Twitch Brand Purple Accent */
   --accent-lavender: #A78BFA;   /* Highlights, chips, ενεργά tabs (Discord vibe) */
+  --accent-cyan: #00E5FF;       /* Cyan neon telemetry glow */
   --accent-glow: rgba(119, 66, 220, 0.35);
 
-  /* Functional & Status Colors */
-  --status-live: #FF4F64;       /* Pulser LIVE indicator για ενεργή ροή κάμερας */
+  /* Functional & Status Colors (Αυστηρά ψυχρά tokens - Μηδέν πορτοκαλί / κόκκινο) */
+  --status-live: #7742DC;       /* Twitch Stream Pulse indicator για ενεργή ροή κάμερας */
   --status-success: #55D6A4;    /* Επιτυχής αποθήκευση, ολοκληρωμένο clip */
-  --status-warning: #FFB347;    /* Χαμηλή μπαταρία, buffer που γεμίζει */
-  --status-error: #FF6B7A;      /* Σφάλμα σύνδεσης ή αποτυχία AI */
+  --status-warning: #A78BFA;    /* Προειδοποίηση / buffer notice (Lavender) */
+  --status-error: #FF6B7A;      /* Σφάλμα σύνδεσης ή αποτυχία AI (Αποκλειστικά για runtime errors) */
 }
 ```
 

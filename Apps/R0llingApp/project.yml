@@ -20,6 +20,8 @@ targets:
         optional: true
       - path: Assets.xcassets
         optional: true
+      - path: PrivacyInfo.xcprivacy
+        optional: true
     dependencies:
       - package: R0lling
         product: R0lling

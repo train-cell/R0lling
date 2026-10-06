@@ -58,7 +58,7 @@ public struct PhotosMediaPickerButton: View {
             }) {
                 Image(systemName: "folder.badge.plus")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(isDisabled ? R0llingTheme.textMuted : R0llingTheme.stravaOrange)
+                    .foregroundColor(isDisabled ? R0llingTheme.textMuted : R0llingTheme.accentPurple)
                     .frame(width: 44, height: 44)
                     .background(R0llingTheme.bgElevated)
                     .clipShape(Circle())
