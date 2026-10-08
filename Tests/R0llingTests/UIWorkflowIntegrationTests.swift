@@ -46,10 +46,10 @@ final class UIWorkflowIntegrationTests: XCTestCase {
     func testEntryEditorSheetDateKeyCalculation() {
         let baseDate = Date(timeIntervalSince1970: 1728211200) // 2024-10-06 10:40:00 UTC
         let entry = JournalEntry(
-            content: "Αρχική σημείωση",
-            tags: ["τεστ"],
             timestamp: baseDate,
-            timeZoneIdentifier: "Europe/Athens"
+            timeZoneIdentifier: "Europe/Athens",
+            content: "Αρχική σημείωση",
+            tags: ["τεστ"]
         )
 
         var savedEntry: JournalEntry?

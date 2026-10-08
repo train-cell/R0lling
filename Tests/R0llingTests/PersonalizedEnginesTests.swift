@@ -133,7 +133,7 @@ final class PersonalizedEnginesTests: XCTestCase {
     func testSOV01ObsidianZettelkastenAtomizer() async {
         let atomizer = ObsidianZettelkastenAtomizer()
         let (fn, md) = await atomizer.atomizeVoiceNote(transcript: "Η αρχιτεκτονική L4NE είναι 50/50 AI και Physics", date: Date())
-        XCTAssertTrue(fn.endsWith(".md"))
+        XCTAssertTrue(fn.hasSuffix(".md"))
         XCTAssertTrue(md.contains("[[Architecture_Index]]"))
     }
 
