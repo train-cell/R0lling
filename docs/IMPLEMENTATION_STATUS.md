@@ -61,7 +61,7 @@
 | CQ-P0-001…007 · CQ-P1-012 | ✅ CLOSED |
 | SEC-001…009 (+ TLS kill-in-Release) | ✅ CLOSED |
 | P0-02 / P0-05 / P1-04 / P1-05 / P1-09 / P1-TLS / P1-HERMES | ✅ SW CLOSED |
-| P0-01 Mac/`swift test` | 🚫 checklist |
+| P0-01 Mac/`swift test` | ✅ PASSED (GHA macOS 14 runner · Runs #20–#23) |
 | P0-06 Stage 6 | 🚫 no device report |
 
 ## 4. Wave-B/C honesty

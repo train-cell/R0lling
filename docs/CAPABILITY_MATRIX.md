@@ -50,7 +50,7 @@ v1 Meta: **simulation-only** (`DECISIONS.md` §2). App shell: `Apps/R0llingApp/`
 Foreground Active:
   - Ροή Κάμερας: ΕΝΕΡΓΗ (αν τα γυαλιά είναι συνδεδεμένα)
   - Rolling Buffer: Γεμίζει κυκλικά (μέχρι 10s)
-  - UI Ένδειξη: "LIVE" (κόκκινο pulsing badge)
+  - UI Ένδειξη: "LIVE" (μωβ pulsing badge, Twitch Purple #7742DC)
   - Clip Button: Ενεργό με ένδειξη πραγματικής διάρκειας (π.χ. "10s", "4.2s")
 
 Background Entering:

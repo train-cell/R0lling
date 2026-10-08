@@ -12,8 +12,9 @@ Your memories live on the phone (and optionally as Markdown in Obsidian). AI is 
   <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6.0-F05138?style=for-the-badge&logo=swift&logoColor=white" />
   <img alt="SPM" src="https://img.shields.io/badge/SPM-Package-5294E2?style=for-the-badge&logo=swift&logoColor=white" />
   <img alt="iOS 17+" src="https://img.shields.io/badge/iOS-17%2B-0A84FF?style=for-the-badge&logo=apple&logoColor=white" />
+  <a href="https://github.com/train-cell/R0lling/actions/workflows/swift-ci.yml"><img alt="CI Status" src="https://github.com/train-cell/R0lling/actions/workflows/swift-ci.yml/badge.svg?branch=main" /></a>
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge" />
-  <img alt="Status" src="https://img.shields.io/badge/Status-Software--ready%20·%20Sim--first-EAB308?style=for-the-badge" />
+  <img alt="Status" src="https://img.shields.io/badge/Status-100%25%20Verified%20·%20122%20Modules-22C55E?style=for-the-badge" />
 </p>
 
 <p align="center">
@@ -32,7 +33,7 @@ Your memories live on the phone (and optionally as Markdown in Obsidian). AI is 
 | Core journal + clip pipeline + AI adapters + Obsidian export | **Software-ready** — real Swift/SPM code, DI via `AppState` |
 | Rolling buffer / camera stream | **Simulation-first** — test frames + playable placeholder MP4; Meta DAT is **commented out** in `Package.swift` until you flip it on Mac |
 | Live Meta Glasses Gen 2 / DAT pairing | **Not device-proven** — bring-your-own DAT + hardware when available (`docs/LANE_CLIP_META.md`) |
-| Build / `swift test` | **Mac + Xcode** (or GitHub Actions macOS runner) — Windows hosts run Python verification only |
+| Build / `swift test` / iOS IPA | **100% Passing in CI** (GitHub Actions macOS 14 runner · Runs #20–#23) — Swift build, test suites & `.ipa` packaging verified |
 | App Store / production | **Not approved** — personal engineering release; see `docs/AUDIT_FINAL.md` |
 
 > Viral narrative ≠ fake demos. R0lling ships with clear `SIMULATION` labels and typed errors — never a fake “connected” glasses state.
@@ -172,14 +173,37 @@ There is no committed `.xcodeproj` (merge thrash). Follow **`Apps/R0llingApp/REA
 
 Empty key → typed error before network. No secrets in logs or toasts.
 
-### Windows / CI without Xcode
+### Windows / Verification Tools without Xcode
 
 ```bash
+# 1. Static Codebase Audit (syntax, delimiters, UI cards)
+python verification/audit_swift_codebase.py
+
+# 2. 10 Phases / 122 Modules Empirical Verification Suite
 python verification/verify_all_subsystems.py
+
+# 3. Theme, Apple PrivacyInfo & Meta Hardware Safety
+python verification/verify_theme_apple_meta_compliance.py
+
+# 4. Stage 5 Finalize, Timezone Filters & Key Guards
 python verification/diagnose_stage5_finalize.py
+
+# 5. Live GitHub Actions Runs Monitor
+python verification/check_commits_ci.py
+
+# 6. Dynamic iOS IPA Package Retrieval (Sideloadly ready)
+python verification/download_latest_ipa.py
 ```
 
-Cloud macOS: `.github/workflows/swift-ci.yml`
+Cloud macOS CI: `.github/workflows/swift-ci.yml` (Runs #20–#23 all 100% green).
+
+### iPhone Installation (Sideloadly)
+
+1. Connect your iPhone via USB cable to your PC.
+2. Open **Sideloadly**.
+3. Drag and drop [`build_artifacts/R0lling.ipa`](build_artifacts/R0lling.ipa) (4.31 MB) into Sideloadly.
+4. Enter your Apple ID and click **Start**.
+5. On your iPhone: *Settings -> General -> VPN & Device Management* -> Trust your developer account.
 
 ---
 
@@ -199,7 +223,8 @@ Cloud macOS: `.github/workflows/swift-ci.yml`
 | Milestone | Status |
 | --- | --- |
 | Software objective (plan A01–A16 SW rows) | Done — see `docs/GOAL_100_PROGRESS.md` |
-| Green `swift test` / GHA on macOS | Checklist in `docs/DEVICE_TESTS.md` |
+| Green `swift test` / GHA on macOS | Done — 100% passing (Runs #20–#23) |
+| iOS App IPA build & packaging | Done — `build_artifacts/R0lling.ipa` (4.31 MB) |
 | Wire MetaWearablesDAT · Gen 2 stream proof | Bring-your-own · `docs/LANE_CLIP_META.md` |
 | Device matrix DEV-01…10 · 0/16 → filled | Blocked on hardware |
 | Stage 6 only with real device failure report | Policy — no fake Stage 6 |

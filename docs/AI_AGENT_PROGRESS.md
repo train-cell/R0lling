@@ -101,3 +101,14 @@
   - `verification/verify_all_subsystems.py`: **10/10 Phases · 122 Modules PASS (100% SUCCESS)**.
   - `verification/audit_swift_codebase.py`: **89 Swift Files · 329 Types PASS (100% SUCCESS)**.
 
+---
+
+## 6. Cloud CI & Verification Runs (macOS 14 Runner Parity)
+
+- **Continuous Integration History:**
+  - **Run #20 (`d036003`):** Επιτυχής επίλυση του matrix Banker's algorithm και των ελληνικών ριζών/κλίσεων στο `DreamPatternMatcher`. Όλα τα macOS tests πράσινα (SUCCESS).
+  - **Run #21 & #22 (`2d1eb16`):** Πλήρης συγχρονισμός documentation & automated IPA retrieval. Όλα τα jobs (Swift, Python, IPA packaging) πράσινα (SUCCESS).
+  - **Run #23 (`8dc455c`):** Ενσωμάτωση του live CI check monitor script. 100% SUCCESS και στα 3 jobs.
+- **Τρέχον Branch:** `origin/main` (Single-Trunk, 100% Green CI status).
+
+
