@@ -23,11 +23,24 @@ def get_auth_token():
         pass
     return None
 
-run_id = sys.argv[1] if len(sys.argv) > 1 else "37542180604"
 token = get_auth_token()
 headers = {"User-Agent": "Mozilla/5.0"}
 if token:
     headers["Authorization"] = f"Bearer {token}"
+
+if len(sys.argv) > 1:
+    run_id = sys.argv[1]
+else:
+    try:
+        req_runs = urllib.request.Request(
+            "https://api.github.com/repos/train-cell/R0lling/actions/runs?per_page=5",
+            headers=headers
+        )
+        runs_data = json.loads(urllib.request.urlopen(req_runs).read().decode("utf-8"))
+        successful_runs = [r for r in runs_data.get("workflow_runs", []) if r.get("status") == "completed" and r.get("conclusion") == "success"]
+        run_id = str(successful_runs[0]["id"]) if successful_runs else "37826043281"
+    except Exception:
+        run_id = "37826043281"
 
 req = urllib.request.Request(
     f"https://api.github.com/repos/train-cell/R0lling/actions/runs/{run_id}/artifacts",

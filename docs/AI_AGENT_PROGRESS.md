@@ -73,7 +73,7 @@
 - **Swift Compilation & Unit Tests (macOS 14 Runner):**
   - 15 Unit Test Suites (περιλαμβανομένων `PersonalizedEnginesTests.swift` & `SovereignOSFeaturesTests.swift`): **100% SUCCESS**
 - **iOS Binary (.ipa) Packaging:**
-  - `build_artifacts/R0lling.ipa`: **3.83 MB (Ready for Sideloadly)**
+  - `build_artifacts/R0lling.ipa`: **4.31 MB (Run 37826043281 · Ready for Sideloadly)**
 
 
 ---
