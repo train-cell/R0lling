@@ -81,16 +81,15 @@ Labels: **Ready** = wired product path · **Sim** = works with simulation / plac
 | **Βοηθός** (`AssistantView`) | Offline Autonomous Jarvis Agent, Deep Work Pacer, Local Obsidian Memory | Ready |
 | **Ρυθμίσεις** (`SettingsView`) | Full-Spectrum HealthKit Permissions, Privacy Manifests, Zero-Knowledge Storage Scrubber | Ready |
 
-### Super-features & 40 Extended Engines (Software-Ready)
+### 40 Personalized Sovereign Engines (High-Performance Polymath Suite)
 
-| Category | Modules & Engines | Status |
-| --- | --- | --- |
-| **Neuro-Cognitive** | DopaminePacer, OcularFatigue, WorkingMemory, VerbalEntropy, PinkNoise, MentalStateAnchor, SelfTalkSentiment, CircadianChronoPeak | Ready |
-| **Biomechanical & Athletic** | BarbellVelocity, HeartRateRecovery, HydrationOsmolality, SaunaHeatShock, StepPacing, CO2Tolerance, DomsReadiness, FastingAutophagy | Ready |
-| **Cryptography & Defensive** | ShamirKeyShard, AcousticLeak, PanicDecoy, BleSurveillance, EphemeralVoice, NetworkExfiltration, ExifScrubber, ProofOfExistence | Ready |
-| **Executive Operations** | NegotiationRehearsal, EnergyRoiTask, AntiProcrastination, SecondOrderThinking, TimeSinkAuditor, OpenLoopExterminator, AdvisoryBoard, DailyMomentum | Ready |
-| **Sensory & Creative** | AcousticSoundscape, VoicePitchBiofeedback, PerspectiveRectifier, SpatialLociMemory, KindleClippings, ConceptWireframe, DreamSymbolCorrelation, GenerationalLegacy | Ready |
-
+| Pillar | Focus | Engines & Modules | Status |
+| --- | --- | --- | --- |
+| **Pillar 1: Swim & Kinetic Mastery** | Κολύμβηση & Ισχύς | `StrokeCadencePacer`, `LactateAccumulation`, `PoolTurnSentry`, `DrylandPowerTransfer`, `DynamicPBSplits`, `HypoxicBreathing`, `ShoulderGuard`, `PostPoolGlycogen` | Ready |
+| **Pillar 2: ECE & Systems Architecture** | Αρχιτεκτονική & OS | `DatapathCycleResolver`, `PsarakisTrapScanner`, `SpacedRepetitionECE`, `AssemblyDisassembler`, `IEEE754Converter`, `DeadlockBanker`, `KarnaughMinimizer`, `VirtualMemoryEAT` | Ready |
+| **Pillar 3: Sovereign Executive Core** | Επιτελείο & Obsidian | `ObsidianAtomizer`, `FiftyFiftyBoundaryGate`, `EnergyROIScheduler`, `ZeroKnowledgeEnclave`, `AutomatedADR`, `LocalVectorVaultRAG`, `PreMortemInversion`, `GitSemanticCommits` | Ready |
+| **Pillar 4: Deep Circadian Biohacking** | Αυτόνομο & Κιρκάδιο | `AutonomicToneTracker`, `ThermalSleepCooler`, `NSDRTrigger`, `CARSentinel`, `SaunaColdCycling`, `FastingAutophagyIndex`, `ElectrolyteLoss`, `BlueLightShield` | Ready |
+| **Pillar 5: Wearable Augmentation** | Meta Glasses & Watch | `SilentHeadGesture`, `AmbientWhisperCoach`, `SpatialAudioLoci`, `WhiteboardOCR`, `TurnTakingGuard`, `AcousticDecibelSentinel`, `VocalProsodyMirror`, `PrivacyCloak` | Ready |
 
 ---
 

@@ -42,6 +42,9 @@ public struct StrategicVaultHubView: View {
                         confidencePercent: 95
                     ))
 
+                    // Pre-Mortem Project Inversion (Charlie Munger)
+                    PreMortemInversionCardView()
+
                     // Personal Board of Advisors (Marcus Aurelius, Jobs, Munger)
                     AdvisoryBoardCardView()
 
@@ -55,6 +58,32 @@ public struct StrategicVaultHubView: View {
             }
         }
         .background(R0llingTheme.bgPrimary.ignoresSafeArea())
+    }
+}
+
+public struct PreMortemInversionCardView: View {
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("Pre-Mortem Inversion (Charlie Munger)", systemImage: "arrow.uturn.backward.circle.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(R0llingTheme.textPrimary)
+                Spacer()
+                Text("INVERSION")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(R0llingTheme.accentLavender)
+            }
+            Text("«Αντίστρεψε πάντα: Πώς εξασφαλίζεις ότι η αρχιτεκτονική αποτυγχάνει; Εξάλειψε αυτά τα 3 σημεία πριν ξεκινήσεις.»")
+                .font(.system(size: 12))
+                .foregroundColor(R0llingTheme.textSecondary)
+        }
+        .padding(14)
+        .background(R0llingTheme.bgSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(R0llingTheme.borderSubtle, lineWidth: 0.5)
+        )
     }
 }
 

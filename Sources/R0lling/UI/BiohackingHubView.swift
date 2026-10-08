@@ -41,6 +41,12 @@ public struct BiohackingHubView: View {
                         }
                     )
 
+                    // Swim & Kinetic Mastery (Cadence & Lactate)
+                    SwimCadenceLactateCardView()
+
+                    // Autonomic Tone & Vagal Dominance
+                    AutonomicToneCardView()
+
                     // Autophagy & Fasting Stage Card
                     FastingAutophagyCardView()
 
@@ -60,6 +66,91 @@ public struct BiohackingHubView: View {
             }
         }
         .background(R0llingTheme.bgPrimary.ignoresSafeArea())
+    }
+}
+
+public struct SwimCadenceLactateCardView: View {
+    @State private var strokesPerMin: Double = 36.5
+    @State private var dpsMeters: Double = 2.15
+    @State private var estimatedLactate: Double = 3.2
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Κολύμβηση: Cadence & DPS Pacer", systemImage: "figure.pool.swim")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(R0llingTheme.textPrimary)
+                Spacer()
+                Text("A2 THRESHOLD")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(R0llingTheme.accentCyan)
+            }
+
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("CADENCE")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundColor(R0llingTheme.textMuted)
+                    Text("\(String(format: "%.1f", strokesPerMin)) SPM")
+                        .font(.system(size: 18, weight: .bold, design: .monospaced))
+                        .foregroundColor(R0llingTheme.accentCyan)
+                }
+                Spacer()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("DPS")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundColor(R0llingTheme.textMuted)
+                    Text("\(String(format: "%.2f", dpsMeters)) m/str")
+                        .font(.system(size: 18, weight: .bold, design: .monospaced))
+                        .foregroundColor(R0llingTheme.statusSuccess)
+                }
+                Spacer()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("LACTATE")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundColor(R0llingTheme.textMuted)
+                    Text("\(String(format: "%.1f", estimatedLactate)) mmol")
+                        .font(.system(size: 18, weight: .bold, design: .monospaced))
+                        .foregroundColor(R0llingTheme.accentLavender)
+                }
+            }
+            .padding(12)
+            .background(R0llingTheme.bgElevated)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .padding(16)
+        .background(R0llingTheme.bgSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(R0llingTheme.borderSubtle, lineWidth: 0.5)
+        )
+    }
+}
+
+public struct AutonomicToneCardView: View {
+    public var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Circle().fill(R0llingTheme.statusSuccess).frame(width: 8, height: 8)
+                    Text("ΑΥΤΟΝΟΜΟΣ ΤΟΝΟΣ: PARASYMPATHETIC (88%)")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(R0llingTheme.statusSuccess)
+                }
+                Text("Υψηλός πνευμονογαστρικός τόνος (High Vagal Tone) · Ιδανική ετοιμότητα για υψηλή ένταση.")
+                    .font(.system(size: 11))
+                    .foregroundColor(R0llingTheme.textSecondary)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(R0llingTheme.bgSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(R0llingTheme.borderSubtle, lineWidth: 0.5)
+        )
     }
 }
 

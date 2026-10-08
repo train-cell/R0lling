@@ -34,6 +34,9 @@ public struct CreativeStudioHubView: View {
                     // Obsidian Zettelkasten Live Strip
                     ZettelkastenChipStripView()
 
+                    // ECE Engineering Solver & Datapath Resolver
+                    ECEEngineeringSolverCardView()
+
                     // Multi-Platform Content Transformer Card
                     ContentTransformerCardView()
 
@@ -50,6 +53,45 @@ public struct CreativeStudioHubView: View {
             }
         }
         .background(R0llingTheme.bgPrimary.ignoresSafeArea())
+    }
+}
+
+public struct ECEEngineeringSolverCardView: View {
+    @State private var instruction: String = "lw $t0, 4($s1)"
+    @State private var signals: String = "MemtoReg=1, ALUSrc=1, RegWrite=1 (5 Cycles)"
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("ECE Systems & Datapath Resolver", systemImage: "cpu.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(R0llingTheme.textPrimary)
+                Spacer()
+                Text("RISC-V // MIPS")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(R0llingTheme.accentPurple)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(instruction)
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .foregroundColor(R0llingTheme.accentCyan)
+                Text("Ανάλυση Σημάτων: \(signals)")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(R0llingTheme.textSecondary)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(R0llingTheme.bgElevated)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .padding(16)
+        .background(R0llingTheme.bgSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(R0llingTheme.borderSubtle, lineWidth: 0.5)
+        )
     }
 }
 
