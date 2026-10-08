@@ -43,7 +43,7 @@
 | `python verification/diagnose_stage4_fixes.py` | ALL PASSED |
 | `python verification/diagnose_stage5_finalize.py` | ALL PASSED (+ SEC + A01–A16 suites) |
 | `python verification/diagnose_journal_media_a01_a03.py` | ALL PASSED |
-| `python verification/verify_all_subsystems.py` | 7/7 phases · 27 modules PASS (100%) |
+| `python verification/verify_all_subsystems.py` | 9/9 phases · 82 modules PASS (100%) |
 | `python verification/verify_theme_apple_meta_compliance.py` | ALL PASSED (Discord/Twitch theme, Apple PrivacyInfo, Meta DAT) |
 | `swift test` (macOS 14 GitHub Actions runner) | ✅ **100% PASSED** (All 8 core test suites passed) |
 | iOS App Packaging (`R0lling.ipa`) | ✅ **SUCCESS** (`R0lling.ipa` 3.66 MB built and verified) |

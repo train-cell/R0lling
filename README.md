@@ -69,25 +69,28 @@ Labels: **Ready** = wired product path · **Sim** = works with simulation / plac
 | Backup / restore | Ready | Manifest + schema version |
 | Meta Glasses Gen 2 live stream | Experimental / BYO DAT | Simulation adapter default · error `4002` without SDK |
 
-### Super-features (software-ready)
+### Sovereign Life OS v2.0 Hubs (7 Dedicated Tabs)
 
-| Feature | Label |
-| --- | --- |
-| Earcons on clip save/error | Ready |
-| Time Capsule anniversary banner | Ready |
-| Highlight Reel (AVComposition) | Ready |
-| Day podcast digest (AVSpeech) | Ready |
-| Obsidian `.canvas` export | Ready |
-| Knowledge graph → Mermaid | Ready |
-| Emotion / entity keyword tags | Ready |
-| Scavenger streak + badges | Ready |
-| Dataview YAML frontmatter | Ready |
-| Nutrition heuristic from OCR tokens | Ready |
-| Adaptive FPS throttle (sim / DAT loop) | Ready |
+| Tab / Hub | Features & Engines | Status |
+| --- | --- | --- |
+| **Σήμερα** (`TodayView`) | Executive Suite (To-Do, Scratchpad, Stopwatch), Bevel 3-Ring Telemetry, Chief of Staff Quick Capture | Ready |
+| **Βιο-Απόδοση** (`BiohackingHubView`) | Full-Spectrum HealthKit 2x3 Grid, Iron Tonnage Logger, Box Breathing 4x4, Circadian Sunlight & Caffeine | Ready |
+| **Studio** (`CreativeStudioHubView`) | Multi-Format Content Transformer (X/LinkedIn/Newsletter), Zettelkasten Live Strip, Dream Correlation, Logic Fallacy Auditor | Ready |
+| **Στρατηγείο** (`StrategicVaultHubView`) | 90-Day Decision Journal, Future Letterbox Capsule, Board of Advisors Simulator, Air-Gapped Firewall, FaceID Vault | Ready |
+| **Ημερολόγιο** (`CalendarView`) | Time Capsule «Σαν Σήμερα», Circadian Schedule, Filtered Search | Ready |
+| **Βοηθός** (`AssistantView`) | Offline Autonomous Jarvis Agent, Deep Work Pacer, Local Obsidian Memory | Ready |
+| **Ρυθμίσεις** (`SettingsView`) | Full-Spectrum HealthKit Permissions, Privacy Manifests, Zero-Knowledge Storage Scrubber | Ready |
 
-### Gated / experimental (not product surface)
+### Super-features & 40 Extended Engines (Software-Ready)
 
-Acoustic auto-clip · head-gesture IMU · remote mirror stream · Watch companion · pseudo-vector search · hyperlapse · Spatial / Metal / Watermark / FileWatcher orphans → `Sources/R0lling/Experimental/`
+| Category | Modules & Engines | Status |
+| --- | --- | --- |
+| **Neuro-Cognitive** | DopaminePacer, OcularFatigue, WorkingMemory, VerbalEntropy, PinkNoise, MentalStateAnchor, SelfTalkSentiment, CircadianChronoPeak | Ready |
+| **Biomechanical & Athletic** | BarbellVelocity, HeartRateRecovery, HydrationOsmolality, SaunaHeatShock, StepPacing, CO2Tolerance, DomsReadiness, FastingAutophagy | Ready |
+| **Cryptography & Defensive** | ShamirKeyShard, AcousticLeak, PanicDecoy, BleSurveillance, EphemeralVoice, NetworkExfiltration, ExifScrubber, ProofOfExistence | Ready |
+| **Executive Operations** | NegotiationRehearsal, EnergyRoiTask, AntiProcrastination, SecondOrderThinking, TimeSinkAuditor, OpenLoopExterminator, AdvisoryBoard, DailyMomentum | Ready |
+| **Sensory & Creative** | AcousticSoundscape, VoicePitchBiofeedback, PerspectiveRectifier, SpatialLociMemory, KindleClippings, ConceptWireframe, DreamSymbolCorrelation, GenerationalLegacy | Ready |
+
 
 ---
 
