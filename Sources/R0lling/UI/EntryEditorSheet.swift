@@ -83,6 +83,7 @@ public struct EntryEditorSheet: View {
                 }
             }
         }
+        .tint(R0llingTheme.accentPurple)
     }
 
     private var provoliDateKey: String {

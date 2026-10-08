@@ -32,6 +32,21 @@ public struct MainTabView: View {
                         Label("Σήμερα", systemImage: "sparkles")
                     }
 
+                BiohackingHubView()
+                    .tabItem {
+                        Label("Βιο-Απόδοση", systemImage: "heart.text.square.fill")
+                    }
+
+                CreativeStudioHubView()
+                    .tabItem {
+                        Label("Studio", systemImage: "brain.head.profile")
+                    }
+
+                StrategicVaultHubView()
+                    .tabItem {
+                        Label("Στρατηγείο", systemImage: "lock.shield.fill")
+                    }
+
                 CalendarView()
                     .tabItem {
                         Label("Ημερολόγιο", systemImage: "calendar")

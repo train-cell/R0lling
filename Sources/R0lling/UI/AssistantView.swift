@@ -284,6 +284,14 @@ public struct AssistantView: View {
                 .padding(.vertical, 10)
                 .background(R0llingTheme.bgElevated)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
+                .onSubmit {
+                    let prompt = inputPrompt
+                    guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                    inputPrompt = ""
+                    Task {
+                        await appState.sendMessageToAssistant(prompt: prompt)
+                    }
+                }
 
             Button(action: {
                 let prompt = inputPrompt

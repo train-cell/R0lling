@@ -53,6 +53,9 @@ public struct CalendarView: View {
                     .onChange(of: searchQuery) {
                         Task { await filterEntries() }
                     }
+                    .onSubmit {
+                        Task { await filterEntries() }
+                    }
 
                 if !searchQuery.isEmpty {
                     Button(action: {

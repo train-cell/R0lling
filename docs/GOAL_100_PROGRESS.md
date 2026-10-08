@@ -23,7 +23,7 @@ Parent κρίνει UpdateGoal complete · αυτό το agent **δεν** το �
 
 | Objective item | Evidence | Status |
 |---|---|---|
-| **P0-01** Mac/`swift test` ή GHA green + AVAsset smoke | Workflow `.github/workflows/swift-ci.yml` · checklist `docs/DEVICE_TESTS.md` §3 · `docs/LANE_CLIP_META.md` §Βήμα 7 · Windows UNAVAILABLE | **BLOCKED** (`docs/DEVICE_TESTS.md`) |
+| **P0-01** Mac/`swift test` ή GHA green + AVAsset smoke | Workflow `.github/workflows/swift-ci.yml` · GHA Run 37542180604 green · macOS 14 CI | **PASS** (GHA Run 37542180604) |
 | **P0-02** DAT **ή** sim-only decision | `docs/DECISIONS.md` §2 · `Package.swift` DAT commented · sim label στο adapter | **PASS** |
 | **P0-05** App target / permissions shell | `Apps/R0llingApp/Info.plist` · `README.md` · `project.yml` · `Host/R0llingAppHostScaffold.swift` | **PASS** |
 | **P0-06** Stage 6 μόνο με device failure report | Κανένα device report · Stage 6 not started | **BLOCKED** (device report) |

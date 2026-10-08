@@ -58,6 +58,10 @@
 	<array>
 		<string>_r0lling-hermes._tcp</string>
 	</array>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Το R0lling διαβάζει μετρήσεις HRV, καρδιακών παλμών ηρεμίας, ύπνου και βημάτων για τον υπολογισμό των δεικτών Cognitive Readiness και Bevel Telemetry.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Το R0lling μπορεί να καταγράφει προπονήσεις και ενέργεια στο Apple Health κατόπιν επιλογής σας.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

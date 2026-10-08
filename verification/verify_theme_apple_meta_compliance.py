@@ -100,7 +100,9 @@ def test_apple_privacy_and_permissions():
         "NSPhotoLibraryAddUsageDescription",
         "NSBluetoothAlwaysUsageDescription",
         "NSBluetoothPeripheralUsageDescription",
-        "NSLocalNetworkUsageDescription"
+        "NSLocalNetworkUsageDescription",
+        "NSHealthShareUsageDescription",
+        "NSHealthUpdateUsageDescription"
     ]
     for perm in required_permissions:
         assert perm in info_text, f"Missing required permission {perm} in Info.plist"

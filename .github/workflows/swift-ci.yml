@@ -132,6 +132,20 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             BUILD_DIR="${PWD}/build"
 
+      - name: Build iOS App (iOS Simulator)
+        working-directory: Apps/R0llingApp
+        run: |
+          xcodebuild build \
+            -project R0llingApp.xcodeproj \
+            -scheme R0llingApp \
+            -configuration Debug \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            BUILD_DIR="${PWD}/build-sim"
+          ls -la build-sim/Debug-iphonesimulator/R0llingApp.app
+
       - name: Package .ipa for Sideloadly
         working-directory: Apps/R0llingApp
         run: |

@@ -14,12 +14,66 @@ public struct TodayView: View {
 
                 ScrollView {
                     LazyVStack(spacing: 16) {
-                        BevelTelemetryCard(
-                            bufferDuration: appState.bufferDuration,
-                            todayClipsCount: appState.todayEntries.filter { !$0.attachments.isEmpty }.count,
-                            isStreaming: appState.isStreaming,
-                            glassesStatus: appState.glassesState.statusDescription
-                        )
+                        if appState.isStreaming {
+                            LiveViewfinderCard(
+                                isStreaming: appState.isStreaming,
+                                bufferDuration: appState.bufferDuration,
+                                onClipTap: {
+                                    Task {
+                                        await appState.triggerClip(seconds: 10.0)
+                                    }
+                                }
+                            )
+                        }
+
+                        // Sovereign Life OS — Bevel 3-Ring Concentric Telemetry
+                        BevelConcentricTelemetryCard(score: appState.cognitiveTelemetry)
+
+                        // Chief of Staff (Jarvis Engine)
+                        ChiefOfStaffCardView()
+
+                        // Private Daily Podcast Player
+                        DailyPodcastPlayerCard()
+
+                        // Biohacking & Performance Quick Hub
+                        VStack(spacing: 12) {
+                            HStack {
+                                Text("BIOHACKING & PERFORMANCE")
+                                    .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                                    .foregroundColor(R0llingTheme.accentCyan)
+                                    .tracking(1.2)
+                                Spacer()
+                            }
+                            DeepWorkSentinelCard()
+                            BinauralSynthesizerCardView()
+                            HealthKitTelemetryCardView(
+                                snapshot: appState.liveHealthSnapshot,
+                                isAuthorized: appState.isHealthKitAuthorized,
+                                onRequestAuth: {
+                                    Task {
+                                        await appState.requestHealthKitAccess()
+                                    }
+                                }
+                            )
+                            GymVolumeLoggerCardView()
+                        }
+
+                        // Executive Productivity & Tools Suite
+                        VStack(spacing: 12) {
+                            HStack {
+                                Text("EXECUTIVE SUITE & UTILITIES")
+                                    .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                                    .foregroundColor(R0llingTheme.accentLavender)
+                                    .tracking(1.2)
+                                Spacer()
+                            }
+                            SovereignToDoListView()
+                            SovereignScratchpadView()
+                            SovereignStopwatchTimerView()
+                        }
+
+                        // Obsidian Live Zettelkasten Linker
+                        ZettelkastenChipStripView()
 
                         if !appState.timeCapsuleMemories.isEmpty {
                             timeCapsuleBanner
@@ -270,6 +324,14 @@ public struct TodayView: View {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .stroke(R0llingTheme.borderSubtle, lineWidth: 1)
                 )
+                .onSubmit {
+                    let text = composerText
+                    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                    composerText = ""
+                    Task {
+                        await appState.addNote(text: text)
+                    }
+                }
 
             Button(action: {
                 let text = composerText

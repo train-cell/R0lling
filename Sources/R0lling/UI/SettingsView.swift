@@ -183,10 +183,12 @@ public struct SettingsView: View {
                             await appState.dimiourgia_backup_bundle()
                         }
                     }
+                    .foregroundColor(R0llingTheme.accentPurple)
 
                     Button("Επαναφορά από Backup Bundle…") {
                         deixeiEpilogiBackup = true
                     }
+                    .foregroundColor(R0llingTheme.bevelCyan)
                 }
 
                 // Section 6: App Info

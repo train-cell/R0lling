@@ -6,6 +6,10 @@ import UIKit
 import AppKit
 #endif
 
+#if canImport(AVKit)
+import AVKit
+#endif
+
 /// Bevel-style Concentric 3-Ring Visualization (Buffer, Captures Target, Vault Status)
 public struct BevelConcentricRingsView: View {
     public let bufferRatio: Double    // 0.0 ... 1.0 (Ring 1: Outer Cyan)
@@ -433,6 +437,7 @@ public struct MediaPreviewCard: View {
     @State private var resolvedURL: URL?
     @State private var loadError: String?
     @State private var isLoading = false
+    @State private var isShowingViewer = false
 
     public init(
         attachment: MediaAttachment,
@@ -476,15 +481,23 @@ public struct MediaPreviewCard: View {
                     Spacer()
                     HStack {
                         Spacer()
-                        ZStack {
-                            Circle()
-                                .fill(Color.black.opacity(0.65))
-                                .frame(width: 48, height: 48)
-                            Image(systemName: attachment.mediaType == .audio ? "waveform" : "play.fill")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(.white)
-                                .offset(x: attachment.mediaType == .audio ? 0 : 2)
+                        Button(action: {
+                            if resolvedURL != nil {
+                                R0llingTheme.triggerHapticFeedback()
+                                isShowingViewer = true
+                            }
+                        }) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black.opacity(0.65))
+                                    .frame(width: 48, height: 48)
+                                Image(systemName: attachment.mediaType == .audio ? "waveform" : "play.fill")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .offset(x: attachment.mediaType == .audio ? 0 : 2)
+                            }
                         }
+                        .buttonStyle(.plain)
                         Spacer()
                     }
                     Spacer()
@@ -528,6 +541,18 @@ public struct MediaPreviewCard: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(R0llingTheme.borderSubtle, lineWidth: 1)
         )
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .onTapGesture {
+            if resolvedURL != nil {
+                R0llingTheme.triggerHapticFeedback()
+                isShowingViewer = true
+            }
+        }
+        .sheet(isPresented: $isShowingViewer) {
+            if let resolvedURL {
+                MediaViewerSheet(url: resolvedURL, attachment: attachment)
+            }
+        }
         .task(id: attachment.id) {
             await fortoseMedia()
         }
@@ -727,3 +752,263 @@ public struct TagChip: View {
             .clipShape(Capsule())
     }
 }
+
+/// Viewfinder HUD Overlay με vector γωνίες και crosshair
+public struct ViewfinderHUDOverlay: View {
+    public init() {}
+
+    public var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let cornerLen: CGFloat = 16
+
+            Path { path in
+                // Top-Left corner
+                path.move(to: CGPoint(x: 14, y: 14 + cornerLen))
+                path.addLine(to: CGPoint(x: 14, y: 14))
+                path.addLine(to: CGPoint(x: 14 + cornerLen, y: 14))
+
+                // Top-Right corner
+                path.move(to: CGPoint(x: w - 14 - cornerLen, y: 14))
+                path.addLine(to: CGPoint(x: w - 14, y: 14))
+                path.addLine(to: CGPoint(x: w - 14, y: 14 + cornerLen))
+
+                // Bottom-Left corner
+                path.move(to: CGPoint(x: 14, y: h - 14 - cornerLen))
+                path.addLine(to: CGPoint(x: 14, y: h - 14))
+                path.addLine(to: CGPoint(x: 14 + cornerLen, y: h - 14))
+
+                // Bottom-Right corner
+                path.move(to: CGPoint(x: w - 14 - cornerLen, y: h - 14))
+                path.addLine(to: CGPoint(x: w - 14, y: h - 14))
+                path.addLine(to: CGPoint(x: w - 14, y: h - 14 - cornerLen))
+
+                // Center crosshair
+                let cx = w / 2
+                let cy = h / 2
+                path.move(to: CGPoint(x: cx - 8, y: cy))
+                path.addLine(to: CGPoint(x: cx + 8, y: cy))
+                path.move(to: CGPoint(x: cx, y: cy - 8))
+                path.addLine(to: CGPoint(x: cx, y: cy + 8))
+            }
+            .stroke(R0llingTheme.accentCyan.opacity(0.65), lineWidth: 1.5)
+        }
+    }
+}
+
+/// Cyberpunk Viewfinder HUD Card για ενεργή ροή κάμερας
+public struct LiveViewfinderCard: View {
+    public let isStreaming: Bool
+    public let bufferDuration: Double
+    public var onClipTap: () -> Void
+
+    @State private var scanOffset: CGFloat = -60
+
+    public init(
+        isStreaming: Bool,
+        bufferDuration: Double,
+        onClipTap: @escaping () -> Void
+    ) {
+        self.isStreaming = isStreaming
+        self.bufferDuration = bufferDuration
+        self.onClipTap = onClipTap
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                LiveStreamBadge()
+                Spacer()
+                Text("1080p • 30 FPS • META GEN 2")
+                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                    .foregroundColor(R0llingTheme.textMuted)
+            }
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(hex: 0x0E0E14))
+                    .frame(height: 150)
+
+                ViewfinderHUDOverlay()
+                    .frame(height: 150)
+
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.clear, R0llingTheme.accentPurple.opacity(0.4), Color.clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(height: 14)
+                    .offset(y: scanOffset)
+
+                VStack(spacing: 6) {
+                    Image(systemName: "eyeglasses")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundColor(R0llingTheme.accentLavender.opacity(0.85))
+
+                    Text("LIVE POV STREAMING")
+                        .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                        .foregroundColor(R0llingTheme.textPrimary)
+
+                    Text("Κυκλική αποθήκευση: \(String(format: "%.1fs", bufferDuration)) / 10.0s")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(R0llingTheme.accentLavender)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(R0llingTheme.accentPurple.opacity(0.4), lineWidth: 1)
+            )
+        }
+        .r0llingCard()
+        .onAppear {
+            withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: true)) {
+                scanOffset = 60
+            }
+        }
+    }
+}
+
+/// Πλήρης προβολέας/αναπαραγωγέας πολυμέσων (VideoPlayer, AudioPlayer, Image Viewer)
+public struct MediaViewerSheet: View {
+    public let url: URL
+    public let attachment: MediaAttachment
+    @Environment(\.dismiss) private var dismiss
+
+    #if canImport(AVKit)
+    @State private var player: AVPlayer?
+    @State private var isPlayingAudio: Bool = true
+    #endif
+
+    public init(url: URL, attachment: MediaAttachment) {
+        self.url = url
+        self.attachment = attachment
+    }
+
+    public var body: some View {
+        NavigationStack {
+            ZStack {
+                R0llingTheme.bgPrimary.ignoresSafeArea()
+
+                switch attachment.mediaType {
+                case .photo:
+                    photoView
+                case .video, .clip:
+                    videoView
+                case .audio:
+                    audioView
+                }
+            }
+            .navigationTitle(attachment.originalFilename)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Κλείσιμο") {
+                        #if canImport(AVKit)
+                        player?.pause()
+                        #endif
+                        dismiss()
+                    }
+                    .foregroundColor(R0llingTheme.accentLavender)
+                }
+            }
+            .onAppear {
+                #if canImport(AVKit)
+                if attachment.mediaType == .video || attachment.mediaType == .clip || attachment.mediaType == .audio {
+                    player = AVPlayer(url: url)
+                    player?.play()
+                }
+                #endif
+            }
+            .onDisappear {
+                #if canImport(AVKit)
+                player?.pause()
+                player = nil
+                #endif
+            }
+        }
+    }
+
+    private var photoView: some View {
+        VStack {
+            Spacer()
+            if let img = loadCrossPlatformImage() {
+                img
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding()
+            } else {
+                Text("Αδυναμία προβολής εικόνας")
+                    .foregroundColor(R0llingTheme.textMuted)
+            }
+            Spacer()
+        }
+    }
+
+    private var videoView: some View {
+        VStack {
+            #if canImport(AVKit)
+            if let player {
+                VideoPlayer(player: player)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding()
+            } else {
+                ProgressView()
+                    .tint(R0llingTheme.accentLavender)
+            }
+            #else
+            Text("Video playback μη διαθέσιμο σε αυτή την πλατφόρμα")
+                .foregroundColor(R0llingTheme.textMuted)
+            #endif
+        }
+    }
+
+    private var audioView: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "waveform.circle.fill")
+                .font(.system(size: 72))
+                .foregroundColor(R0llingTheme.accentPurple)
+
+            Text(attachment.originalFilename)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(R0llingTheme.textPrimary)
+
+            #if canImport(AVKit)
+            if let player {
+                Button(action: {
+                    if isPlayingAudio {
+                        player.pause()
+                        isPlayingAudio = false
+                    } else {
+                        player.play()
+                        isPlayingAudio = true
+                    }
+                }) {
+                    Image(systemName: isPlayingAudio ? "pause.circle.fill" : "play.circle.fill")
+                        .font(.system(size: 54))
+                        .foregroundColor(R0llingTheme.accentPurple)
+                }
+            }
+            #endif
+        }
+        .padding()
+    }
+
+    private func loadCrossPlatformImage() -> Image? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        #if canImport(UIKit)
+        if let ui = UIImage(data: data) { return Image(uiImage: ui) }
+        #elseif canImport(AppKit)
+        if let ns = NSImage(data: data) { return Image(nsImage: ns) }
+        #endif
+        return nil
+    }
+}
+

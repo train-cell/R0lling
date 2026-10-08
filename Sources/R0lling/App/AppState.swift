@@ -45,6 +45,17 @@ public final class AppState: ObservableObject {
     public let knowledgeGraphEngine = AssociativeKnowledgeGraphEngine()
     public let nutritionLogger = MealNutritionVisionLogger()
 
+    // MARK: - Sovereign OS & Apple HealthKit Live Telemetry
+    public let healthKitService = HealthKitService.shared
+    public let chiefOfStaff = ChiefOfStaffService()
+    public let deepWorkManager = DeepWorkSessionManager()
+    public let decisionEngine = DecisionJournalEngine()
+    public let cognitiveCalculator = CognitiveReadinessCalculator()
+
+    @Published public var liveHealthSnapshot: HealthKitTelemetrySnapshot = HealthKitTelemetrySnapshot()
+    @Published public var isHealthKitAuthorized: Bool = false
+    @Published public var cognitiveTelemetry: CognitiveTelemetryScore = CognitiveTelemetryScore(cognitiveStrain: 9.4, focusMinutes: 85, readinessPercent: 88)
+
     // MARK: - Gated hardware hooks (ready=false · κρατούνται για diagnose + μελλοντικό feed)
 
     public let acousticTrigger = AcousticTriggerService()
@@ -132,6 +143,31 @@ public final class AppState: ObservableObject {
         self.timeCapsuleMemories = timeCapsuleEngine.findTimeCapsuleEntries(today: selectedDate, allEntries: all)
         self.scavengerStreak = streakManager.currentStreak
         self.scavengerBadges = streakManager.badges
+        await refreshLiveHealthTelemetry()
+    }
+
+    // MARK: - Sovereign OS & HealthKit Methods
+    public func requestHealthKitAccess() async {
+        do {
+            let granted = try await healthKitService.requestAuthorization()
+            self.isHealthKitAuthorized = granted
+            if granted {
+                await refreshLiveHealthTelemetry()
+                showToast("Το Apple Health συνδέθηκε επιτυχώς.")
+            }
+        } catch {
+            showToast("Σφάλμα πρόσβασης HealthKit: \(error.localizedDescription)")
+        }
+    }
+
+    public func refreshLiveHealthTelemetry() async {
+        let snap = await healthKitService.fetchLiveTelemetrySnapshot()
+        self.liveHealthSnapshot = snap
+        let strainAndReady = await cognitiveCalculator.computeTelemetry(
+            entriesCount: todayEntries.count,
+            deepWorkSeconds: 3600.0
+        )
+        self.cognitiveTelemetry = strainAndReady
     }
 
     // MARK: - Glasses & Streaming
