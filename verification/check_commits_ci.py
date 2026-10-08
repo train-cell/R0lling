@@ -1,0 +1,31 @@
+import urllib.request
+import json
+import subprocess
+
+def get_auth_token():
+    try:
+        proc = subprocess.Popen(
+            ["git", "credential", "fill"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        out, _ = proc.communicate("protocol=https\nhost=github.com\n")
+        for line in out.splitlines():
+            if line.startswith("password="):
+                return line.split("=", 1)[1].strip()
+    except Exception:
+        pass
+    return None
+
+token = get_auth_token()
+headers = {"User-Agent": "Mozilla/5.0"}
+if token:
+    headers["Authorization"] = f"Bearer {token}"
+
+req = urllib.request.Request('https://api.github.com/repos/train-cell/R0lling/actions/runs?per_page=8', headers=headers)
+runs = json.loads(urllib.request.urlopen(req).read().decode('utf-8'))['workflow_runs']
+print("=== LIVE GITHUB ACTIONS TREE ===")
+for r in runs:
+    print(f"Run #{r['run_number']} (id={r['id']}): sha={r['head_sha'][:7]} event={r['event']} status={r['status']} conclusion={r['conclusion']} msg={r['head_commit']['message'].splitlines()[0][:50]}")
