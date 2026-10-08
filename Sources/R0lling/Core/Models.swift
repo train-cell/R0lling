@@ -53,6 +53,7 @@ public enum MediaType: String, Codable, Sendable, CaseIterable {
 public struct MediaAttachment: Identifiable, Codable, Sendable, Equatable {
     public let id: UUID
     public var relativePath: String
+    public var originalFilename: String
     public var mediaType: MediaType
     public var byteSize: Int64
     public var durationSeconds: Double?
@@ -64,6 +65,7 @@ public struct MediaAttachment: Identifiable, Codable, Sendable, Equatable {
     public init(
         id: UUID = UUID(),
         relativePath: String,
+        originalFilename: String? = nil,
         mediaType: MediaType,
         byteSize: Int64,
         durationSeconds: Double? = nil,
@@ -74,6 +76,7 @@ public struct MediaAttachment: Identifiable, Codable, Sendable, Equatable {
     ) {
         self.id = id
         self.relativePath = relativePath
+        self.originalFilename = originalFilename ?? URL(fileURLWithPath: relativePath).lastPathComponent
         self.mediaType = mediaType
         self.byteSize = byteSize
         self.durationSeconds = durationSeconds
@@ -82,7 +85,27 @@ public struct MediaAttachment: Identifiable, Codable, Sendable, Equatable {
         self.height = height
         self.hasAudio = hasAudio
     }
+
+    enum CodingKeys: String, CodingKey {
+        case id, relativePath, originalFilename, mediaType, byteSize, durationSeconds, captureTimestamp, width, height, hasAudio
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.relativePath = try container.decode(String.self, forKey: .relativePath)
+        self.originalFilename = try container.decodeIfPresent(String.self, forKey: .originalFilename)
+            ?? URL(fileURLWithPath: self.relativePath).lastPathComponent
+        self.mediaType = try container.decode(MediaType.self, forKey: .mediaType)
+        self.byteSize = try container.decode(Int64.self, forKey: .byteSize)
+        self.durationSeconds = try container.decodeIfPresent(Double.self, forKey: .durationSeconds)
+        self.captureTimestamp = try container.decode(Date.self, forKey: .captureTimestamp)
+        self.width = try container.decodeIfPresent(Int.self, forKey: .width)
+        self.height = try container.decodeIfPresent(Int.self, forKey: .height)
+        self.hasAudio = try container.decode(Bool.self, forKey: .hasAudio)
+    }
 }
+
 
 /// Βασική καταχώριση ημερολογίου στο R0lling
 public struct JournalEntry: Identifiable, Codable, Sendable, Equatable {

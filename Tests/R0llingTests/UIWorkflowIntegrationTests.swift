@@ -61,4 +61,51 @@ final class UIWorkflowIntegrationTests: XCTestCase {
         XCTAssertNotNil(editor)
         XCTAssertEqual(entry.timeZoneIdentifier, "Europe/Athens")
     }
+
+    @MainActor
+    func testStrategicVaultCardViews() {
+        let diaryCard = EncryptedDiaryCardView(secretContent: "Απόρρητο μήνυμα")
+        XCTAssertNotNil(diaryCard)
+        XCTAssertEqual(diaryCard.secretContent, "Απόρρητο μήνυμα")
+
+        let decision = DecisionRecord(
+            decisionText: "Αρχιτεκτονική απόφαση On-Device",
+            coreAssumptions: ["Μηδενικό latency"],
+            confidencePercent: 98
+        )
+        let decisionCard = DecisionRecordCardView(decision: decision)
+        XCTAssertNotNil(decisionCard)
+        XCTAssertEqual(decisionCard.decision.confidencePercent, 98)
+
+        let inversionCard = PreMortemInversionCardView()
+        XCTAssertNotNil(inversionCard)
+
+        let airGappedBanner = AirGappedStatusBanner()
+        XCTAssertNotNil(airGappedBanner)
+    }
+
+    func testMediaAttachmentFilenameHandling() throws {
+        let attWithDefault = MediaAttachment(
+            relativePath: "photos/vacation.jpg",
+            mediaType: .photo,
+            byteSize: 2048
+        )
+        XCTAssertEqual(attWithDefault.originalFilename, "vacation.jpg")
+
+        let attWithExplicit = MediaAttachment(
+            relativePath: "photos/123.jpg",
+            originalFilename: "custom_name.jpg",
+            mediaType: .photo,
+            byteSize: 1024
+        )
+        XCTAssertEqual(attWithExplicit.originalFilename, "custom_name.jpg")
+
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        let data = try encoder.encode(attWithExplicit)
+        let decoded = try decoder.decode(MediaAttachment.self, from: data)
+        XCTAssertEqual(decoded.originalFilename, "custom_name.jpg")
+        XCTAssertEqual(decoded.relativePath, "photos/123.jpg")
+    }
 }
+

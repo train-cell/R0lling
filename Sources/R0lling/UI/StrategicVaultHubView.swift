@@ -61,6 +61,100 @@ public struct StrategicVaultHubView: View {
     }
 }
 
+public struct EncryptedDiaryCardView: View {
+    @State private var isUnlocked: Bool = false
+    public let secretContent: String
+
+    public init(secretContent: String) {
+        self.secretContent = secretContent
+    }
+
+    public var body: some View {
+        ZStack {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("ΑΠΟΛΥΤΩΣ ΑΠΟΡΡΗΤΗ ΣΚΕΨΗ")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(R0llingTheme.accentLavender)
+                    Spacer()
+                    Image(systemName: isUnlocked ? "lock.open.fill" : "lock.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(isUnlocked ? R0llingTheme.statusSuccess : R0llingTheme.accentLavender)
+                }
+                Text(secretContent)
+                    .font(.system(size: 13))
+                    .foregroundColor(R0llingTheme.textPrimary)
+            }
+            .padding(14)
+            .blur(radius: isUnlocked ? 0 : 14)
+
+            if !isUnlocked {
+                Button {
+                    isUnlocked = true
+                } label: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "faceid")
+                            .font(.system(size: 28))
+                            .foregroundColor(R0llingTheme.accentCyan)
+                        Text("Tap για ξεκλείδωμα FaceID")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(R0llingTheme.textPrimary)
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+        }
+        .background(R0llingTheme.bgSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(R0llingTheme.borderSubtle, lineWidth: 0.5)
+        )
+    }
+}
+
+public struct DecisionRecordCardView: View {
+    public let decision: DecisionRecord
+
+    public init(decision: DecisionRecord) {
+        self.decision = decision
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("STRATEGIC DECISION")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(R0llingTheme.accentLavender)
+                Spacer()
+                Text("\(decision.confidencePercent)% CONFIDENCE")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(R0llingTheme.accentCyan)
+            }
+
+            Text(decision.decisionText)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(R0llingTheme.textPrimary)
+
+            HStack {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 11))
+                    .foregroundColor(R0llingTheme.textMuted)
+                Text("Αναθεώρηση σε 90 ημέρες")
+                    .font(.system(size: 11))
+                    .foregroundColor(R0llingTheme.textSecondary)
+            }
+        }
+        .padding(14)
+        .background(R0llingTheme.bgSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(R0llingTheme.borderSubtle, lineWidth: 0.5)
+        )
+    }
+}
+
 public struct PreMortemInversionCardView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
