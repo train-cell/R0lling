@@ -700,11 +700,23 @@ public actor DreamPatternMatcher {
 
     public func extractSymbols(from dreamText: String) -> [String: Int] {
         var counts: [String: Int] = [:]
-        let keywords = ["νερό", "θάλασσα", "πτήση", "πτώση", "κώδικας", "ταξίδι", "σπίτι", "βουνό"]
+        let symbolMap: [(key: String, forms: [String])] = [
+            ("νερό", ["νερό", "νερού"]),
+            ("θάλασσα", ["θάλασσα", "θάλασσας"]),
+            ("πτήση", ["πτήση", "πετούσα", "πετάω"]),
+            ("πτώση", ["πτώση", "έπεφτα"]),
+            ("κώδικας", ["κώδικας", "κώδικα", "κώδικες"]),
+            ("ταξίδι", ["ταξίδι", "ταξιδεύω"]),
+            ("σπίτι", ["σπίτι", "σπιτιού"]),
+            ("βουνό", ["βουνό", "βουνού"])
+        ]
         let lower = dreamText.lowercased()
-        for kw in keywords {
-            if lower.contains(kw) {
-                counts[kw, default: 0] += 1
+        for item in symbolMap {
+            for form in item.forms {
+                if lower.contains(form) {
+                    counts[item.key, default: 0] += 1
+                    break
+                }
             }
         }
         return counts
