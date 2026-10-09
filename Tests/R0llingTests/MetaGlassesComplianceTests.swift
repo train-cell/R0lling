@@ -36,6 +36,34 @@ final class MetaGlassesComplianceTests: XCTestCase {
         }
     }
 
+    func testConfiguredBufferWindowIsAppliedWhenStreamingStarts() async throws {
+        let buffer = RollingBufferService(mediaStorage: MediaStorageService())
+        let adapter = MetaGlassesAdapter(
+            bufferService: buffer,
+            initialBufferTargetSeconds: 5.0
+        )
+
+        let configuredBeforeStart = await adapter.configuredBufferTargetSeconds
+        XCTAssertEqual(configuredBeforeStart, 5.0)
+
+        try await adapter.connectDevice()
+        try await adapter.startStreaming()
+
+        let activeTarget = await buffer.targetWindowSeconds
+        XCTAssertEqual(activeTarget, 5.0)
+        await adapter.stopStreaming()
+    }
+
+    func testUnsupportedBufferWindowFallsBackToTenSeconds() async {
+        let adapter = MetaGlassesAdapter(initialBufferTargetSeconds: .infinity)
+        let configured = await adapter.configuredBufferTargetSeconds
+        XCTAssertEqual(configured, 10.0)
+
+        await adapter.setBufferTargetSeconds(6.0)
+        let normalized = await adapter.configuredBufferTargetSeconds
+        XCTAssertEqual(normalized, 5.0)
+    }
+
     func testLifecycleBackgroundPausesStreamingHonesty() async throws {
         let adapter = MetaGlassesAdapter()
         try await adapter.connectDevice()

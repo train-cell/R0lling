@@ -1,4 +1,6 @@
-# R0lling — AUDIT FINAL (canonical CTO)
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
+# R0lling — Historical audit snapshot (2026-10-06)
 
 ```yaml
 Last_Modified: 2026-10-06T19:20:00+03:00
@@ -12,8 +14,7 @@ stage_6: NOT RUN (no device failure report)
 git_commit_this_pass: NONE (docs only · user forbade commit)
 ```
 
-**Αυτό το αρχείο είναι το canonical τελικό audit.**  
-Παλαιότερα lane docs (`AUDIT_ROLLUP`, `AUDIT_SECURITY`, `GEMINI_AUDIT`, κ.ά.) είναι ιστορικά/λειπτικά — **μην** τα εμπιστεύεσαι χωρίς re-verify εδώ.
+**This file is an archived snapshot from 2026-10-06. It is not canonical and does not describe the current checkout.** Its counts, paths, CI/head data, and gate statuses below are retained for historical context only. Use `IMPLEMENTATION_STATUS.md`, `CAPABILITY_MATRIX.md`, and `FINDINGS_REMEDIATION.md` for current source-based status.
 
 **Skills εφαρμοσμένα:** `architect` · `repo_scan` · `code_reviewer` · `mp_code-review` · `security_reviewer` · `ponytail_ponytail-audit` · `verification_loop` · `ecc_loop_mode` · `godmode_audit` · `deep_code_analysis` (scoped).
 
@@ -251,7 +252,7 @@ swift test / xcodebuild                          → UNAVAILABLE
 ## 11. Pointer map
 
 ```text
-CANONICAL CTO          docs/AUDIT_FINAL.md          ← THIS FILE
+Archived 2026-10-06    docs/AUDIT_FINAL.md          ← historical snapshot only
 Legacy rollup          docs/AUDIT_ROLLUP.md         → header points here
 Session handoff        docs/HANDOFF.md
 Architecture lane      docs/AUDIT_ARCHITECTURE.md   (historical)

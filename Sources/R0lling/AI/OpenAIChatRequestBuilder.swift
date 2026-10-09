@@ -5,6 +5,20 @@ public enum OpenAIChatRequestBuilder {
     public static let maxContextEntries: Int = 5
     public static let maxVisionFrames: Int = 4
 
+    /// Selects the exact context entries used by both the prompt and response provenance.
+    /// The newest entries are chosen, then returned in chronological order for readability.
+    public static func selectedContextEntries(
+        from entries: [JournalEntry],
+        limit: Int = maxContextEntries
+    ) -> [JournalEntry] {
+        let boundedLimit = max(0, min(limit, maxContextEntries))
+        guard boundedLimit > 0 else { return [] }
+        return entries
+            .sorted { $0.timestamp > $1.timestamp }
+            .prefix(boundedLimit)
+            .sorted { $0.timestamp < $1.timestamp }
+    }
+
     /// Χτίζει το `messages` array για chat/completions (text + optional multi-frame vision).
     public static func buildMessages(
         payload: AIRequestPayload,
@@ -19,10 +33,11 @@ public enum OpenAIChatRequestBuilder {
         }
         messages.append(["role": "system", "content": sysContent])
 
-        for entry in payload.contextEntries.prefix(maxContextEntries) {
+        for entry in selectedContextEntries(from: payload.contextEntries) {
             messages.append([
                 "role": "user",
                 "content": "[Καταγραφή \(entry.formattedTime)] \(entry.content)"
+                    + (entry.locationName.map { "\n[Τοποθεσία] \($0)" } ?? "")
             ])
         }
 
@@ -63,12 +78,27 @@ public enum OpenAIChatRequestBuilder {
     public static func parseChatCompletionResponse(
         data: Data,
         fallbackReply: String,
-        referencedEntryIDs: [UUID]
+        referencedEntryIDs: [UUID],
+        invalidResponseDomain: String,
+        invalidResponseCode: Int
     ) throws -> AIResponseResult {
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let json: [String: Any]?
+        do {
+            json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        } catch {
+            throw NSError(domain: invalidResponseDomain, code: invalidResponseCode, userInfo: [
+                NSLocalizedDescriptionKey: "Ο πάροχος AI επέστρεψε μη έγκυρη απάντηση.",
+                NSUnderlyingErrorKey: error
+            ])
+        }
         let choices = json?["choices"] as? [[String: Any]]
         let firstChoice = choices?.first?["message"] as? [String: Any]
-        let replyText = firstChoice?["content"] as? String ?? fallbackReply
+        guard let replyText = firstChoice?["content"] as? String,
+              !replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw NSError(domain: invalidResponseDomain, code: invalidResponseCode, userInfo: [
+                NSLocalizedDescriptionKey: "Ο πάροχος AI επέστρεψε κενή ή μη έγκυρη απάντηση."
+            ])
+        }
         let usage = json?["usage"] as? [String: Any]
         let totalTokens = usage?["total_tokens"] as? Int
         return AIResponseResult(

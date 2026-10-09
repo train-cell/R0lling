@@ -20,6 +20,7 @@ public actor HighlightReelMuxer {
 
     /// Συνένωση όλων των clips της ημέρας σε ένα ενιαίο Highlight Reel μέσω AVFoundation composition.
     public func createDailyHighlightReel(for dateEntries: [JournalEntry]) async throws -> ReelExportResult {
+        try Task.checkCancellation()
         var clipAttachments: [MediaAttachment] = []
         for entry in dateEntries {
             for att in entry.attachments where att.mediaType == .clip {
@@ -55,25 +56,52 @@ public actor HighlightReelMuxer {
         var includedCount = 0
 
         for att in clipAttachments {
-            guard let fileURL = try? mediaStorage.getMediaFileURL(relativePath: att.relativePath) else { continue }
-            guard FileManager.default.fileExists(atPath: fileURL.path) else { continue }
+            try Task.checkCancellation()
+            let fileURL = try mediaStorage.getMediaFileURL(relativePath: att.relativePath)
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                throw NSError(domain: "R0lling.HighlightReel", code: 3109, userInfo: [
+                    NSLocalizedDescriptionKey: "Λείπει clip από το ημερήσιο reel: \(att.relativePath)"
+                ])
+            }
 
             let asset = AVURLAsset(url: fileURL)
             let videoTracks = asset.tracks(withMediaType: .video)
-            guard let sourceVideo = videoTracks.first else { continue }
-
-            let duration = asset.duration
-            guard duration.isNumeric && duration.seconds > 0 else { continue }
-
-            let timeRange = CMTimeRange(start: .zero, duration: duration)
-            try compositionVideo.insertTimeRange(timeRange, of: sourceVideo, at: cursor)
-
-            if let compositionAudio,
-               let sourceAudio = asset.tracks(withMediaType: .audio).first {
-                try? compositionAudio.insertTimeRange(timeRange, of: sourceAudio, at: cursor)
+            guard let sourceVideo = videoTracks.first else {
+                throw NSError(domain: "R0lling.HighlightReel", code: 3110, userInfo: [
+                    NSLocalizedDescriptionKey: "Το clip δεν περιέχει video track: \(att.relativePath)"
+                ])
             }
 
-            cursor = CMTimeAdd(cursor, duration)
+            let timeRange = sourceVideo.timeRange
+            guard timeRange.isValid && timeRange.duration.isNumeric && timeRange.duration.seconds > 0 else {
+                throw NSError(domain: "R0lling.HighlightReel", code: 3111, userInfo: [
+                    NSLocalizedDescriptionKey: "Μη έγκυρη διάρκεια clip: \(att.relativePath)"
+                ])
+            }
+
+            try compositionVideo.insertTimeRange(timeRange, of: sourceVideo, at: cursor)
+
+            if let sourceAudio = asset.tracks(withMediaType: .audio).first {
+                let audioRange = CMTimeRangeGetIntersection(timeRange, sourceAudio.timeRange)
+                guard audioRange.isValid && audioRange.duration.isNumeric && audioRange.duration.seconds > 0 else {
+                    throw NSError(domain: "R0lling.HighlightReel", code: 3112, userInfo: [
+                        NSLocalizedDescriptionKey: "Το audio track δεν επικαλύπτεται με το video clip: \(att.relativePath)"
+                    ])
+                }
+                guard let compositionAudio else {
+                    throw NSError(domain: "R0lling.HighlightReel", code: 3113, userInfo: [
+                        NSLocalizedDescriptionKey: "Αδυναμία δημιουργίας audio track για το reel."
+                    ])
+                }
+                let offset = CMTimeSubtract(audioRange.start, timeRange.start)
+                try compositionAudio.insertTimeRange(
+                    audioRange,
+                    of: sourceAudio,
+                    at: CMTimeAdd(cursor, offset)
+                )
+            }
+
+            cursor = CMTimeAdd(cursor, timeRange.duration)
             includedCount += 1
         }
 
@@ -87,6 +115,7 @@ public actor HighlightReelMuxer {
 
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("r0lling_highlight_\(UUID().uuidString).mp4")
+        defer { try? FileManager.default.removeItem(at: tempURL) }
         if FileManager.default.fileExists(atPath: tempURL.path) {
             try FileManager.default.removeItem(at: tempURL)
         }
@@ -104,26 +133,23 @@ public actor HighlightReelMuxer {
         exporter.outputURL = tempURL
         exporter.outputFileType = .mp4
 
+        try Task.checkCancellation()
         try await exportSession(exporter)
+        try Task.checkCancellation()
 
-        let exportedData = try Data(contentsOf: tempURL)
-        try? FileManager.default.removeItem(at: tempURL)
-
-        // Post-write moov guard — fail closed όπως PlayableClipExporter.
-        let probe = exportedData.prefix(2_000_000)
-        let probeText = String(decoding: probe, as: UTF8.self)
-        let hasMoov = probe.contains("moov".data(using: .ascii)!) || probeText.contains("moov")
-        guard hasMoov else {
+        let exportedAsset = AVURLAsset(url: tempURL)
+        guard try await exportedAsset.load(.isPlayable) else {
             throw NSError(
                 domain: "R0lling.HighlightReel",
                 code: 3105,
-                userInfo: [NSLocalizedDescriptionKey: "Highlight Reel export χωρίς moov atom — απορρίφθηκε."]
+                userInfo: [NSLocalizedDescriptionKey: "Το AVFoundation δεν αναγνωρίζει το Highlight Reel ως playable video."]
             )
         }
 
+        try Task.checkCancellation()
         let filename = "highlight_reel_\(Int(Date().timeIntervalSince1970)).mp4"
         let savedAttachment = try await mediaStorage.saveMediaFile(
-            data: exportedData,
+            from: tempURL,
             originalFilename: filename,
             mediaType: .video
         )
@@ -140,36 +166,34 @@ public actor HighlightReelMuxer {
 
     /// Async wrapper για AVAssetExportSession (iOS 17+ / macOS compatible).
     private func exportSession(_ exporter: AVAssetExportSession) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            exporter.exportAsynchronously {
-                switch exporter.status {
-                case .completed:
-                    continuation.resume()
-                case .failed:
-                    let err = exporter.error ?? NSError(
-                        domain: "R0lling.HighlightReel",
-                        code: 3106,
-                        userInfo: [NSLocalizedDescriptionKey: "Highlight Reel export απέτυχε."]
-                    )
-                    continuation.resume(throwing: err)
-                case .cancelled:
-                    continuation.resume(
-                        throwing: NSError(
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                exporter.exportAsynchronously {
+                    switch exporter.status {
+                    case .completed:
+                        continuation.resume()
+                    case .failed:
+                        let err = exporter.error ?? NSError(
                             domain: "R0lling.HighlightReel",
-                            code: 3107,
-                            userInfo: [NSLocalizedDescriptionKey: "Highlight Reel export ακυρώθηκε."]
+                            code: 3106,
+                            userInfo: [NSLocalizedDescriptionKey: "Highlight Reel export απέτυχε."]
                         )
-                    )
-                default:
-                    continuation.resume(
-                        throwing: NSError(
-                            domain: "R0lling.HighlightReel",
-                            code: 3108,
-                            userInfo: [NSLocalizedDescriptionKey: "Highlight Reel export σε άγνωστη κατάσταση."]
+                        continuation.resume(throwing: err)
+                    case .cancelled:
+                        continuation.resume(throwing: CancellationError())
+                    default:
+                        continuation.resume(
+                            throwing: NSError(
+                                domain: "R0lling.HighlightReel",
+                                code: 3108,
+                                userInfo: [NSLocalizedDescriptionKey: "Highlight Reel export σε άγνωστη κατάσταση."]
+                            )
                         )
-                    )
+                    }
                 }
             }
+        } onCancel: {
+            exporter.cancelExport()
         }
     }
 }

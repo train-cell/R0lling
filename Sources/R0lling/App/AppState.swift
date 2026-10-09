@@ -14,7 +14,7 @@ public final class AppState: ObservableObject {
     public let agentManager: AgentFolderManager
     public let aiRouter: AIRouter
     public let gameEngine: ObservationGameEngine
-    public let backupEngine: BackupRestoreEngine
+    private let backupEngine: BackupRestoreEngine
 
     // Published State
     @Published public var todayEntries: [JournalEntry] = []
@@ -23,9 +23,17 @@ public final class AppState: ObservableObject {
     @Published public var glassesState: GlassesConnectionState = .disconnected
     @Published public var bufferDuration: Double = 0.0
     @Published public var isStreaming: Bool = false
+    @Published public var isSimulationMode: Bool = true
+    @Published public var deepWorkEndsAt: Date?
+    @Published public private(set) var deepWorkSessionRestored = false
+    @Published public private(set) var completedFocusSecondsToday: TimeInterval = 0
     @Published public var isListeningSpeech: Bool = false
     @Published public var toastMessage: String?
+    @Published public private(set) var pendingBackupExportURL: URL?
     @Published public var chatMessages: [(id: UUID, isUser: Bool, text: String, timestamp: Date)] = []
+    @Published public private(set) var pendingVisionNote: String?
+    @Published public private(set) var pendingVisionNoteIsSaved = false
+    @Published public private(set) var isSavingVisionNote = false
     @Published public var currentMission: ObservationMission?
     @Published public var gameScore: Int = 0
     @Published public var gameSessionState: ObservationGameSessionState = .idle
@@ -37,6 +45,8 @@ public final class AppState: ObservableObject {
     public let timeCapsuleEngine = TimeCapsuleEngine()
     public let streakManager = ScavengerHuntStreakManager()
     public let podcastGenerator = DailyPodcastGenerator()
+    private var pendingVisionTags: [String] = []
+    private var pendingVisionNoteID: UUID?
     public let highlightMuxer: HighlightReelMuxer
     public let canvasGenerator = ObsidianCanvasGenerator()
     public let emotionAnalyzer = VoiceEmotionAnalyzer()
@@ -49,12 +59,13 @@ public final class AppState: ObservableObject {
     public let healthKitService = HealthKitService.shared
     public let chiefOfStaff = ChiefOfStaffService()
     public let deepWorkManager = DeepWorkSessionManager()
-    public let decisionEngine = DecisionJournalEngine()
     public let cognitiveCalculator = CognitiveReadinessCalculator()
 
     @Published public var liveHealthSnapshot: HealthKitTelemetrySnapshot = HealthKitTelemetrySnapshot()
-    @Published public var isHealthKitAuthorized: Bool = false
-    @Published public var cognitiveTelemetry: CognitiveTelemetryScore = CognitiveTelemetryScore(cognitiveStrain: 9.4, focusMinutes: 85, readinessPercent: 88)
+    @Published public var fitnessActivitySnapshot: FitnessActivitySnapshot = .unavailable()
+    /// HealthKit does not disclose per-type read permission; this only tracks callback completion.
+    @Published public var didCompleteHealthKitAccessRequest: Bool = false
+    @Published public var cognitiveTelemetry: CognitiveTelemetryScore = CognitiveTelemetryScore(cognitiveStrain: 0, focusMinutes: 0, readinessPercent: nil)
 
     // MARK: - Gated hardware hooks (ready=false · κρατούνται για diagnose + μελλοντικό feed)
 
@@ -76,24 +87,34 @@ public final class AppState: ObservableObject {
     @Published public var teleutaiaObsidianConflicts: [String] = []
 
     private var cancellables = Set<AnyCancellable>()
+    /// Prevents restore and orphan cleanup from racing while media paths are referenced by the journal.
+    private let mediaReferenceMutationGate: MediaReferenceMutationGate
     private var tickerTimer: Timer?
     /// Ενεργή AI Task για cancelation (chat / vision / recall).
     private var activeAITask: Task<Void, Never>?
+    private var toastDismissalTask: Task<Void, Never>?
 
     public init() {
         let storage = JSONFileStorageService()
         let mediaStorage = MediaStorageService()
         let bufferService = RollingBufferService(mediaStorage: mediaStorage)
-        let glasses = MetaGlassesAdapter(bufferService: bufferService)
+        let storedBufferTarget = UserDefaults.standard.object(forKey: "r0lling.buffer.targetSeconds") as? Double ?? 10.0
+        let glasses = MetaGlassesAdapter(
+            bufferService: bufferService,
+            initialBufferTargetSeconds: storedBufferTarget
+        )
         let speech = SpeechTranscriptionService()
         let obsidian = ObsidianVaultBridge()
         let agent = AgentFolderManager()
-        let ai = AIRouter(settings: AISettings())
+        let aiSettings = AIRouter.loadSettings()
+        let ai = AIRouter(settings: aiSettings)
         let game = ObservationGameEngine(aiRouter: ai)
+        let mutationGate = MediaReferenceMutationGate()
         let backup = BackupRestoreEngine(
             storage: storage,
             mediaStorage: mediaStorage,
-            agentManager: agent
+            agentManager: agent,
+            mediaReferenceMutationGate: mutationGate
         )
 
         self.storage = storage
@@ -104,13 +125,18 @@ public final class AppState: ObservableObject {
         self.obsidianBridge = obsidian
         self.agentManager = agent
         self.aiRouter = ai
+        self.activeProvider = aiSettings.activeProvider
         self.gameEngine = game
         self.backupEngine = backup
+        self.mediaReferenceMutationGate = mutationGate
         self.highlightMuxer = HighlightReelMuxer(mediaStorage: mediaStorage)
 
         setupSpeechCommandHandler()
         setupSuperFeatureHooks()
         startPeriodicStateSync()
+        Task { [weak self] in
+            await self?.restoreDeepWorkSession()
+        }
     }
 
     public func loadInitialData() async {
@@ -137,23 +163,45 @@ public final class AppState: ObservableObject {
     }
 
     public func refreshEntries() async {
-        let all = await storage.getAllEntries()
-        self.allEntries = all
-        self.todayEntries = await storage.getEntriesForDate(selectedDate)
-        self.timeCapsuleMemories = timeCapsuleEngine.findTimeCapsuleEntries(today: selectedDate, allEntries: all)
-        self.scavengerStreak = streakManager.currentStreak
-        self.scavengerBadges = streakManager.badges
-        await refreshLiveHealthTelemetry()
+        do {
+            let all = try await storage.getAllEntries()
+            self.allEntries = all
+            self.todayEntries = try await storage.getEntriesForDate(selectedDate)
+            self.timeCapsuleMemories = timeCapsuleEngine.findTimeCapsuleEntries(today: selectedDate, allEntries: all)
+            self.scavengerStreak = streakManager.currentStreak
+            self.scavengerBadges = streakManager.badges
+            await refreshLiveHealthTelemetry()
+        } catch {
+            showToast(error.localizedDescription)
+        }
     }
 
     // MARK: - Sovereign OS & HealthKit Methods
+    private func restoreDeepWorkSession() async {
+        defer { deepWorkSessionRestored = true }
+        guard case .active(let startedAt, let duration, _) = await deepWorkManager.getState() else {
+            deepWorkEndsAt = nil
+            return
+        }
+        let deadline = startedAt.addingTimeInterval(duration)
+        if deadline > Date() {
+            deepWorkEndsAt = deadline
+        } else {
+            deepWorkEndsAt = nil
+            await refreshLiveHealthTelemetry()
+        }
+    }
+
     public func requestHealthKitAccess() async {
         do {
-            let granted = try await healthKitService.requestAuthorization()
-            self.isHealthKitAuthorized = granted
-            if granted {
+            let requestCompleted = try await healthKitService.requestAuthorization()
+            self.didCompleteHealthKitAccessRequest = requestCompleted
+            if requestCompleted {
                 await refreshLiveHealthTelemetry()
-                showToast("Το Apple Health συνδέθηκε επιτυχώς.")
+                await refreshFitnessActivity()
+                showToast("Το αίτημα Apple Health ολοκληρώθηκε. Το HealthKit δεν αποκαλύπτει αν εγκρίθηκε η ανάγνωση· η κάρτα δείχνει μόνο τις μετρήσεις που επέστρεψαν.")
+            } else {
+                showToast("Το HealthKit δεν είναι διαθέσιμο σε αυτή τη συσκευή.")
             }
         } catch {
             showToast("Σφάλμα πρόσβασης HealthKit: \(error.localizedDescription)")
@@ -163,20 +211,62 @@ public final class AppState: ObservableObject {
     public func refreshLiveHealthTelemetry() async {
         let snap = await healthKitService.fetchLiveTelemetrySnapshot()
         self.liveHealthSnapshot = snap
+        let telemetryDate = Date()
+        let completedFocusSeconds = await deepWorkManager.focusSeconds(
+            on: telemetryDate,
+            includeActiveSession: false
+        )
+        let focusSeconds = await deepWorkManager.focusSeconds(on: telemetryDate)
+        let sessionState = await deepWorkManager.getState()
+        if case .active(let startedAt, let duration, _) = sessionState {
+            let deadline = startedAt.addingTimeInterval(duration)
+            deepWorkEndsAt = deadline > Date() ? deadline : nil
+        } else {
+            deepWorkEndsAt = nil
+        }
+        self.completedFocusSecondsToday = completedFocusSeconds
         let strainAndReady = await cognitiveCalculator.computeTelemetry(
             entriesCount: todayEntries.count,
-            deepWorkSeconds: 3600.0
+            deepWorkSeconds: focusSeconds
         )
         self.cognitiveTelemetry = strainAndReady
     }
 
+    public func refreshFitnessActivity() async {
+        fitnessActivitySnapshot = await healthKitService.fetchFitnessActivitySnapshot()
+    }
+
+    /// Starts or completes a real elapsed-time focus session.
+    public func toggleDeepWork() async {
+        guard deepWorkSessionRestored else { return }
+        if deepWorkEndsAt != nil {
+            await completeDeepWork()
+        } else {
+            await deepWorkManager.startSession(
+                goal: "Εστίαση",
+                durationMinutes: DeepWorkSessionTiming.defaultDurationMinutes
+            )
+            deepWorkEndsAt = Date().addingTimeInterval(DeepWorkSessionTiming.defaultDurationSeconds)
+        }
+        await refreshLiveHealthTelemetry()
+    }
+
+    /// Finishes the current session and refreshes its measured focus duration.
+    public func completeDeepWork() async {
+        guard deepWorkSessionRestored, deepWorkEndsAt != nil else { return }
+        _ = await deepWorkManager.completeSession()
+        deepWorkEndsAt = nil
+        await refreshLiveHealthTelemetry()
+    }
+
     // MARK: - Glasses & Streaming
     public func toggleGlassesConnection() async {
+        isSimulationMode = await glassesAdapter.isSimulationMode
         do {
             if case .disconnected = glassesState {
                 try await glassesAdapter.connectDevice()
                 glassesState = await glassesAdapter.connectionState
-                showToast("Τα Meta Glasses συνδέθηκαν.")
+                showToast(isSimulationMode ? "Simulation γυαλιών ενεργή." : "Τα Meta Glasses συνδέθηκαν.")
             } else {
                 await glassesAdapter.disconnectDevice()
                 glassesState = .disconnected
@@ -199,7 +289,7 @@ public final class AppState: ObservableObject {
                 try await glassesAdapter.startStreaming()
                 isStreaming = true
                 glassesState = await glassesAdapter.connectionState
-                showToast("Η ροή ξεκίνησε. Buffer ενεργό.")
+                showToast(isSimulationMode ? "Simulation ροή ενεργή. Συνθετικός buffer." : "Η ροή ξεκίνησε. Buffer ενεργό.")
             }
         } catch {
             showToast("Σφάλμα ροής: \(error.localizedDescription)")
@@ -224,7 +314,7 @@ public final class AppState: ObservableObject {
             )
 
             let simulationSuffix = result.isSimulationPlaceholder
-                ? " [simulation placeholder — playable MP4 με moov]"
+                ? " [δοκιμαστικό placeholder — επιβεβαιωμένη αναπαραγωγή MP4]"
                 : ""
             let entry = JournalEntry(
                 content: "Rolling Clip (\(String(format: "%.1f", result.duration))s) από τα Meta Glasses.\(simulationSuffix)",
@@ -252,8 +342,9 @@ public final class AppState: ObservableObject {
     }
 
     // MARK: - Notes & Composer
-    public func addNote(text: String, tags: [String] = [], source: EntrySource = .manual) async {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    @discardableResult
+    public func addNote(text: String, tags: [String] = [], source: EntrySource = .manual) async -> Bool {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
 
         let detectedEmotionTags = emotionAnalyzer.analyzeTranscript(text: text)
         let detectedEntityTags = entityRecognizer.detectEntities(textClues: [text])
@@ -270,8 +361,10 @@ public final class AppState: ObservableObject {
             await refreshEntries()
             await exportEntryToObsidianIfConfigured(entry)
             showToast("✅ Η σημείωση αποθηκεύτηκε.")
+            return true
         } catch {
             showToast("Σφάλμα αποθήκευσης: \(error.localizedDescription)")
+            return false
         }
     }
 
@@ -339,6 +432,35 @@ public final class AppState: ObservableObject {
         showToast("Ακυρώθηκε η κλήση AI.")
     }
 
+    /// Save the latest on-demand vision result only after the user asks.
+    public func savePendingVisionNote() async {
+        guard !isSavingVisionNote,
+              !pendingVisionNoteIsSaved,
+              let note = pendingVisionNote,
+              let noteID = pendingVisionNoteID else { return }
+        isSavingVisionNote = true
+        defer { isSavingVisionNote = false }
+        let tags = pendingVisionTags
+        guard await addNote(text: note, tags: tags, source: .ai) else { return }
+        if pendingVisionNoteID == noteID {
+            pendingVisionNoteIsSaved = true
+        }
+    }
+
+    /// Speak the latest on-demand vision result using the existing Greek TTS service.
+    public func speakPendingVisionNote() {
+        guard let note = pendingVisionNote else { return }
+        podcastGenerator.playDailyPodcast(summaryText: note)
+        showToast("Η εκφώνηση ξεκίνησε.")
+    }
+
+    public func discardPendingVisionNote() {
+        pendingVisionNote = nil
+        pendingVisionNoteIsSaved = false
+        pendingVisionTags = []
+        pendingVisionNoteID = nil
+    }
+
     public func sendMessageToAssistant(prompt: String) async {
         chatMessages.append((id: UUID(), isUser: true, text: prompt, timestamp: Date()))
 
@@ -346,7 +468,10 @@ public final class AppState: ObservableObject {
         let task = Task { @MainActor in
             do {
                 try Task.checkCancellation()
-                let memory = try? await agentManager.loadAgentMemory()
+                let settings = await aiRouter.currentSettings()
+                let memory: AgentMemory?
+                if settings.includeAgentMemoryInChat { memory = try await agentManager.loadAgentMemory() }
+                else { memory = nil }
                 let result = try await aiRouter.askAssistant(
                     prompt: prompt,
                     contextEntries: todayEntries,
@@ -366,33 +491,63 @@ public final class AppState: ObservableObject {
 
     /// A11: vision path — multi-frame από buffer· fallback `capturePhoto` (protocol/sim)· OCR on-device.
     public func executeWhatAmISeeing() async {
+        guard !(await glassesAdapter.isSimulationMode) else {
+            showToast("Η simulation δεν καταγράφει πραγματικές εικόνες για AI ανάλυση.")
+            return
+        }
+        await executeWhatAmISeeing(selectedImage: nil)
+    }
+
+    /// A11 fallback: analyze a user-selected Photos image without requiring glasses.
+    public func executeWhatAmISeeing(imageData: Data) async {
+        guard !imageData.isEmpty else {
+            showToast("Η επιλεγμένη φωτογραφία είναι κενή.")
+            return
+        }
+        guard imageData.count <= ImageMetadataSanitizer.maximumVisionInputBytes else {
+            showToast("Η εικόνα υπερβαίνει το όριο των 40 MB.")
+            return
+        }
+        await executeWhatAmISeeing(selectedImage: imageData)
+    }
+
+    private func executeWhatAmISeeing(selectedImage: Data?) async {
         activeAITask?.cancel()
         let task = Task { @MainActor in
             do {
                 try Task.checkCancellation()
-                let bufferFrames = await bufferService.snapshotVisionKeyframes()
+                let bufferFrames: [Data]
+                if selectedImage == nil {
+                    bufferFrames = await bufferService.snapshotVisionKeyframes()
+                } else {
+                    bufferFrames = []
+                }
                 let photoForOCR: Data
                 let reply: String
 
-                if bufferFrames.count >= 2 {
-                    photoForOCR = bufferFrames.last!
+                if let selectedImage {
+                    photoForOCR = try await prepareVisionImage(selectedImage)
+                    reply = try await aiRouter.askWhatAmISeeing(imageData: photoForOCR, customQuestion: nil)
+                } else if bufferFrames.count >= 2, let lastFrame = bufferFrames.last {
+                    photoForOCR = try await prepareVisionImage(lastFrame)
                     reply = try await aiRouter.askWhatAmISeeingMultiFrames(
                         frames: bufferFrames,
                         customQuestion: nil
                     )
                 } else if let single = bufferFrames.first {
-                    photoForOCR = single
-                    reply = try await aiRouter.askWhatAmISeeing(imageData: single, customQuestion: nil)
+                    photoForOCR = try await prepareVisionImage(single)
+                    reply = try await aiRouter.askWhatAmISeeing(imageData: photoForOCR, customQuestion: nil)
                 } else {
                     let photoData = try await glassesAdapter.capturePhoto()
-                    photoForOCR = photoData
-                    reply = try await aiRouter.askWhatAmISeeing(imageData: photoData, customQuestion: nil)
+                    photoForOCR = try await prepareVisionImage(photoData)
+                    reply = try await aiRouter.askWhatAmISeeing(imageData: photoForOCR, customQuestion: nil)
                 }
 
                 try Task.checkCancellation()
 
                 // On-device OCR (READY) πριν/μαζί με cloud vision
                 let ocrTokens = await onDeviceVision.recognizeTextFromImage(imageData: photoForOCR)
+                try Task.checkCancellation()
 
                 var visionNote = "👀 Περιγραφή εικόνας: \(reply)"
                 if !ocrTokens.isEmpty {
@@ -400,9 +555,17 @@ public final class AppState: ObservableObject {
                 }
 
                 chatMessages.append((id: UUID(), isUser: false, text: "👀 [What am I seeing]: \(reply)", timestamp: Date()))
-                await addNote(text: visionNote, tags: ["vision", "glasses"], source: .ai)
+                pendingVisionNote = visionNote
+                pendingVisionNoteIsSaved = false
+                pendingVisionTags = ["vision", selectedImage == nil ? "glasses" : "photos"]
+                pendingVisionNoteID = UUID()
+                if selectedImage == nil {
+                    showToast("Η περιγραφή δεν αποθηκεύτηκε· γνωστά τρόφιμα μπορεί να καταγραφούν ως εκτίμηση γεύματος.")
+                } else {
+                    showToast("Η ανάλυση ολοκληρώθηκε. Το αποτέλεσμα δεν αποθηκεύτηκε ακόμη.")
+                }
 
-                if FeatureReadinessRegistry.nutritionHeuristic.ready {
+                if selectedImage == nil, FeatureReadinessRegistry.nutritionHeuristic.ready {
                     await logMealFromDetectedTokens(ocrTokens)
                 }
             } catch is CancellationError {
@@ -413,6 +576,15 @@ public final class AppState: ObservableObject {
         }
         activeAITask = task
         await task.value
+    }
+
+    private func prepareVisionImage(_ data: Data) async throws -> Data {
+        try Task.checkCancellation()
+        let prepared = try await Task.detached(priority: .userInitiated) {
+            try ImageMetadataSanitizer.encodeForVision(data)
+        }.value
+        try Task.checkCancellation()
+        return prepared
     }
 
     /// A12: ανάκληση μνήμης από journal + AI.
@@ -457,6 +629,10 @@ public final class AppState: ObservableObject {
     /// Αξιολογεί capture από γυαλιά. `true` μόνο σε επιτυχή αποστολή (G5-002).
     @discardableResult
     public func evaluateGameCapture() async -> Bool {
+        guard !(await glassesAdapter.isSimulationMode) else {
+            showToast("Χρειάζεται πραγματική εικόνα ή εισαγωγή φωτογραφίας για αξιολόγηση.")
+            return false
+        }
         do {
             let photoData = try await glassesAdapter.capturePhoto()
             return await evaluateGameCapture(imageData: photoData)
@@ -505,7 +681,7 @@ public final class AppState: ObservableObject {
         scavengerStreak = streakManager.currentStreak
         scavengerBadges = streakManager.badges
         if !apotelesma.didPersist {
-            showToast("Το streak ενημερώθηκε στη μνήμη αλλά απέτυχε η αποθήκευση.")
+            showToast("Το streak δεν αποθηκεύτηκε.")
         }
         return apotelesma.didPersist
     }
@@ -556,10 +732,21 @@ public final class AppState: ObservableObject {
     public func dimiourgia_backup_bundle() async {
         do {
             let backupURL = try await backupEngine.createBackupBundle()
-            showToast("Backup έτοιμο: \(backupURL.lastPathComponent)")
+            pendingBackupExportURL = backupURL
         } catch {
             showToast(AppErrorTaxonomy.minimaXristi(gia: error))
         }
+    }
+
+    public func finishBackupExport(didExport: Bool) {
+        guard let backupURL = pendingBackupExportURL else { return }
+        if didExport {
+            showToast("Το backup αντιγράφηκε στον επιλεγμένο προορισμό.")
+        } else {
+            showToast("Η εξαγωγή backup ακυρώθηκε.")
+        }
+        try? FileManager.default.removeItem(at: backupURL)
+        pendingBackupExportURL = nil
     }
 
     /// A15: επαναφορά από Files-picked backup φάκελο (security-scoped).
@@ -576,6 +763,8 @@ public final class AppState: ObservableObject {
             showToast(
                 "Επαναφορά: \(result.restoredEntries) εγγραφές, \(result.restoredMedia) μέσα."
             )
+        } catch is CancellationError {
+            showToast("Η επαναφορά ακυρώθηκε πριν ξεκινήσει.")
         } catch {
             showToast(AppErrorTaxonomy.minimaXristi(gia: error))
         }
@@ -631,8 +820,8 @@ public final class AppState: ObservableObject {
 
     // MARK: - Super Feature Hooks (μόνο όταν ready=true ή latent WCSession)
     private func setupSuperFeatureHooks() {
-        // Acoustic / IMU triggers: fail-closed μέχρι FeatureReadinessRegistry flip.
-        // Feed pipeline είναι πάντα wired (adapter → sink) — flip ready = 100% auto-clip.
+        // Acoustic / IMU triggers stay fail-closed: the sink is wired, but the current
+        // adapter only simulates sensor values and has no live DAT microphone/IMU source.
         acousticTrigger.config.isEnabled = FeatureReadinessRegistry.acoustic.ready
 
         if FeatureReadinessRegistry.acoustic.ready {
@@ -660,7 +849,8 @@ public final class AppState: ObservableObject {
             await glassesAdapter.setSensorFeedSink(self)
         }
 
-        // Latent WCSession: ενεργό μόνο αν companion στείλει (ready=false · χωρίς Watch UI)
+        guard FeatureReadinessRegistry.watchCompanion.ready else { return }
+        // Companion callbacks are disabled until a watchOS target is integrated.
         WatchConnectivityCoordinator.shared.onRemoteClipTriggerRequested = { [weak self] in
             guard let self = self else { return }
             Task { @MainActor in
@@ -848,14 +1038,22 @@ public final class AppState: ObservableObject {
     /// Διαγραφή καταγραφής + orphan media μόνο αν δεν αναφέρεται αλλού.
     public func deleteEntry(id: UUID) async {
         do {
-            guard let entry = await storage.getEntry(id: id) else {
-                showToast("Η καταγραφή δεν βρέθηκε.")
-                return
+            try await mediaReferenceMutationGate.withExclusiveAccess { [self] in
+                do {
+                    guard let entry = try await storage.getEntry(id: id) else {
+                        showToast("Η καταγραφή δεν βρέθηκε.")
+                        return
+                    }
+                    try await storage.deleteEntry(id: id)
+                    await katharismosOrphanMedia(afairoumena: entry.attachments)
+                    await refreshEntries()
+                    showToast("Η καταγραφή διαγράφηκε.")
+                } catch {
+                    showToast("Σφάλμα διαγραφής: \(error.localizedDescription)")
+                }
             }
-            try await storage.deleteEntry(id: id)
-            await katharismosOrphanMedia(afairoumena: entry.attachments)
-            await refreshEntries()
-            showToast("Η καταγραφή διαγράφηκε.")
+        } catch is CancellationError {
+            return
         } catch {
             showToast("Σφάλμα διαγραφής: \(error.localizedDescription)")
         }
@@ -894,21 +1092,21 @@ public final class AppState: ObservableObject {
         newTimestamp: Date,
         timeZoneIdentifier: String? = nil
     ) async {
-        guard var entry = await storage.getEntry(id: id) else {
-            showToast("Η καταγραφή δεν βρέθηκε.")
-            return
-        }
-        entry.timestamp = newTimestamp
-        if let timeZoneIdentifier {
-            let trimmed = timeZoneIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
-                entry.timeZoneIdentifier = trimmed
-            }
-        }
-        entry.lastModified = Date()
         do {
+            guard var entry = try await storage.getEntry(id: id) else {
+                showToast("Η καταγραφή δεν βρέθηκε.")
+                return
+            }
+            entry.timestamp = newTimestamp
+            if let timeZoneIdentifier {
+                let trimmed = timeZoneIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    entry.timeZoneIdentifier = trimmed
+                }
+            }
+            entry.lastModified = Date()
             try await storage.saveEntry(entry)
-            let sameIdCount = await storage.getAllEntries().filter { $0.id == id }.count
+            let sameIdCount = try await storage.getAllEntries().filter { $0.id == id }.count
             guard sameIdCount == 1 else {
                 showToast("Σφάλμα ακεραιότητας: διπλότυπο ID μετά από διόρθωση ημερομηνίας.")
                 return
@@ -926,7 +1124,12 @@ public final class AppState: ObservableObject {
         tag: String? = nil,
         source: EntrySource? = nil
     ) async -> [JournalEntry] {
-        await storage.searchEntries(query: query, tag: tag, source: source)
+        do {
+            return try await storage.searchEntries(query: query, tag: tag, source: source)
+        } catch {
+            showToast(error.localizedDescription)
+            return []
+        }
     }
 
     // MARK: - Media Attach (A03)
@@ -945,33 +1148,73 @@ public final class AppState: ObservableObject {
                 originalFilename: originalFilename,
                 mediaType: mediaType
             )
+            try await persistMediaAttachment(attachment, toEntryId: toEntryId, noteText: noteText)
+        } catch {
+            showToast("Σφάλμα media: \(error.localizedDescription)")
+        }
+    }
 
-            if let toEntryId, var entry = await storage.getEntry(id: toEntryId) {
-                entry.attachments.append(attachment)
-                entry.lastModified = Date()
-                try await storage.saveEntry(entry)
-                await refreshEntries()
-                await exportEntryToObsidianIfConfigured(entry)
-                showToast("✅ Media επισυνάφθηκε στην καταγραφή.")
-                return
+    /// File-backed path for Photos/Files imports; avoids loading large assets into Data.
+    public func attachMediaFile(
+        from sourceURL: URL,
+        originalFilename: String,
+        mediaType: MediaType,
+        toEntryId: UUID? = nil,
+        noteText: String? = nil
+    ) async {
+        do {
+            let attachment = try await mediaStorage.saveMediaFile(
+                from: sourceURL,
+                originalFilename: originalFilename,
+                mediaType: mediaType
+            )
+            try await persistMediaAttachment(attachment, toEntryId: toEntryId, noteText: noteText)
+        } catch {
+            showToast("Σφάλμα media: \(error.localizedDescription)")
+        }
+    }
+
+    private func persistMediaAttachment(
+        _ attachment: MediaAttachment,
+        toEntryId: UUID?,
+        noteText: String?
+    ) async throws {
+        var journalCommitted = false
+        do {
+            if let toEntryId {
+                let existingEntry = try await storage.getEntry(id: toEntryId)
+                if var entry = existingEntry {
+                    entry.attachments.append(attachment)
+                    entry.lastModified = Date()
+                    try await storage.saveEntry(entry)
+                    journalCommitted = true
+                    await refreshEntries()
+                    await exportEntryToObsidianIfConfigured(entry)
+                    showToast("✅ Media επισυνάφθηκε στην καταγραφή.")
+                    return
+                }
             }
 
             let content = (noteText?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap {
                 $0.isEmpty ? nil : $0
-            } ?? JournalMediaImporter.proepiloghmenoKeimeno(gia: mediaType)
+            } ?? JournalMediaImporter.proepiloghmenoKeimeno(gia: attachment.mediaType)
 
             let entry = JournalEntry(
                 content: content,
                 source: .importFile,
-                tags: [mediaType.rawValue],
+                tags: [attachment.mediaType.rawValue],
                 attachments: [attachment]
             )
             try await storage.saveEntry(entry)
+            journalCommitted = true
             await refreshEntries()
             await exportEntryToObsidianIfConfigured(entry)
-            showToast("✅ \(mediaType.folderName) αποθηκεύτηκε τοπικά.")
+            showToast("✅ \(attachment.mediaType.folderName) αποθηκεύτηκε τοπικά.")
         } catch {
-            showToast("Σφάλμα media: \(error.localizedDescription)")
+            if !journalCommitted {
+                try? await mediaStorage.deleteMediaFile(relativePath: attachment.relativePath)
+            }
+            throw error
         }
     }
 
@@ -986,14 +1229,18 @@ public final class AppState: ObservableObject {
 
     /// Σβήνει μόνο attachments που δεν αναφέρονται πλέον από καμία καταγραφή.
     private func katharismosOrphanMedia(afairoumena: [MediaAttachment]) async {
-        let all = await storage.getAllEntries()
-        let activePaths = Set(all.flatMap { $0.attachments.map(\.relativePath) })
-        for att in afairoumena where !activePaths.contains(att.relativePath) {
-            do {
-                try await mediaStorage.deleteMediaFile(relativePath: att.relativePath)
-            } catch {
-                showToast("Orphan media: \(error.localizedDescription)")
+        do {
+            let all = try await storage.getAllEntries()
+            let activePaths = Set(all.flatMap { $0.attachments.map(\.relativePath) })
+            for att in afairoumena where !activePaths.contains(att.relativePath) {
+                do {
+                    try await mediaStorage.deleteMediaFile(relativePath: att.relativePath)
+                } catch {
+                    showToast("Orphan media: \(error.localizedDescription)")
+                }
             }
+        } catch {
+            showToast(error.localizedDescription)
         }
     }
 
@@ -1014,19 +1261,24 @@ public final class AppState: ObservableObject {
     }
 
     public func showToast(_ message: String) {
+        toastDismissalTask?.cancel()
         self.toastMessage = message
-        Task {
-            try? await Task.sleep(nanoseconds: 2_500_000_000)
-            if self.toastMessage == message {
-                self.toastMessage = nil
+        toastDismissalTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 2_500_000_000)
+            } catch {
+                return
             }
+            guard let self, !Task.isCancelled else { return }
+            self.toastMessage = nil
+            self.toastDismissalTask = nil
         }
     }
 }
 
-// MARK: - GlassesSensorFeedSink (acoustic / IMU feed API end-to-end)
+// MARK: - GlassesSensorFeedSink (simulation sink; no live DAT sensor source is available)
 extension AppState: GlassesSensorFeedSink {
-    /// Δέχεται dBFS από MetaGlassesAdapter (simulation ή DAT mic).
+    /// Receives dBFS values from the adapter; current app builds only provide simulation values.
     /// Auto-clip μόνο όταν `FeatureReadinessRegistry.acoustic.ready == true`.
     public nonisolated func receiveAcousticLevel(decibels: Float) {
         Task { @MainActor in
@@ -1034,7 +1286,7 @@ extension AppState: GlassesSensorFeedSink {
         }
     }
 
-    /// Δέχεται IMU από MetaGlassesAdapter (simulation ή DAT).
+    /// Receives IMU values from the adapter; current app builds only provide simulation values.
     /// Auto-clip μόνο όταν `FeatureReadinessRegistry.headGesture.ready == true`.
     public nonisolated func receiveIMUSample(_ sample: HeadGestureDetector.IMUSample) {
         Task { @MainActor in

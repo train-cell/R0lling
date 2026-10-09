@@ -49,6 +49,7 @@ public final class HermesConnector: AIConnectorProtocol, @unchecked Sendable {
             timeout: AIHTTPClient.hermesTimeoutSeconds,
             errorDomain: AIErrorTaxonomy.hermesDomain,
             httpRejectedCode: AIErrorTaxonomy.hermesHTTPRejected,
+            responseTooLargeCode: AIErrorTaxonomy.hermesResponseTooLarge,
             transportCode: AIErrorTaxonomy.hermesTransport,
             retryExhaustedCode: AIErrorTaxonomy.hermesRetryExhausted,
             httpRejectedMessagePrefix: "Ο Hermes Agent απέρριψε την κλήση",
@@ -60,7 +61,11 @@ public final class HermesConnector: AIConnectorProtocol, @unchecked Sendable {
             return try OpenAIChatRequestBuilder.parseChatCompletionResponse(
                 data: data,
                 fallbackReply: "Δεν ελήφθη απάντηση από τον Hermes.",
-                referencedEntryIDs: payload.contextEntries.map { $0.id }
+                referencedEntryIDs: OpenAIChatRequestBuilder
+                    .selectedContextEntries(from: payload.contextEntries)
+                    .map(\.id),
+                invalidResponseDomain: AIErrorTaxonomy.hermesDomain,
+                invalidResponseCode: AIErrorTaxonomy.hermesInvalidResponse
             )
         } catch let hermesError as NSError where hermesError.domain == AIErrorTaxonomy.hermesDomain {
             // CQ-P0-003: μην καλύπτεις typed 7102/cancellation ως «αδυναμία σύνδεσης».

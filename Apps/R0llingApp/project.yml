@@ -28,6 +28,7 @@ targets:
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.personal.r0lling
       INFOPLIST_FILE: Info.plist
+      CODE_SIGN_ENTITLEMENTS: R0llingApp.entitlements
       TARGETED_DEVICE_FAMILY: "1,2"
       GENERATE_INFOPLIST_FILE: NO
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

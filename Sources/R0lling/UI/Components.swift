@@ -10,13 +10,59 @@ import AppKit
 import AVKit
 #endif
 
+#if canImport(ImageIO)
+import ImageIO
+#endif
+
+/// Visible label for sample-only UI cards.
+public struct PrototypeNotice: View {
+    public init() {}
+    public var body: some View {
+        Text("ΠΡΟΕΠΙΣΚΟΠΗΣΗ — Τα παρακάτω είναι δείγματα UI. Δεν είναι προσωπικές μετρήσεις ή συνδεδεμένες υπηρεσίες.")
+            .font(.caption)
+            .foregroundColor(R0llingTheme.accentLavender)
+            .padding(12)
+            .r0llingCard()
+    }
+}
+
+/// Decode a bounded display-size thumbnail without first loading the full source file into memory.
+private func imageThumbnail(from url: URL, maximumPixelSize: Int) -> Image? {
+    #if canImport(ImageIO) && canImport(UIKit)
+    let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions) else { return nil }
+    let thumbnailOptions = [
+        kCGImageSourceCreateThumbnailFromImageAlways: true,
+        kCGImageSourceCreateThumbnailWithTransform: true,
+        kCGImageSourceThumbnailMaxPixelSize: max(1, maximumPixelSize),
+        kCGImageSourceShouldCacheImmediately: true
+    ] as CFDictionary
+    guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else { return nil }
+    return Image(uiImage: UIImage(cgImage: thumbnail))
+    #elseif canImport(ImageIO) && canImport(AppKit)
+    let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions) else { return nil }
+    let thumbnailOptions = [
+        kCGImageSourceCreateThumbnailFromImageAlways: true,
+        kCGImageSourceCreateThumbnailWithTransform: true,
+        kCGImageSourceThumbnailMaxPixelSize: max(1, maximumPixelSize),
+        kCGImageSourceShouldCacheImmediately: true
+    ] as CFDictionary
+    guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else { return nil }
+    let size = NSSize(width: CGFloat(thumbnail.width), height: CGFloat(thumbnail.height))
+    return Image(nsImage: NSImage(cgImage: thumbnail, size: size))
+    #else
+    return nil
+    #endif
+}
+
 /// Bevel-style Concentric 3-Ring Visualization (Buffer, Captures Target, Vault Status)
 public struct BevelConcentricRingsView: View {
     public let bufferRatio: Double    // 0.0 ... 1.0 (Ring 1: Outer Cyan)
     public let clipsRatio: Double     // 0.0 ... 1.0 (Ring 2: Middle Purple)
     public let batteryRatio: Double   // 0.0 ... 1.0 (Ring 3: Inner Emerald)
 
-    public init(bufferRatio: Double = 1.0, clipsRatio: Double = 0.6, batteryRatio: Double = 0.85) {
+    public init(bufferRatio: Double = 0, clipsRatio: Double = 0, batteryRatio: Double = 0) {
         self.bufferRatio = min(max(bufferRatio, 0.0), 1.0)
         self.clipsRatio = min(max(clipsRatio, 0.0), 1.0)
         self.batteryRatio = min(max(batteryRatio, 0.0), 1.0)
@@ -24,43 +70,40 @@ public struct BevelConcentricRingsView: View {
 
     public var body: some View {
         ZStack {
-            // Ring 1: Buffer Health (Outer - Bevel Cyan)
+            // Ring 1: Buffer Health (Outer - warm amber)
             Circle()
-                .stroke(R0llingTheme.bevelCyan.opacity(0.18), lineWidth: 8)
+                .stroke(R0llingTheme.accentAmber.opacity(0.18), lineWidth: 8)
                 .frame(width: 96, height: 96)
             Circle()
                 .trim(from: 0.0, to: CGFloat(bufferRatio))
                 .stroke(
-                    AngularGradient(
-                        colors: [R0llingTheme.bevelCyan, R0llingTheme.bevelCyan.opacity(0.8)],
-                        center: .center
-                    ),
+                    R0llingTheme.accentAmber,
                     style: StrokeStyle(lineWidth: 8, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
                 .frame(width: 96, height: 96)
 
-            // Ring 2: Clips Target (Middle - Twitch Purple)
+            // Ring 2: Clips Target (Middle - lime)
             Circle()
-                .stroke(R0llingTheme.accentPurple.opacity(0.18), lineWidth: 8)
+                .stroke(R0llingTheme.accentLime.opacity(0.18), lineWidth: 8)
                 .frame(width: 74, height: 74)
             Circle()
                 .trim(from: 0.0, to: CGFloat(clipsRatio))
                 .stroke(
-                    R0llingTheme.accentPurple,
+                    R0llingTheme.accentLime,
                     style: StrokeStyle(lineWidth: 8, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
                 .frame(width: 74, height: 74)
 
-            // Ring 3: Hardware Battery / Vault (Inner - Bevel Emerald)
+            // Ring 3: Hardware Battery / Vault (Inner - periwinkle)
             Circle()
-                .stroke(R0llingTheme.bevelEmerald.opacity(0.18), lineWidth: 8)
+                .stroke(R0llingTheme.accentCyan.opacity(0.18), lineWidth: 8)
                 .frame(width: 52, height: 52)
             Circle()
                 .trim(from: 0.0, to: CGFloat(batteryRatio))
                 .stroke(
-                    R0llingTheme.bevelEmerald,
+                    R0llingTheme.accentCyan,
                     style: StrokeStyle(lineWidth: 8, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
@@ -80,6 +123,7 @@ public struct BevelTelemetryCard: View {
     public let bufferDuration: Double
     public let todayClipsCount: Int
     public let isStreaming: Bool
+    public var isSimulation: Bool = true
     public let glassesStatus: String
 
     public init(
@@ -110,6 +154,7 @@ public struct BevelTelemetryCard: View {
                 .padding(.vertical, 4)
                 .background(R0llingTheme.bgElevated)
                 .clipShape(Capsule())
+                .r0llingBevelCapsule()
 
                 Spacer()
 
@@ -126,7 +171,7 @@ public struct BevelTelemetryCard: View {
                 BevelConcentricRingsView(
                     bufferRatio: min(bufferDuration / 10.0, 1.0),
                     clipsRatio: min(Double(todayClipsCount) / 10.0, 1.0),
-                    batteryRatio: 0.88
+                    batteryRatio: 0
                 )
 
                 // 3 Metrics Breakdown
@@ -170,7 +215,7 @@ public struct BevelTelemetryCard: View {
                             Text("VIDEO STREAM")
                                 .font(.system(size: 9, weight: .heavy))
                                 .foregroundColor(R0llingTheme.textMuted)
-                            Text("1080p · 30 FPS · AAC")
+                            Text(isSimulation ? "SYNTHETIC BUFFER" : "FORMAT UNAVAILABLE")
                                 .font(.system(size: 14, weight: .bold, design: .rounded))
                                 .foregroundColor(R0llingTheme.textPrimary)
                         }
@@ -298,7 +343,9 @@ public struct TimelineEntryCard: View {
 
                 BevelStatPill(
                     icon: "video.badge.waveform.fill",
-                    value: "1080p",
+                    value: entry.attachments.first.flatMap { attachment in
+                        attachment.width.flatMap { width in attachment.height.map { "\(width)×\($0)" } }
+                    } ?? "—",
                     label: "QUALITY",
                     accentColor: R0llingTheme.bevelEmerald
                 )
@@ -318,7 +365,7 @@ public struct TimelineEntryCard: View {
             // 3. Entry Text / Note
             if !entry.content.isEmpty {
                 Text(entry.content)
-                    .font(.system(size: 15, weight: .regular))
+                    .font(.body)
                     .foregroundColor(R0llingTheme.textPrimary)
                     .lineSpacing(3.5)
             }
@@ -373,8 +420,10 @@ public struct TimelineEntryCard: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
+                    .frame(minHeight: 44)
                     .background(R0llingTheme.bgElevated)
                     .clipShape(Capsule())
+                    .r0llingBevelCapsule()
                 }
             }
             .padding(.top, 4)
@@ -425,6 +474,7 @@ public struct BevelStatPill: View {
         .padding(.vertical, 6)
         .background(R0llingTheme.bgElevated)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .r0llingBevelSurface(cornerRadius: 10)
     }
 }
 
@@ -498,6 +548,7 @@ public struct MediaPreviewCard: View {
                             }
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(attachment.mediaType == .audio ? "Άνοιγμα αναπαραγωγής ήχου" : "Άνοιγμα αναπαραγωγής βίντεο")
                         Spacer()
                     }
                     Spacer()
@@ -542,6 +593,15 @@ public struct MediaPreviewCard: View {
                 .stroke(R0llingTheme.borderSubtle, lineWidth: 1)
         )
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(attachment.originalFilename), \(attachment.mediaType.folderName)")
+        .accessibilityHint("Άνοιγμα προεπισκόπησης πολυμέσου")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(.default) {
+            guard resolvedURL != nil else { return }
+            R0llingTheme.triggerHapticFeedback()
+            isShowingViewer = true
+        }
         .onTapGesture {
             if resolvedURL != nil {
                 R0llingTheme.triggerHapticFeedback()
@@ -630,34 +690,20 @@ public struct MediaPreviewCard: View {
 
         guard attachment.mediaType == .photo else { return }
 
-        do {
-            let data = try Data(contentsOf: url)
-            photoImage = eikonaApoDedomena(data)
-            if photoImage == nil {
-                loadError = "Δεν αποκωδικοποιήθηκε η εικόνα"
-            }
-        } catch {
+        photoImage = imageThumbnail(from: url, maximumPixelSize: 512)
+        if photoImage == nil {
             photoImage = nil
-            loadError = error.localizedDescription
+            loadError = "Δεν αποκωδικοποιήθηκε η εικόνα"
         }
-    }
-
-    private func eikonaApoDedomena(_ data: Data) -> Image? {
-#if canImport(UIKit)
-        guard let ui = UIImage(data: data) else { return nil }
-        return Image(uiImage: ui)
-#elseif canImport(AppKit)
-        guard let ns = NSImage(data: data) else { return nil }
-        return Image(nsImage: ns)
-#else
-        return nil
-#endif
     }
 }
 
 /// Ένδειξη LIVE ροής κάμερας με Strava Pulse
 public struct LiveStreamBadge: View {
+    public var isSimulation: Bool = true
     @State private var isPulsing = false
+
+    public init(isSimulation: Bool = true) { self.isSimulation = isSimulation }
 
     public var body: some View {
         HStack(spacing: 6) {
@@ -667,7 +713,7 @@ public struct LiveStreamBadge: View {
                 .scaleEffect(isPulsing ? 1.35 : 1.0)
                 .opacity(isPulsing ? 0.6 : 1.0)
 
-            Text("REC LIVE")
+            Text(isSimulation ? "SIMULATION" : "REC LIVE")
                 .font(.system(size: 10, weight: .heavy, design: .monospaced))
                 .foregroundColor(R0llingTheme.accentPurple)
         }
@@ -687,6 +733,7 @@ public struct LiveStreamBadge: View {
 public struct FloatingClipBar: View {
     public let bufferDuration: Double
     public let isStreaming: Bool
+    public var isSimulation: Bool = true
     public var onClipTapped: () -> Void
 
     public var body: some View {
@@ -694,7 +741,7 @@ public struct FloatingClipBar: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     if isStreaming {
-                        LiveStreamBadge()
+                        LiveStreamBadge(isSimulation: isSimulation)
                     }
                     Text(String(format: "BUFFER: %.1fs", bufferDuration))
                         .font(.system(size: 13, weight: .heavy, design: .monospaced))
@@ -723,13 +770,12 @@ public struct FloatingClipBar: View {
                 .padding(.vertical, 14)
                 .background(R0llingTheme.primaryButtonGradient)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadow(color: R0llingTheme.accentPurple.opacity(0.45), radius: 10, x: 0, y: 4)
+                .shadow(color: Color.black.opacity(0.32), radius: 4, x: 0, y: 3)
             }
             .disabled(!isStreaming || bufferDuration < 0.5)
         }
         .padding(14)
-        .background(R0llingTheme.bgSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .r0llingBevelSurface(cornerRadius: 18)
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(R0llingTheme.borderFocus, lineWidth: 1.5)
@@ -800,6 +846,7 @@ public struct ViewfinderHUDOverlay: View {
 /// Cyberpunk Viewfinder HUD Card για ενεργή ροή κάμερας
 public struct LiveViewfinderCard: View {
     public let isStreaming: Bool
+    public var isSimulation: Bool = true
     public let bufferDuration: Double
     public var onClipTap: () -> Void
 
@@ -807,10 +854,12 @@ public struct LiveViewfinderCard: View {
 
     public init(
         isStreaming: Bool,
+        isSimulation: Bool = true,
         bufferDuration: Double,
         onClipTap: @escaping () -> Void
     ) {
         self.isStreaming = isStreaming
+        self.isSimulation = isSimulation
         self.bufferDuration = bufferDuration
         self.onClipTap = onClipTap
     }
@@ -818,9 +867,9 @@ public struct LiveViewfinderCard: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                LiveStreamBadge()
+                LiveStreamBadge(isSimulation: isSimulation)
                 Spacer()
-                Text("1080p • 30 FPS • META GEN 2")
+                Text(isSimulation ? "SYNTHETIC DATA" : "PREVIEW UNAVAILABLE")
                     .font(.system(size: 10, weight: .heavy, design: .monospaced))
                     .foregroundColor(R0llingTheme.textMuted)
             }
@@ -849,7 +898,7 @@ public struct LiveViewfinderCard: View {
                         .font(.system(size: 30, weight: .semibold))
                         .foregroundColor(R0llingTheme.accentLavender.opacity(0.85))
 
-                    Text("LIVE POV STREAMING")
+                    Text(isSimulation ? "SIMULATION — NO CAMERA FEED" : "CAMERA PREVIEW UNAVAILABLE")
                         .font(.system(size: 11, weight: .heavy, design: .monospaced))
                         .foregroundColor(R0llingTheme.textPrimary)
 
@@ -1002,13 +1051,7 @@ public struct MediaViewerSheet: View {
     }
 
     private func loadCrossPlatformImage() -> Image? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        #if canImport(UIKit)
-        if let ui = UIImage(data: data) { return Image(uiImage: ui) }
-        #elseif canImport(AppKit)
-        if let ns = NSImage(data: data) { return Image(nsImage: ns) }
-        #endif
-        return nil
+        imageThumbnail(from: url, maximumPixelSize: 2048)
     }
 }
 

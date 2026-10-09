@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 
 /// Κεντρικός δρομολογητής AI (AIRouter) που διαχειρίζεται τα ερωτήματα και τη μνήμη.
 public actor AIRouter {
@@ -11,7 +12,19 @@ public actor AIRouter {
         updateConnectors()
     }
 
+    /// Loads persisted non-secret settings; credentials remain in Keychain.
+    public static func loadSettings() -> AISettings {
+        guard let data = UserDefaults.standard.data(forKey: "r0lling.ai.settings"),
+              let value = try? JSONDecoder().decode(AISettings.self, from: data) else { return AISettings() }
+        return value
+    }
+
+    public func currentSettings() -> AISettings { settings }
+
     public func updateSettings(_ newSettings: AISettings) {
+        if let data = try? JSONEncoder().encode(newSettings) {
+            UserDefaults.standard.set(data, forKey: "r0lling.ai.settings")
+        }
         self.settings = newSettings
         updateConnectors()
     }
@@ -61,10 +74,14 @@ public actor AIRouter {
     ) async throws -> AIResponseResult {
         try Task.checkCancellation()
         let connector = try activeConnector()
-        let memoryText = Self.formatAgentMemory(agentMemory)
+        let memoryText = settings.includeAgentMemoryInChat ? Self.formatAgentMemory(agentMemory) : nil
+        let limit = max(0, min(settings.maxContextEntries, OpenAIChatRequestBuilder.maxContextEntries))
+        let context = settings.includeJournalInChat
+            ? OpenAIChatRequestBuilder.selectedContextEntries(from: contextEntries, limit: limit)
+            : []
         let payload = AIRequestPayload(
             prompt: prompt,
-            contextEntries: contextEntries,
+            contextEntries: contextForAI(context),
             agentMemoryContext: memoryText
         )
         return try await connector.generateReply(payload: payload)
@@ -73,7 +90,7 @@ public actor AIRouter {
     public func askWhatAmISeeing(imageData: Data, customQuestion: String?) async throws -> String {
         try Task.checkCancellation()
         let connector = try activeConnector()
-        return try await connector.describeImage(imageData: imageData, question: customQuestion)
+        return try await connector.describeImage(imageData: Self.jpegForAI(imageData), question: customQuestion)
     }
 
     /// Πολυ-καδρική σύνθεση (A11) — connector δέχεται `imageBase64Frames`.
@@ -89,7 +106,7 @@ public actor AIRouter {
         }
         let connector = try activeConnector()
         let limited = Array(frames.prefix(OpenAIChatRequestBuilder.maxVisionFrames))
-        let b64Frames = limited.map { $0.base64EncodedString() }
+        let b64Frames = try limited.map { try Self.jpegForAI($0).base64EncodedString() }
         let prompt = (customQuestion ?? "Περιέγραψε τι συμβαίνει σε αυτή τη χρονική σειρά καρέ από τα Meta Glasses μου.")
             + " (Ανάλυση \(limited.count) διαδοχικών στιγμιοτύπων)."
         let payload = AIRequestPayload(
@@ -104,7 +121,7 @@ public actor AIRouter {
     public func summarizeDay(entries: [JournalEntry]) async throws -> String {
         try Task.checkCancellation()
         let connector = try activeConnector()
-        return try await connector.summarizeDay(entries: entries)
+        return try await connector.summarizeDay(entries: contextForAI(entries))
     }
 
     /// Ανάκληση αναμνήσεων (A12) — local keyword recall + AI σύνθεση.
@@ -134,7 +151,7 @@ public actor AIRouter {
 
         let connector = try activeConnector()
         let promptText = "Ο χρήστης ρωτάει: «\(query)». Με βάση τις παρακάτω καταχωρήσεις, απάντησε συγκεκριμένα και ανάφερε τις ακριβείς ημερομηνίες ή πρόσωπα."
-        let payload = AIRequestPayload(prompt: promptText, contextEntries: Array(relevantEntries.prefix(5)))
+        let payload = AIRequestPayload(prompt: promptText, contextEntries: contextForAI(Array(relevantEntries.prefix(5))))
         let result = try await connector.generateReply(payload: payload)
 
         return (reply: result.reply, matchingEntries: relevantEntries)
@@ -150,6 +167,16 @@ public actor AIRouter {
         updateConnectors()
     }
 
+    public func deleteSecret(forKey key: String) throws {
+        try KeychainSecretStore.deleteChecked(forKey: key)
+        updateConnectors()
+    }
+
+    public func hasSecret(forKey key: String) -> Bool {
+        guard let value = retrieveSecret(forKey: key) else { return false }
+        return !value.isEmpty
+    }
+
     /// Επικυρώνει Hermes URL πριν αποθήκευση ρυθμίσεων (fail-closed UI).
     public func validateHermesURL(_ raw: String) throws {
         _ = try HermesEndpointAsfaleia.epikyroseHermesBaseURL(raw)
@@ -158,6 +185,40 @@ public actor AIRouter {
     /// Επικυρώνει Direct HTTPS URL πριν αποθήκευση ρυθμίσεων.
     public func validateDirectURL(_ raw: String) throws {
         _ = try HermesEndpointAsfaleia.epikyroseDirectBaseURL(raw)
+    }
+
+    public func validateEndpointForSaving(
+        provider: AIProviderType,
+        directBaseURL: String,
+        hermesBaseURL: String
+    ) throws {
+        switch provider {
+        case .directAPI:
+            try validateDirectURL(directBaseURL)
+        case .hermes:
+            try validateHermesURL(hermesBaseURL)
+        }
+    }
+
+    /// Normalizes the wire MIME type and strips source image metadata.
+    private static func jpegForAI(_ data: Data) throws -> Data {
+        try ImageMetadataSanitizer.encodeForVision(data)
+    }
+
+    /// Applies the same location setting to explicit summary and recall requests.
+    private func contextForAI(_ entries: [JournalEntry]) -> [JournalEntry] {
+        Self.sanitizedContextEntries(entries, includeLocation: settings.includeLocationInContext)
+    }
+
+    internal static func sanitizedContextEntries(
+        _ entries: [JournalEntry],
+        includeLocation: Bool
+    ) -> [JournalEntry] {
+        entries.map { entry in
+            var sanitized = entry
+            if !includeLocation { sanitized.locationName = nil }
+            return sanitized
+        }
     }
 
     // MARK: - Agent memory honesty (CQ-P0-001)

@@ -1,84 +1,49 @@
-# R0lling — Κατάσταση Υλοποίησης (IMPLEMENTATION_STATUS)
+# Implementation status
 
-**Έργο:** `R0lling`  
-**Ημερομηνία:** 6 Οκτωβρίου 2026 (~19:45 EEST · CreateGoal SW close)  
-**Έκδοση:** 1.0.0-rc1 (post Stage 5 + P0/P1 SW residuals)  
-**Περιβάλλον:** Windows host · Python diagnostics · **χωρίς** Swift/Xcode runtime  
+Updated: 2026-10-09. Baseline inspected: `5e9f4d3890406ed82a40710b933a0be756e6808d`; remediation is currently uncommitted. This is the current source-based status, not a release certification.
 
-> **Honesty note (R3-011):** Καμία δήλωση «ελεγμένο σε device» χωρίς proof. Python harness ≠ Swift actors.  
-> Canonical: `docs/AUDIT_FINAL.md` · DoD: `docs/GOAL_100_FEATURE_MATRIX.md` · Progress: `docs/GOAL_100_PROGRESS.md`
+## Implemented paths
 
----
+- JSON journal CRUD/search/date buckets; loads now throw on corrupt JSON, unsupported schema, and duplicate IDs. Failed writes do not update the cache.
+- Sandboxed media storage/viewing, safe relative paths, UUID filenames with constrained alphanumeric extensions, truthful deletion counts, and file-backed Photos/Files import so large assets are copied without loading the whole file into `Data`. Writes and orphan cleanup reject per-type folder symlinks that resolve outside the configured media root.
+- Obsidian Files picker/bookmarks, scoped access, one-way Markdown export, persisted hashes/conflict sidecars, and attachment copies that verify regular-file types and copied bytes. Agent managed reads and writes coordinate the vault on Apple platforms and use no-follow, descriptor-relative operations for the vault and `Agent/` directory, including staged replacement and rollback; the opened vault identity is pinned per manager, directory identity is checked, original bytes are compared with the staged backup, and concurrent target replacement/content edits are rejected before commit. Linking the vault is explicit; journal saves and edits automatically export entries while it remains linked. Corrupt hash metadata, non-UTF-8 notes, an untrusted first-contact entry block, attachment directories, or conflicting attachment bytes fail closed to preserve user files. A daily note is revalidated under file coordination immediately before replacement; generated files and conflict sidecars use exclusive creation, preserve existing content, and reuse matching prior sidecars. Agent writes roll back caught I/O failures but the three-file update is not crash-atomic; Apple Files-provider coordination, replacement during the initial path open, and non-cooperating concurrent writers still need device validation.
+- Backup bundle/restore with schema/count/ID and bounded-manifest validation, Files export through the system document picker, and canonical attachment paths. Bundle media must exist as regular files with the declared size before restore; copied bytes are checked, restored media directories and staged files receive the same iOS Data Protection as imports, and existing target collisions are reused only when the bytes match, otherwise the entry receives a unique media path. Media is staged before one atomic insert-if-absent journal batch; media or journal failure triggers best-effort removal of newly staged/copied files. If filesystem cleanup itself fails, an unreferenced orphan may remain. Concurrent existing IDs are never overwritten. Agent memory is staged and compensated if its separate vault write fails; rollback failure is reported and referenced media is retained.
+- Direct/Hermes HTTP connectors, Keychain credentials, persisted provider/endpoint/context settings; save validates only the selected endpoint, and Settings can remove stored credentials. Journal location names are manually editable and are sent only with a separate opt-in. Provider response bodies are streamed with an 8 MiB per-request cap, including when `Content-Length` is absent; oversized replies are canceled and surfaced as typed provider errors. Journal and Agent memory opt-ins default OFF for ordinary chat. Explicit summary/recall sends corresponding entries; the shared builder selects the newest five entries in chronological prompt order, and connectors report IDs for that same selection. Malformed successful provider bodies receive typed invalid-response errors. The builder supports four image frames.
+- Image requests reject sources over 40 MB, downsample to at most 2048 px per side, cap the encoded JPEG at 8 MB, and omit source metadata. Assistant/game Photos pickers use file-backed imports and verify file size before loading image bytes. Media cards and the viewer now decode bounded ImageIO thumbnails instead of loading full-resolution photo files into `Data`. Assistant vision on a selected Photos image keeps its AI/OCR result in memory and does not automatically write a meal or journal entry; the user saves or speaks that result. On the no-selected-image glasses path, recognized food tokens may create a separate heuristic meal journal entry automatically. Raw H264/synthetic buffer bytes are excluded from image keyframe snapshots; live multi-frame acquisition from DAT remains unavailable.
+- Clip placeholder/remux and highlight reel exports validate playability through AVFoundation instead of scanning for a `moov` byte sequence. Highlight reels and clips are copied file-to-file rather than loaded wholly into RAM. Missing or invalid referenced reel clips fail the export instead of returning a partial success; cancellation propagates and prevents generated files from being saved. Rolling-buffer input rejects non-finite and out-of-order timestamps and enforces its 25 MB hard cap; placeholder generation rejects non-finite or over-5-minute durations. Current MP4 writer paths produce video-only files, so clips do not claim an audio track even if input audio samples exist.
+- Apple Speech is explicitly on-device or unavailable; parser and service lifecycle state are synchronized, stale callbacks rejected, final dictation results survive command deduplication, and teardown deactivates the audio session.
+- Executive task persistence, real scratchpad journal save acknowledgement, monotonic stopwatch with cleanup, and DeepWork session state/history persisted through UserDefaults. Today's focus total sums completed and active session overlap with the local calendar day; the active ring updates from its deadline without HealthKit polling. A still-active deadline is restored after relaunch; expired sessions transition to completed. Focus state/history and goals are plain text in UserDefaults, and the cross-relaunch deadline uses the adjustable system wall clock. Legacy single-session state is still readable; old completed states without timestamps are omitted from daily totals.
+- Observation-game streaks use an injectable UserDefaults store for isolated tests; if saved streak data cannot be decoded, the manager retains the raw value and reports persistence failure rather than replacing it with a new streak.
+- HealthKit recent optional quantities and overnight sleep episode aggregation, including body temperature in Celsius. Each returned sample now carries its HealthKit source and sample timestamp into the six-tile UI (HRV, resting heart rate, respiratory rate, blood oxygen, body temperature, and sleep duration). The authorization request includes those six metric types plus workouts, the only additional type used by the Fitness activity screen; it requests no write access. No missing-data fallback values, clinical labels, or recovery score. Authorization-request completion is not proof of permission to read any specific type, so the UI reports returned measurements/workouts rather than a granted state.
+- Fitness is a separate activity screen with a selectable 30-day workout-count calendar and cumulative workout-duration chart; the headline and period comparison use the same HealthKit workout duration. The previous wellness/HealthKit and local breathing/audio tools remain reachable from the primary navigation's Health destination; sample cards stay collapsed as previews.
+- Local private diary CRUD is stored in one AES-GCM authenticated ciphertext file with a device-bound Keychain key. Store APIs require an unforgeable per-store authorization capability minted after successful LocalAuthentication; the UI revokes that capability and clears plaintext view state on lock, app deactivation, and disappearance. The public legacy AES helper uses a separate Keychain service and cannot open the diary key. The store stages ciphertext, sets the backup-exclusion flag on the staged file, then atomically replaces the vault file; it restores the shared Application Support parent to included status for installs touched by an earlier broad exclusion, while only excluding the vault file. This gates access through the store API, but is not an OS Keychain ACL: the key remains a standard device-bound Keychain item, not biometry-bound or Secure Enclave-backed. Device loss has no recovery path.
+- Future letters are stored in the same authenticated ciphertext. The store listing API redacts payloads until the device's current wall clock reaches the saved date; this is not a trusted-time guarantee and a changed device clock can move the date. The old in-memory actor remains a legacy helper; the UI uses the encrypted store.
+- Decision journal entries and 90-day outcome reviews use the encrypted store; each create/list/review/delete operation passes a store authorization capability issued after successful LocalAuthentication and revoked on lock/deactivation/disappearance. The key remains a standard device-bound Keychain item, not biometry-bound or Secure Enclave-backed. The encrypted vault file is excluded from OS backups and cannot be recovered after device loss.
+- AES-GCM helper, single-image EXIF stripping, deterministic SHA256 digest.
+- Bevel-inspired charcoal/slate theme, shared raised bevel on Today/wellness/Studio/Vault cards and HealthKit metric tiles, a two-column health grid that collapses to one column on narrow/accessibility layouts, beveled status/navigation/Assistant/Photos-Files/glasses controls, raised Settings/edit form rows, compact metric pills, and one raised Today overview card that groups three truthful productivity indicators with the entry/focus snapshot. Today shows the real HealthKit metrics directly after the summary and collapses secondary productivity tools by default; its localized date is a single-line hero, the metric card extends separators across each metric group and uses stacked rows on narrow/accessibility layouts, and the composer switches to a stacked layout when space is insufficient with an inset input surface. The secondary-actions sheet adapts columns and detents for narrow layouts and accessibility text, and routes to Vault, a new note, Files, Assistant, Studio, Journal, and Settings. Diary entry text uses Dynamic Type, and HealthKit tiles speak the full Greek metric name, value, unit, and availability. Biohacking shows live data and working local breathing/audio tools first; disconnected sample cards are grouped under a collapsed preview section. Assistant quick-action labels, composer, and message bubbles use scalable text styles, and the memory/send icon buttons have VoiceOver labels. Creative Studio and executive utility text now uses scalable text styles, disconnected Zettelkasten sample actions are disabled, and clipboard copy is labeled as a local action. The health UI omits the unsupported recovery score. Screenshot references were inspected, but no iOS rendering or visual parity check has run.
+- AI request context selects the newest five entries by timestamp, then presents those entries oldest-to-newest; this avoids omitting recent notes when a day's entries are returned oldest-first.
+- The legacy `AIRouter.askAssistant` now uses the same newest-first selector before applying its configured context limit; the previous `suffix(limit)` chose old entries from the production newest-first storage result.
+- The daily score estimate is now absent when both today's journal-entry count and focus duration are zero. The Bevel-style ring shows an em dash/no-input state instead of a full 100% score from empty input; the UI names it “Daily score” and says it estimates from entries and focus time, not health. The inert ellipsis was removed, disconnected Zettelkasten samples are disabled, and the transformer labels its actual local clipboard action.
+- The 5s/10s rolling-buffer selection now persists in `@AppStorage`, initializes the glasses adapter at app launch, and configures the next stream; changing it is disabled while streaming. The control sits on the shared charcoal theme, while non-live DAT builds show a fixed simulation-only status instead of an ineffective toggle.
+- Biohacking no-data state no longer uses the green success color. Creative Studio's fallacy walkthrough and dream-correlation placeholder are labeled as examples; the invented 76% and personal-correlation claim were removed.
 
-## 1. Πίνακας A01–A16
+## Unavailable / prototypes
 
-| ID | Κατάσταση | Τεκμηρίωση | Επόμενο |
-|---|---|---|---|
-| **A01** | **SW ✅ · Mac/DEV 🚫** | Offline note + ISO8601 restart (R3-001) · XCTest γραμμένα | `swift test` / GHA · DEVICE_TESTS DEV-02 |
-| **A02** | **SW ✅ · Mac/DEV 🚫** | Edit/search/TZ `makeDateKey` (R3-009) · EntryEditorSheet | Mac XCTest · DEV-05b |
-| **A03** | **SW ✅ · DEV 🚫** | PhotosUI+Files picker · MediaStorage · PathAsfaleia | iPhone Photos permission |
-| **A04** | **SW ✅ · DEV 🚫** | R3-006 voice dedup · SpeechStopResult | device mic |
-| **A05** | **SW ✅ sim · DEV 🚫** | Playable placeholder + H264 remux · `LANE_CLIP_META` · DECISIONS §2 sim-only | Mac `AVAsset.isPlayable` · DAT NAL |
-| **A06** | **SW ✅ · DEV 🚫** | Warm-up · disconnect generation · concurrent 3012 | device concurrency |
-| **A07** | **SW ✅ policy · DEV 🚫** | ScenePhase PAUSED · `promisesContinuousBackgroundCapture=false` | iPhone background |
-| **A08** | **SW ✅ · DEV 🚫** | Idempotent export + Files picker + bookmark | iOS Files vault |
-| **A09** | **SW ✅ · DEV 🚫** | Conflict sidecar + hash persist | Obsidian vault device |
-| **A10** | **SW ✅ adapters · DEV 🚫** | Keychain + SEC-004/007 · DECISIONS §3 | live tokens |
-| **A11** | **SW ✅ path · DEV 🚫** | capturePhoto + OCR | live vision |
-| **A12** | **SW ✅ keyword · DEV 🚫** | Local keyword recall | live AI polish |
-| **A13** | **SW ✅ · DEV 🚫** | AgentFolder + PathAsfaleia + empty templates | device Files |
-| **A14** | **SW ✅ · DEV 🚫** | ObservationGameEngine + fail-closed | device vision |
-| **A15** | **SW ✅ · DEV 🚫** | Backup+agent+media · clean restore XCTest | device restore |
-| **A16** | **SW ✅ scaffold · DEV 🚫** | `AppErrorTaxonomy` · `Apps/R0llingApp/Info.plist` · disk-full | device permissions |
+- Real Meta DAT pairing/session/video/photo/audio/IMU remains unimplemented even when the module is importable. Real mode remains disabled; UI identifies simulation. The adapter now rejects the real streaming path while its bridge implementation flag is false and no longer attempts to open a second DAT session after connection.
+- No camera preview, measured battery throttle, Watch app, Whisper weights, VAD feed, semantic embeddings, release mirror/TLS stream, GPS hyperlapse mux, video watermark, Metal pixel pool, or integrated file watcher.
+- Shamir now provides a fixed 2-of-3 GF(256) split/reconstruction API with strict canonical share parsing, checked Apple Security randomness, per-share HMAC-SHA256 integrity, mixed/duplicate/tampered-share rejection, and exact UTF-8 recovery. It has no share-delivery UI, persistence integration, or independent security audit; secure zeroization still returns false.
+- Emergency Privacy Cloak is unavailable; no app-wide vault-lock or volatile-memory clearing hook is connected.
+- Most Sovereign OS / Extended / Personalized actors are small formula or template helpers. Their presence and unit assertions do not establish service/UI integration or scientific validity. The remaining strategic decision-support cards are labeled prototypes; Today omits disconnected podcast/Jarvis/gym/Zettelkasten demos. Binaural playback now has an AVAudioEngine stereo-tone path with four beat presets and stops when its card disappears; it requires stereo headphones, has no pink/brown noise layer or background-audio mode, and its Apple-device output is not validated here.
+- Binaural frequencies are audio presets only; the app does not claim they improve focus, relaxation, or health.
+- The daily score percentage is only a productivity heuristic based on today's journal-entry count and focus duration (including the active session); HealthKit is not an input. Chief-of-Staff parsing is available from an explicit local paste-text action in the persisted task card; no stream is read and no AI request is sent. The remote mirror stays gated because there is no secure app-to-viewer pairing flow for its AUTH token.
+- Voice note prefixes are parsed before action keywords, so a dictated note containing “clip” remains a note; incidental mentions of “clip” do not trigger capture.
+- Obsidian batch export reports the number of distinct daily Markdown files successfully exported, so several entries in one daily note count as one file.
+- Obsidian daily-note and hash-metadata reads open vault-relative parents without following symlinks, reject non-regular files, and stop above 16 MiB; Agent Markdown reads and writes are bounded to 4 MiB per managed file. The production backup engine shares AppState's mutation gate for backup/restore, while journal deletion holds the same gate through orphan-media cleanup; canceled queued mutations are removed before they run.
+- The main journal and media use iOS Data Protection until first unlock (OS-managed encryption at rest, not app-level encryption); new media imports/restores receive protection, existing journal files are protected when loaded, and existing media files when accessed. Tasks, focus-session state, Agent Markdown, and backup bundles remain plaintext. AES keys are device-bound and are not exported in backups. The encrypted diary, future letters, and decision journal are excluded from OS backup and are not part of the app backup format.
+- No network air gap, firewall, outbound byte measurement, automatic PII redaction, or full-spectrum HealthKit read/write implementation.
 
-**Device-proven:** **0 / 16**
+## Verification boundary
 
----
+The full R0lling XCTest target and Apple build have not run during this remediation. WSL has Swift 6.1.3, and `swiftc -frontend -parse` passes for all 114 Swift files under Sources, Tests, and Apps; `audit_swift_codebase.py` scans 113 package-source/test files and reports 407 declared types, but is heuristic only. `swiftc -typecheck -enable-upcoming-feature StrictConcurrency` passes for `AIHTTPClient.swift` and `AIErrorTaxonomy.swift`. The full R0lling `swift test --filter FitnessActivityTests` stops during package compilation because Apple `ImageIO` is unavailable on Linux. A separate Linux XCTest harness compiled the actual Foundation-only fitness snapshot/readiness sources and ran three XCTest cases successfully; a current direct Foundation probe also passed month-grid alignment/window bounds and cumulative-hour chart data. This does not validate SwiftUI, HealthKit, or iOS Data Protection APIs. A standalone URLSession/URLProtocol harness compiled the actual bounded HTTP loader and passed both an exact-limit response and rejection of an oversized chunked body with no `Content-Length`; it does not replace XCTest or Apple networking validation. A standalone SwiftPM harness compiled the current Shamir source and all 16 XCTest cases using Swift Crypto's `Crypto` module and passed all 16; this checks the algorithm/envelope logic but does not build the R0lling target with Apple CryptoKit or execute `SecRandomCopyBytes`. A Foundation-only harness compiled the actual `VoiceCommandParser.swift` and passed English/Greek notes containing “clip”, an incidental clip mention, and explicit English clip commands. Another Foundation-only harness compiled the actual Meta glasses adapter/lifecycle sources with a buffer recorder and DAT stub; it confirmed that 5s and 10s choices reach the next stream and invalid stored values normalize to 10s. A descriptor-relative Agent folder harness compiled the actual manager on Linux and passed normal replace/read, directory/file symlink sentinel preservation, and oversized read/write rejection with file preservation. An isolated Foundation-only SwiftPM harness compiled the production `MediaReferenceMutationGate` and `BoundedRegularFileReader` with eight XCTest cases, including queued cancellation, FIFO/symlink-parent rejection, and selected-root-symlink acceptance; all eight passed. Other targeted harnesses for media storage and Obsidian file paths passed; the Obsidian harness uses a coordinator shim and does not validate Apple coordination. XCTest sources also cover provider-specific URL validation, Keychain credential deletion, note-location opt-in filtering, workout month-grid alignment, cumulative duration-hour trend math, sleep episode overlap/gap/window/nap selection, streamed AI response-size rejection, body-temperature snapshot encoding, final voice dictation dedup resolution, overlapping English/Greek note/action parsing, same-day Obsidian file-count deduplication, binaural preset stereo frequency math, authenticated Shamir split/reconstruction and malformed/tampered-share rejection, overlapping/stale observation evaluations, media-folder and Agent-memory symlink rejection, out-of-order buffer samples, newest-five AI context provenance, invalid AI response typing, generated Obsidian collision/sidecar protection, oversized Obsidian daily-note rejection, and Obsidian symlink preservation, in addition to earlier persistence/media tests. Those package test sources remain unexecuted except for the isolated Shamir, fitness/readiness, sleep-episode, media-mutation-gate, and bounded-file-reader harnesses; the newly added restore, Settings, month-grid, Obsidian symlink, and oversized-note XCTest cases remain unexecuted in the full target. Static diff/config/source checks are reported in FINDINGS_REMEDIATION.md; they are not runtime evidence.
 
-## 2. Verification Summary
-
-| Έλεγχος | Αποτέλεσμα |
-|---|---|
-| `python verification/diagnose_stage3_defects.py` | PASS (delegates stage4) |
-| `python verification/diagnose_stage4_fixes.py` | ALL PASSED |
-| `python verification/diagnose_stage5_finalize.py` | ALL PASSED (+ SEC + A01–A16 suites) |
-| `python verification/diagnose_journal_media_a01_a03.py` | ALL PASSED |
-| `python verification/verify_all_subsystems.py` | 10/10 phases · 122 modules PASS (100%) |
-| `python verification/verify_theme_apple_meta_compliance.py` | ALL PASSED (Discord/Twitch theme, Apple PrivacyInfo, Meta DAT) |
-| `python verification/audit_swift_codebase.py` | ALL PASSED (89 files · 329 types · 100% balanced · 0 missing views) |
-| `swift test` (macOS 14 GitHub Actions runner) | ✅ **100% PASSED** (All 8 core test suites passed) |
-| iOS App Packaging (`R0lling.ipa`) | ✅ **SUCCESS** (`R0lling.ipa` 4.31 MB built and verified · Run 37826043281) |
-| Meta Gen 2 / DAT SDK | Simulation-safe + real adapter wire ready (docs/LANE_CLIP_META.md) |
-
----
-
-## 3. Finding status
-
-| Suite | Status |
-|---|---|
-| R3-001…012 | ✅ CLOSED (code) |
-| G5-001…005 | ✅ CLOSED |
-| CQ-P0-001…007 · CQ-P1-012 | ✅ CLOSED |
-| SEC-001…009 (+ TLS kill-in-Release) | ✅ CLOSED |
-| P0-02 / P0-05 / P1-04 / P1-05 / P1-09 / P1-TLS / P1-HERMES | ✅ SW CLOSED |
-| P0-01 Mac/`swift test` | ✅ PASSED (GHA macOS 14 runner · Runs #20–#23) |
-| P0-06 Stage 6 | 🚫 no device report |
-
-## 4. Wave-B/C honesty
-
-- READY flags: earcon · timeCapsule · highlightReel · podcast · canvas · KG · emotion · streak · speech · OCR · entity · nutrition · dataview · adaptiveBattery  
-- Orphans: `Sources/R0lling/Experimental/` (Spatial · Metal · Watermark · FileWatcher) · ready=false  
-- Pseudo vector: `PseudoLexicalVectorSearchEngine` (όχι MobileCLIP weights) · ready=false  
-- Mirror: AUTH + Release kill · ready=false μέχρι TLS+frames  
-- Acoustic/IMU: feed wired · ready=false  
-
-## 5. Pointers
-
-```text
-AUDIT_FINAL          docs/AUDIT_FINAL.md
-GOAL matrix          docs/GOAL_100_FEATURE_MATRIX.md
-GOAL progress        docs/GOAL_100_PROGRESS.md
-Device/Mac checklist docs/DEVICE_TESTS.md §3
-DAT flip             docs/LANE_CLIP_META.md
-Decisions            docs/DECISIONS.md
-```
+Before release, run the macOS Swift build/test and iOS build jobs, inspect failure paths on device, and compare rendered UI to the 16 Bevel reference screenshots. `IMG_0491`–`IMG_0497` are separate concepts, not Bevel references. Do not reuse historic CI URLs, IPA sizes, feature counts, or Python toy assertions as evidence for this checkout.

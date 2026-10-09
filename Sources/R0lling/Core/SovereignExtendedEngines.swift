@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 // MARK: - [CATEGORY 1] Neuro-Cognitive Engines
 
@@ -219,23 +220,6 @@ public actor FastingAutophagyEngine {
 
 // MARK: - [CATEGORY 3] Cryptography & Defensive Engines
 
-public actor ShamirKeyShardEngine {
-    public init() {}
-
-    public func splitSecretIntoQuorum(secret: String) -> (shardA: String, shardB: String, shardC: String) {
-        let h = secret.hashValue
-        return (
-            shardA: "SHARD-A-\(h)-ALPHA",
-            shardB: "SHARD-B-\(h)-BETA",
-            shardC: "SHARD-C-\(h)-GAMMA"
-        )
-    }
-
-    public func verifyQuorum(shards: [String]) -> Bool {
-        return shards.count >= 2
-    }
-}
-
 public actor AcousticLeakDetector {
     public init() {}
 
@@ -248,8 +232,8 @@ public actor PanicDecoyCoordinator {
     public init() {}
 
     public func triggerZeroization() -> Bool {
-        // Zeroes sensitive session state in RAM
-        return true
+        // No secure erasure primitive is integrated; do not claim success.
+        return false
     }
 }
 
@@ -286,9 +270,9 @@ public actor NetworkExfiltrationCanary {
 public actor ExifScrubberService {
     public init() {}
 
-    public func sanitizeImageData(data: Data) -> Data {
-        // Strips GPS and device identifier dictionaries
-        return data
+    /// Re-encodes a single image with only orientation; discards source metadata.
+    public func sanitizeImageData(data: Data) throws -> Data {
+        try ImageMetadataSanitizer.encode(data)
     }
 }
 
@@ -296,7 +280,7 @@ public actor ProofOfExistenceNotary {
     public init() {}
 
     public func generateSha256Digest(content: String) -> String {
-        return "SHA256-\(abs(content.hashValue))-\(Date().timeIntervalSince1970)"
+        return SHA256.hash(data: Data(content.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }
 

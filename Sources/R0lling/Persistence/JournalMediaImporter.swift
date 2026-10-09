@@ -11,6 +11,7 @@ public enum MediaApothikeusiError: Error, LocalizedError, Sendable, Equatable {
     case agnostosTypos(onomaArxeiou: String)
     case egrafiApetixe(minima: String)
     case arxeioDenVrethike(relativePath: String)
+    case unsafeRelativePath(relativePath: String)
 
     public var errorDescription: String? {
         switch self {
@@ -24,6 +25,8 @@ public enum MediaApothikeusiError: Error, LocalizedError, Sendable, Equatable {
             return "Αποτυχία εγγραφής media: \(minima)"
         case .arxeioDenVrethike(let path):
             return "Το media δεν βρέθηκε: \(path)"
+        case .unsafeRelativePath(let path):
+            return "Μη έγκυρο σχετικό path πολυμέσου: \(path)"
         }
     }
 }

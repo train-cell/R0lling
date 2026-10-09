@@ -1,4 +1,5 @@
 import XCTest
+import AVFoundation
 @testable import R0lling
 
 final class RollingBufferTests: XCTestCase {
@@ -28,6 +29,51 @@ final class RollingBufferTests: XCTestCase {
         }
     }
 
+    func testNonFiniteAndOversizedSamplesCannotExceedBufferMemoryLimit() async throws {
+        await bufferService.startBuffering(targetSeconds: 10)
+        await bufferService.appendSample(sample: BufferedSample(
+            timestampSeconds: .infinity,
+            isKeyframe: true,
+            isAudio: false,
+            data: Data([0x01])
+        ))
+
+        do {
+            _ = try await bufferService.triggerClip(requestedSeconds: 10)
+            XCTFail("Non-finite timestamps must be ignored")
+        } catch let error as NSError {
+            XCTAssertEqual(error.code, 3001)
+        }
+
+        await bufferService.appendSample(sample: BufferedSample(
+            timestampSeconds: 0,
+            isKeyframe: true,
+            isAudio: false,
+            data: Data(count: 26 * 1024 * 1024)
+        ))
+
+        do {
+            _ = try await bufferService.triggerClip(requestedSeconds: 10)
+            XCTFail("An oversized sample must be dropped to respect the hard memory limit")
+        } catch let error as NSError {
+            XCTAssertEqual(error.code, 3001)
+        }
+    }
+
+    func testPlaceholderExporterRejectsInfiniteDuration() async throws {
+        let url = tempDirectory.appendingPathComponent("invalid_duration.mp4")
+        do {
+            try await PlayableClipExporter.grapsePlayablePlaceholderMP4(
+                durationSeconds: .infinity,
+                destinationURL: url
+            )
+            XCTFail("Infinite duration must not be converted into an unbounded frame count")
+        } catch let error as NSError {
+            XCTAssertEqual(error.code, 3009)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
     func testBufferingAndWarmupClip() async throws {
         await bufferService.startBuffering(targetSeconds: 10.0)
 
@@ -51,12 +97,90 @@ final class RollingBufferTests: XCTestCase {
         XCTAssertLessThan(result.duration, 4.0)
         XCTAssertGreaterThan(result.duration, 2.0)
         XCTAssertTrue(FileManager.default.fileExists(atPath: result.fileURL.path))
-        let data = try Data(contentsOf: result.fileURL)
-        XCTAssertNotNil(data.range(of: Data("moov".utf8)), "Το clip πρέπει να περιέχει moov box")
-        XCTAssertNotNil(data.range(of: Data("ftyp".utf8)), "Το clip πρέπει να περιέχει ftyp box")
+        let asset = AVURLAsset(url: result.fileURL)
+        let isPlayable = try await asset.load(.isPlayable)
+        XCTAssertTrue(isPlayable, "AVFoundation πρέπει να ανοίγει το εξαγόμενο clip")
         XCTAssertTrue(result.isPlayable)
         XCTAssertTrue(result.isSimulationPlaceholder, "Synthetic samples → simulation placeholder")
         XCTAssertGreaterThan(result.byteSize, 0)
+    }
+
+    func testOutOfOrderSamplesAreIgnoredAndExportDoesNotClaimUnmuxedAudio() async throws {
+        await bufferService.startBuffering(targetSeconds: 10)
+        await bufferService.appendSample(sample: BufferedSample(
+            timestampSeconds: 1, isKeyframe: true, isAudio: false, data: Data([0x01])
+        ))
+        await bufferService.appendSample(sample: BufferedSample(
+            timestampSeconds: 3, isKeyframe: false, isAudio: false, data: Data([0x02])
+        ))
+        await bufferService.appendSample(sample: BufferedSample(
+            timestampSeconds: 2, isKeyframe: false, isAudio: true, data: Data([0x03])
+        ))
+
+        let duration = await bufferService.availableDuration
+        XCTAssertEqual(duration, 2, accuracy: 0.001)
+        let result = try await bufferService.triggerClip(requestedSeconds: 10)
+
+        XCTAssertFalse(result.hasAudio, "The current MP4 writer emits video only")
+    }
+
+    func testHighlightReelIncludesAllClipsAndIsPlayable() async throws {
+        let firstSource = tempDirectory.appendingPathComponent("first_source.mp4")
+        let secondSource = tempDirectory.appendingPathComponent("second_source.mp4")
+        defer {
+            try? FileManager.default.removeItem(at: firstSource)
+            try? FileManager.default.removeItem(at: secondSource)
+        }
+        try await PlayableClipExporter.grapsePlayablePlaceholderMP4(
+            durationSeconds: 0.6,
+            destinationURL: firstSource
+        )
+        try await PlayableClipExporter.grapsePlayablePlaceholderMP4(
+            durationSeconds: 0.8,
+            destinationURL: secondSource
+        )
+
+        let firstAttachment = try await mediaStorage.saveMediaFile(
+            data: Data(contentsOf: firstSource),
+            originalFilename: "first.mp4",
+            mediaType: .clip
+        )
+        let secondAttachment = try await mediaStorage.saveMediaFile(
+            data: Data(contentsOf: secondSource),
+            originalFilename: "second.mp4",
+            mediaType: .clip
+        )
+        let entries = [
+            JournalEntry(content: "First clip", attachments: [firstAttachment]),
+            JournalEntry(content: "Second clip", attachments: [secondAttachment])
+        ]
+
+        let muxer = HighlightReelMuxer(mediaStorage: mediaStorage)
+        let reel = try await muxer.createDailyHighlightReel(for: entries)
+        XCTAssertEqual(reel.totalClipsIncluded, 2)
+        XCTAssertGreaterThan(reel.totalDurationSeconds, 1.0)
+
+        let exportedAsset = AVURLAsset(url: reel.fileURL)
+        let isPlayable = try await exportedAsset.load(.isPlayable)
+        XCTAssertTrue(isPlayable)
+        XCTAssertTrue(reel.isPlayable)
+    }
+
+    func testHighlightReelFailsWhenAReferencedClipIsMissing() async throws {
+        let attachment = MediaAttachment(
+            relativePath: "Clips/missing.mp4",
+            mediaType: .clip,
+            byteSize: 1
+        )
+        let entry = JournalEntry(content: "Missing clip", attachments: [attachment])
+        let muxer = HighlightReelMuxer(mediaStorage: mediaStorage)
+
+        do {
+            _ = try await muxer.createDailyHighlightReel(for: [entry])
+            XCTFail("A reel must not report success while omitting a referenced clip")
+        } catch let error as NSError {
+            XCTAssertEqual(error.code, 3109)
+        }
     }
 
     func testBufferTrimmingPastTenSeconds() async throws {

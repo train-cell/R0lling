@@ -90,12 +90,12 @@ public enum FeatureReadinessRegistry {
     public static let acoustic = Flag(
         id: "acoustic",
         ready: false,
-        reason: "Feed API wired (adapter→AppState) · ready=false μέχρι Gen2/mic proof — flip = auto-clip"
+        reason: "Sink API accepts samples; current adapter is simulation-only · no live DAT microphone proof"
     )
     public static let headGesture = Flag(
         id: "headGesture",
         ready: false,
-        reason: "IMU feed API wired (adapter→AppState) · ready=false μέχρι Gen2 IMU — flip = auto-clip"
+        reason: "Sink API accepts samples; current adapter is simulation-only · no live DAT IMU proof"
     )
     public static let spatialAudio = Flag(
         id: "spatialAudio",
@@ -155,12 +155,12 @@ public enum FeatureReadinessRegistry {
     public static let multiFrameVision = Flag(
         id: "multiFrameVision",
         ready: false,
-        reason: "AIRouter στέλνει μόνο το 1ο frame · όχι πραγματικό multi-frame"
+        reason: "Request builder δέχεται έως 4 εικόνες · λείπει DAT H264-to-image capture pipeline"
     )
     public static let adaptiveBattery = Flag(
         id: "adaptiveBattery",
-        ready: true,
-        reason: "MetaGlassesAdapter low-battery FPS throttle (15fps <20%) στο simulation/DAT loop"
+        ready: false,
+        reason: "Throttle helper υπάρχει · χωρίς πραγματική τηλεμετρία μπαταρίας ή DAT feed"
     )
 
     /// Όλες οι σημαίες (READY + REMOVED) για diagnostics.

@@ -53,6 +53,7 @@ public final class DirectAPIConnector: AIConnectorProtocol, @unchecked Sendable 
             timeout: AIHTTPClient.defaultTimeoutSeconds,
             errorDomain: AIErrorTaxonomy.directDomain,
             httpRejectedCode: AIErrorTaxonomy.directHTTPRejected,
+            responseTooLargeCode: AIErrorTaxonomy.directResponseTooLarge,
             transportCode: AIErrorTaxonomy.directTransport,
             retryExhaustedCode: AIErrorTaxonomy.directRetryExhausted,
             httpRejectedMessagePrefix: "Direct AI API Σφάλμα",
@@ -64,7 +65,11 @@ public final class DirectAPIConnector: AIConnectorProtocol, @unchecked Sendable 
             return try OpenAIChatRequestBuilder.parseChatCompletionResponse(
                 data: data,
                 fallbackReply: "Δεν ελήφθη απάντηση από το AI.",
-                referencedEntryIDs: payload.contextEntries.map { $0.id }
+                referencedEntryIDs: OpenAIChatRequestBuilder
+                    .selectedContextEntries(from: payload.contextEntries)
+                    .map(\.id),
+                invalidResponseDomain: AIErrorTaxonomy.directDomain,
+                invalidResponseCode: AIErrorTaxonomy.directInvalidResponse
             )
         } catch is CancellationError {
             throw CancellationError()

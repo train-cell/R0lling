@@ -31,16 +31,11 @@ public struct CalendarView: View {
                     .padding(.vertical, 4)
                     .background(R0llingTheme.accentPurple.opacity(0.15))
                     .clipShape(Capsule())
+                    .r0llingBevelCapsule()
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(R0llingTheme.bgSurface)
-            .overlay(
-                Rectangle()
-                    .frame(height: 1)
-                    .foregroundColor(R0llingTheme.borderSubtle),
-                alignment: .bottom
-            )
+            .background(R0llingTheme.bgPrimary)
 
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
@@ -73,12 +68,7 @@ public struct CalendarView: View {
                 }
             }
             .padding(12)
-            .background(R0llingTheme.bgElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(R0llingTheme.borderSubtle, lineWidth: 1)
-            )
+            .r0llingBevelInsetSurface(cornerRadius: 14)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
 
@@ -201,13 +191,17 @@ public struct FilterChip: View {
                 .foregroundColor(isSelected ? .white : R0llingTheme.textSecondary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
+                .frame(minHeight: 44)
+                .contentShape(Capsule())
                 .background(isSelected ? R0llingTheme.accentPurple : R0llingTheme.bgElevated)
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
                         .stroke(isSelected ? R0llingTheme.accentLavender : R0llingTheme.borderSubtle, lineWidth: 1)
                 )
-                .shadow(color: isSelected ? R0llingTheme.accentPurple.opacity(0.35) : Color.clear, radius: 6, x: 0, y: 2)
+                .r0llingBevelCapsule()
         }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

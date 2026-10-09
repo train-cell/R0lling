@@ -32,7 +32,7 @@ final class PersistenceRestartDiagnosticTests: XCTestCase {
         try await writer.saveEntry(entry)
 
         let reader = JSONFileStorageService(storageURL: fileURL)
-        let retrieved = await reader.getEntry(id: entry.id)
+        let retrieved = try await reader.getEntry(id: entry.id)
 
         XCTAssertNotNil(
             retrieved,

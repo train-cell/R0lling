@@ -1,64 +1,45 @@
-# R0lling — Πίνακας Δυνατοτήτων (Capability Matrix) v1.0
+# Capability map
 
-**Έργο:** `R0lling`  
-**Συσκευές:** Meta Glasses Gen 2 & iPhone  
-**Ημερομηνία:** 6 Οκτωβρίου 2026  
-**Επίσημο SDK:** Meta Wearables Device Access Toolkit (DAT) iOS SDK 1.0  
+Updated: 2026-10-09. Current authority: IMPLEMENTATION_STATUS.md and the source files below. “Implemented” refers to a source path; Apple build/runtime validation remains pending.
 
----
+| Documented feature | Code path | Actual capability / remaining gap |
+|---|---|---|
+| Journal and offline persistence | Persistence/JSONFileStorageService.swift; Persistence/R0llingFileProtection.swift; App/AppState.swift | CRUD/search/date correction; fail-closed load, schema/ID validation, atomic write; iOS Data Protection until first user authentication (OS-level, not app-level encryption) |
+| Media attach/view | UI/PhotosMediaPicker.swift; UI/TodayView.swift; Persistence/MediaStorageService.swift; Persistence/R0llingFileProtection.swift; UI/Components.swift | Photos uses file representations and Files uses scoped URLs; both route to file-backed sandbox copies without reading full assets into `Data`; new imports use iOS Data Protection and existing files are protected on access; image cards/viewer use bounded ImageIO thumbnails; generated UUID filenames use constrained extensions; resolution comes from attachment metadata |
+| Obsidian integration | Obsidian/ObsidianVaultBridge.swift; AgentFolderManager.swift; App/AppState.swift | Explicit vault linking; journal saves and edits automatically export while linked; one-way export with persisted conflict detection and scoped I/O; daily-note and hash-metadata reads reject symlinked path components, non-regular files, and files over 16 MiB; Agent Markdown reads and writes cap each file at 4 MiB; rejects untrusted existing entry blocks, non-UTF-8 notes, unsafe paths, and mismatched attachment bytes; not general two-way sync |
+| Backup | Persistence/BackupRestoreEngine.swift; UI/SettingsView.swift; UI/BackupBundleExportPicker.swift; App/AppState.swift | Plain JSON/media/memory; Files document-picker export; bounded manifest and canonical attachment paths; validates bundled file type, size, and copied bytes; restored media gets iOS Data Protection; collision media gets a unique path; staged media plus atomic insert-if-absent journal batch; AppState serializes restore against deletion/orphan cleanup; cleanup is best-effort and may leave an unreferenced orphan if file removal fails; Agent-memory write is compensated on failure, but cannot be one atomic transaction across the journal and vault |
+| AI providers | AI/AIRouter.swift; DirectAPIConnector.swift; HermesConnector.swift; AIHTTPClient.swift; UI/SettingsView.swift | Configurable remote requests with an 8 MiB streamed response cap; save validates only the selected provider; saved credentials can be removed from Settings; oversized response cancels; no enforced offline/LAN-only operation |
+| Context privacy | Core/Models.swift; AI/AIRouter.swift; UI/SettingsView.swift; UI/EntryEditorSheet.swift; AI/OpenAIChatRequestBuilder.swift | Separate OFF-by-default chat journal/memory switches; users can add a location name while editing a journal entry, and a separate opt-in controls sending it; explicit summary/recall sends entries; chat context selects the newest configured 0–5 entries in prompt chronology |
+| Multi-frame vision | AI/OpenAIChatRequestBuilder.swift; Buffer/RollingBufferService.swift | Up to four actual image payloads; H264-to-image/DAT acquisition missing; flag remains false |
+| On-demand image analysis | App/AppState.swift; UI/AssistantView.swift; AI/AIRouter.swift | A selected Photos image produces AI/OCR output in memory; the user explicitly saves it or speaks it with TTS, with no automatic meal/journal write. On the no-selected-image glasses path, matched OCR food tokens may create a separate heuristic meal entry automatically; live provider credentials are still required |
+| Meta Gen 2 | Glasses/MetaDATStreamBridge.swift; MetaGlassesAdapter.swift | Simulation only; linked module != implemented live session; when enabled later, the adapter opens one session on connect and reuses it for streaming |
+| Clips | Buffer/RollingBufferService.swift; PlayableClipExporter.swift; H264AnnexBRemuxer.swift | AVFoundation `isPlayable` check for placeholder/remux output; hard 25 MB sample cap; exported clips currently contain video only and report `hasAudio == false`; real compressed DAT feed missing |
+| Rolling-buffer duration control | UI/SettingsView.swift; Glasses/MetaGlassesAdapter.swift; Buffer/RollingBufferService.swift | Persisted 5s/10s selection is applied when the next stream starts; live DAT input remains unavailable |
+| Acoustic/gesture capture | Core/FeatureReadinessRegistry.swift | Disabled pending real sensor input |
+| Adaptive battery | Glasses/MetaGlassesAdapter.swift; FeatureReadinessRegistry.swift | Disabled; synthetic battery values cannot prove throttle behavior |
+| Voice notes | Speech/SpeechTranscriptionService.swift; VoiceCommandParser.swift | Apple on-device recognition when supported; final dictation survives command dedup, note prefixes precede action keywords, incidental “clip” mentions do not trigger capture, and audio session is deactivated on teardown; no Meta wake word or Meta mic |
+| Observation game | Game/ObservationGameEngine.swift; App/AppState.swift | Imported real images / manual fallback; synthetic glass photos are not AI-evaluated |
+| Time capsule / streak | Core/TimeCapsuleEngine.swift; Game/ScavengerHuntStreakManager.swift | Local lookup and UserDefaults streak state; unreadable streak data is retained and reports that it could not be saved |
+| Podcast / highlight / canvas / KG | Relevant Core/Buffer/Obsidian helpers; UI/AssistantView.swift | Highlight reel composes every referenced clip or fails; AVFoundation validates output; KG/emotion/entity/nutrition are heuristics, not trained models |
+| HealthKit | Core/HealthKitService.swift; Core/SleepEpisodeAggregator.swift; Core/SovereignOSServices.swift; Core/FitnessActivitySnapshot.swift; UI/SovereignOSComponents.swift; UI/FitnessView.swift | Six optional readings including body temperature and one longest merged asleep episode clipped to the prior-day 18:00–today-noon window; overlapping sleep stages count once and a separate nap is not added; actual workout samples back the 30-day Fitness view; read request is limited to these data types; wellness readings carry source/time into UI; permission grants remain undisclosed; no recovery classifier or fabricated defaults |
+| Fitness activity | Core/FitnessActivitySnapshot.swift; Core/HealthKitService.swift; App/AppState.swift; UI/FitnessView.swift | Real HealthKit workouts bucketed by start date into current and prior 30-day periods; selectable month-grid calendar with count heatmap, cumulative workout-duration chart, duration total/comparison, expandable trend; no synthetic data; denied reads may look like an empty result because HealthKit does not disclose read authorization |
+| Binaural audio | Core/SovereignOSServices.swift; UI/SovereignOSComponents.swift; UI/BiohackingHubView.swift | AVAudioEngine stereo sine tones with four 6/10/20/40 Hz channel offsets and start/stop/preset controls; requires stereo headphones; no background audio mode or pink/brown noise layer; no focus or health efficacy claim; device playback not validated |
+| Daily score estimate | App/AppState.swift; Core/SovereignOSServices.swift; UI/SovereignOSComponents.swift | Productivity heuristic from today's journal-entry count and focus seconds (including an active session); it does not use HealthKit or measure physiological readiness; absent with no inputs |
+| Bevel navigation and quick actions | App/R0llingApp.swift; UI/TodayView.swift; UI/FitnessView.swift; UI/PhotosMediaPicker.swift | Floating primary capsule routes to Today, Journal, Fitness activity, and Health; “more” sheet reaches Vault, new note, Files import, Assistant, Studio, Journal, and Settings |
+| Focus / tasks / scratchpad / stopwatch | UI/ExecutiveUtilityViews.swift; UI/SovereignOSComponents.swift; App/AppState.swift; Core/SovereignOSServices.swift | Tasks and focus history persist in UserDefaults; daily focus totals use session/day overlap; active focus ring updates live; scratchpad saves to journal; stopwatch uses monotonic time; active deadline restores after relaunch using adjustable wall-clock time |
+| Chief of Staff task parsing | Core/SovereignOSServices.swift; UI/ExecutiveUtilityViews.swift | An explicit local text-entry action parses one pasted task per line and appends non-duplicate titles to the UserDefaults-backed task list; it does not read/transcribe a daily stream or call AI automatically |
+| Private diary | Core/EncryptedDiaryStore.swift; Core/VaultCryptography.swift; UI/StrategicVaultHubView.swift | CRUD is encrypted as an AES-GCM authenticated file using a device-bound Keychain key. Store APIs require an unforgeable per-store capability minted after LocalAuthentication and revoked on lock; the keychain item itself is not biometry-bound or Secure Enclave-backed. OS-backup exclusion is set; no device-loss recovery |
+| Future letterbox | Core/EncryptedDiaryStore.swift; UI/StrategicVaultHubView.swift | Encrypted local persistence; store API requires the post-biometric authorization capability and returns redacted previews before the local wall-clock unlock date; time is not trusted against device-clock changes; excluded from OS backup |
+| Decision journal | Core/EncryptedDiaryStore.swift; Core/SovereignOSServices.swift; UI/DecisionJournalCardView.swift | Encrypted decisions, assumptions, confidence, due-date-gated outcome review; UI schedules review after 90 days; store mutations and reads require a post-biometric authorization capability; Keychain item is not biometry-bound; excluded from OS backup |
+| Vault AES helper | Core/VaultCryptography.swift; PersonalizedSovereignEngines.swift | AES-GCM with a separate device-bound Keychain service from the private diary; not Secure Enclave AES; main journal/backup encryption remains unimplemented |
+| Shamir 2-of-3 key sharing | Core/ShamirKeyShardEngine.swift | GF(256) threshold split/reconstruction; checked Apple Security randomness; HMAC-SHA256-authenticated shares using a separately shared random validation key; API only, no share-delivery UI or independent security audit |
+| Panic zeroization | Core/SovereignExtendedEngines.swift | Unavailable / false; Swift cannot guarantee secure erasure of arbitrary in-memory copies |
+| Emergency Privacy Cloak | Core/PersonalizedSovereignEngines.swift | Unavailable / false; no app-wide vault-lock or volatile-memory clearing hook is connected |
+| EXIF / proof digest | Core/SovereignExtendedEngines.swift; AI/AIRouter.swift | Single-image metadata removal / SHA256; no trusted timestamp/notary service |
+| Biohacking / Studio / strategy hubs | UI/*HubView.swift | Biohacking places live HealthKit and working local tools before a collapsed preview section; other explicit sample previews remain; no scientific or product integration certification |
+| 39 Extended + 40 Personalized helper actors | Core/SovereignExtendedEngines.swift; PersonalizedSovereignEngines.swift | Helper/prototype catalog; each future feature needs real input, caller, persistence, UI and device evidence |
+| Watch / mirror / spatial / watermark / Metal / watcher / hyperlapse / Whisper / pseudo vectors | FeatureReadinessRegistry.swift; Experimental/ | Disabled/incomplete; helper presence is not readiness |
+| Remote mirror pairing | App/AppState.swift; Buffer/RemoteMirrorStreamServer.swift | Gated off; the server requires `AUTH <token>`, but the app has no secure pairing flow that provisions its generated token to a viewer |
+| Reference UI | UI/Theme.swift; all UI views | Shared charcoal/slate surfaces, layered bevel edges, floating capsule navigation, and rounded metric cards follow the supplied Bevel direction; static sample claims are labeled as examples; pixel-level/runtime comparison still pending |
 
-## 1. Κατάσταση Δυνατοτήτων Meta Glasses Gen 2 (Hardware & SDK)
-
-| Δυνατότητα | Κατάσταση SDK 1.0 | Απαιτεί Physical Device / Account | Συμπεριφορά στο R0lling | Εναλλακτική (Fallback) |
-|---|---|---|---|---|
-| **Camera Live Stream (Foreground)** | Επίσημα υποστηριζόμενο (HEVC/H.264) | Ναι (Meta Dev Account + Gen 2) | Πλήρης λήψη καρέ και τροφοδότηση Rolling Buffer. | Simulation Stream Generator (Test Frames). |
-| **High-Res Photo Capture** | Επίσημα υποστηριζόμενο | Ναι (Gen 2 paired) | Λήψη πλήρους ανάλυσης snapshot από τα γυαλιά. | iPhone Camera / Photo Picker. |
-| **Microphone Audio Stream** | Επίσημα υποστηριζόμενο | Ναι (Bluetooth HFP/LE Audio) | Συγχρονισμός ήχου στο buffer με τα βίντεο frames. | iPhone Built-in Microphone. |
-| **Rolling Buffer 5-10s** | Εφαρμογή R0lling (Local) | Όχι (Επεξεργασία στο iPhone) | Ring-buffer + keyframe snap· export playable MP4 via AVAssetWriter (simulation = placeholder με moov). | Πλήρως λειτουργικό σε Simulation (ρητό placeholder label). |
-| **«Hey Meta, clip this» (Voice Wake)** | Experimental / Restricted | Ναι (Meta AI Voice Invocation) | Ανίχνευση μέσω SDK voice hooks όταν είναι διαθέσιμα. | Μεγάλο κουμπί `Clip 10s` / `Clip 5s` στο UI + iOS Dictation. |
-| **«Hey Meta, note this» (Voice Wake)** | Experimental / Restricted | Ναι (Meta AI Voice Invocation) | Ανίχνευση φράσης έναρξης υπαγόρευσης. | Κουμπί μικροφώνου (iOS Speech Framework) στο Composer. |
-| **Stream in Background (App Minimized)** | Περιορισμένο / Beta | Ναι | Το sample κλείνει το session κατά το backgrounding. Αν το SDK 1.0 επιτρέπει compressed stream, διατηρείται· αλλιώς pause με σαφή ένδειξη. | Καθαρή ένδειξη στο UI: «Ροή ανεστάλη στο background». |
-| **Stream with Locked Screen** | Μη υποστηριζόμενο από iOS Sandbox | Ναι | Αναστολή ροής για προστασία απορρήτου και μπαταρίας. | Αυτόματη επαναφορά κατά το ξεκλείδωμα. |
-| **On-device AI Vision** | Μη διαθέσιμο στα Gen 2 | Ναι | Αποστολή ενός (1) επιλεγμένου καρέ στο συνδεδεμένο AI. | Local / Cloud Vision API (GPT-4o, Gemini Flash). |
-
----
-
-## 2. Κατάσταση Αποθήκευσης & Εξωτερικών Υπηρεσιών
-
-| Σύστημα | Κατάσταση | Απαιτήσεις | Συμπεριφορά στο R0lling |
-|---|---|---|---|
-| **Τοπική Βάση (Local DB)** | R3-001 ISO8601 + R3-009 TZ day filter στον κώδικα · device XCTest εκκρεμεί | Τοπικό Sandbox iPhone | Offline-first JSON journal· day buckets via entry.dateKey + display TZ. |
-| **Rolling Clip Export** | Playable placeholder MP4 (AVAssetWriter + moov) · πραγματικό DAT NAL remux εκκρεμεί | iPhone · Gen 2 για πραγματικό stream | Simulation: playable placeholder + `isSimulationPlaceholder`. |
-| **Obsidian Vault Export** | Κώδικας OK (R3-005 conflict sidecar) · Files picker εκκρεμεί | iOS Files picker | Idempotent markers· hash mismatch → `.r0lling-conflict.md` χωρίς overwrite. |
-| **Hermes Gateway (Home PC)** | Connectors υπάρχουν · live endpoint εκκρεμεί | PC σε LAN/VPN + token | OpenAI-compatible HTTP· χωρίς silent failover. |
-| **Direct AI API** | Connectors + Keychain (R3-004) · empty-key guard (R3-012) στον κώδικα | API Key στο Keychain | HTTPS· άδειο key → typed error 7004 πριν network. |
-| **Meta DAT Pairing** | Simulation-only χωρίς SDK (R3-003) | MetaWearablesDAT SPM + Gen 2 | Non-sim χωρίς SDK → error 4002 (όχι ψευδής σύνδεση). |
-| **Observation Game** | Κώδικας υπάρχει · vision live εκκρεμεί | Κάμερα + Vision AI | Manual fallback αν λείπει το AI. |
-
----
-
-## Stage 4–5 note (2026-10-06)
-
-Μην βασίζεσαι σε παλιές δηλώσεις «100% Υλοποιημένο» για hardware paths. Βλέπε `IMPLEMENTATION_STATUS.md`, `AUDIT_FINAL.md`, `GOAL_100_PROGRESS.md`.  
-Gemini super-features: READY via `FeatureReadinessRegistry` · orphans σε `Sources/R0lling/Experimental/` · acoustic/head-nod **ready=false** · Mirror TLS kill-in-Release · **όχι** Gen 2 proof (0/16 device).  
-v1 Meta: **simulation-only** (`DECISIONS.md` §2). App shell: `Apps/R0llingApp/`. Mac/`swift test`: checklist `DEVICE_TESTS.md` §3.
-
-
-## 3. Lifecycle Πολιτική (State Transitions)
-
-```text
-Foreground Active:
-  - Ροή Κάμερας: ΕΝΕΡΓΗ (αν τα γυαλιά είναι συνδεδεμένα)
-  - Rolling Buffer: Γεμίζει κυκλικά (μέχρι 10s)
-  - UI Ένδειξη: "LIVE" (μωβ pulsing badge, Twitch Purple #7742DC)
-  - Clip Button: Ενεργό με ένδειξη πραγματικής διάρκειας (π.χ. "10s", "4.2s")
-
-Background Entering:
-  - Ενημέρωση Buffer: Ασφαλής δέσμευση τελευταίου snapshot
-  - Έλεγχος SDK session: Αν το session κλείσει από το λειτουργικό, κατάσταση -> Paused
-  - UI Ένδειξη: "PAUSED / INACTIVE"
-
-Screen Locked:
-  - Ασφαλής διακοπή buffering, μηδενισμός κατανάλωσης ενέργειας
-  - Καμία ψευδής ένδειξη ότι καταγράφει στα κρυφά
-```
+Paths in this table are relative to `Sources/R0lling/`. Historical feature matrices describe proposals or past assertions. They are not the status of this checkout.

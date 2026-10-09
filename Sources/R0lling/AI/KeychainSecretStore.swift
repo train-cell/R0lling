@@ -22,7 +22,14 @@ public enum KeychainSecretStore {
             kSecAttrAccount as String: key
         ]
 
-        SecItemDelete(query as CFDictionary)
+        let changes: [String: Any] = [kSecValueData as String: data]
+        let updated = SecItemUpdate(query as CFDictionary, changes as CFDictionary)
+        if updated == errSecSuccess { return }
+        guard updated == errSecItemNotFound else {
+            throw NSError(domain: "R0lling.Keychain", code: Int(updated), userInfo: [
+                NSLocalizedDescriptionKey: "Αποτυχία ενημέρωσης Keychain (status \(updated))."
+            ])
+        }
 
         var addQuery = query
         addQuery[kSecValueData as String] = data
@@ -62,6 +69,11 @@ public enum KeychainSecretStore {
 
     /// Διαγράφει secret από Keychain / UserDefaults fallback.
     public static func delete(forKey key: String) {
+        try? deleteChecked(forKey: key)
+    }
+
+    /// Deletes a secret and reports Keychain failures to interactive callers.
+    public static func deleteChecked(forKey key: String) throws {
         if shouldUseUserDefaultsFallback() {
             UserDefaults.standard.removeObject(forKey: key)
             return
@@ -71,7 +83,14 @@ public enum KeychainSecretStore {
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: key
         ]
-        SecItemDelete(query as CFDictionary)
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw NSError(
+                domain: "R0lling.Keychain",
+                code: Int(status),
+                userInfo: [NSLocalizedDescriptionKey: "Αποτυχία διαγραφής από Keychain (status \(status))."]
+            )
+        }
     }
 
     /// UserDefaults fallback ΜΟΝΟ σε DEBUG + ρητό env — ποτέ σε Release (Keychain audit).

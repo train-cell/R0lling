@@ -1,3 +1,5 @@
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
 # R0lling — Οδηγός Ρύθμισης AI & Hermes Agent (SETUP_AI_HERMES)
 
 **Έργο:** `R0lling`  
@@ -21,7 +23,7 @@ hermes gateway start --host 0.0.0.0 --port 8080 --api-key "YOUR_SECRET_HERMES_TO
 
 - **Εντός σπιτιού (Wi-Fi):** HTTPS προτιμότερο· cleartext μόνο σε RFC1918 (π.χ. `http://192.168.1.50:8080/v1`).
 - **Default στο app:** `https://127.0.0.1:8080/v1` (loopback HTTPS — χωρίς cleartext LAN default).
-- **Εκτός σπιτιού:** Tailscale/WireGuard (`http://100.x.y.z:8080/v1` allowlisted) ή HTTPS.
+- **Εκτός σπιτιού:** Tailscale CGNAT cleartext HTTP επιτρέπεται μόνο για IPv4 διευθύνσεις μέσα στο `100.64.0.0/10` (`100.64.0.0` έως `100.127.255.255`, συμπεριλαμβανομένων των ορίων), π.χ. `http://100.100.0.1:8080/v1`. Οι αμέσως γειτονικές διευθύνσεις `100.63.255.255` και `100.128.0.0` απορρίπτονται. WireGuard μπορεί να χρησιμοποιήσει HTTP μόνο αν η διεύθυνσή του είναι επίσης σε επιτρεπόμενο private/LAN range· διαφορετικά χρησιμοποίησε HTTPS.
 
 **ΠΟΤΕ** μην κάνεις port-forward Hermes στο δημόσιο internet χωρίς TLS.
 
@@ -46,13 +48,15 @@ hermes gateway start --host 0.0.0.0 --port 8080 --api-key "YOUR_SECRET_HERMES_TO
 
 ## 3. Προστασία Προσωπικών Δεδομένων
 
-- **Context scrubbing:** μόνο σχετικές journal entries + πραγματική Agent memory (άδεια headings δεν στέλνονται).
-- **Vision on-demand:** multi-frame από rolling buffer όταν υπάρχει· αλλιώς ένα `capturePhoto` (protocol/sim). Όχι continuous cloud stream.
+- **Context scrubbing:** στο συνηθισμένο chat αποστέλλονται έως πέντε πιο πρόσφατες εγγραφές της σημερινής ημέρας μόνο όταν είναι ενεργό το αντίστοιχο journal-context setting· δεν γίνεται semantic relevance filtering στο chat. Η ξεχωριστή λειτουργία ανάκλησης χρησιμοποιεί τοπική αντιστοίχιση λέξεων-κλειδιών. Η πραγματική Agent memory έχει δικό της opt-in setting και τα κενά markdown headings δεν αποστέλλονται.
+- **Vision on-demand:** Η τρέχουσα πραγματική διαδρομή είναι ρητή επιλογή εικόνας από Photos και περνά από JPEG sanitization πριν σταλεί στον ρυθμισμένο provider. Η multi-frame λήψη από rolling buffer και το `capturePhoto` σε πραγματικά γυαλιά παραμένουν μη διαθέσιμα, επειδή το Meta DAT session/frame bridge είναι stub. Το αποτέλεσμα αποθηκεύεται μόνο με ρητή επιλογή και μπορεί να εκφωνηθεί με TTS. Δεν υπάρχει continuous cloud stream.
 - **Error scrub (SEC-005):** user-facing μηνύματα = HTTP status μόνο · όχι raw body / tokens.
-- **Retry/timeout:** transient 408/429/5xx με bounded backoff · `Task` cancelation υποστηρίζεται από UI «Άκυρο».
+- **Retry/timeout:** bounded backoff για HTTP 408, 425, 429, 500, 502, 503 και 504 · `Task` cancellation υποστηρίζεται από UI «Άκυρο».
 
 ---
 
-## 4. Live tokens (residual)
+## 4. Verification limits
 
-Για end-to-end A10–A12 proof χρειάζονται πραγματικά credentials στο Keychain + reachable Hermes ή Direct endpoint. Ο κώδικας είναι production-ready χωρίς live tokens.
+The code contains configurable Direct/Hermes connector paths and stores credentials in Keychain, but a configured source path is not production certification. No Swift XCTest, Apple build, or live provider request has been run for the current checkout. End-to-end validation needs a real credential in Keychain and a reachable endpoint; verify TLS/allowlist behavior, cancellation, errors, opt-in context payloads, and image limits against a controlled endpoint before release.
+
+The app does not perform automatic text PII redaction. Ordinary chat sends journal context and Agent memory only when their separate settings are enabled; explicit summary and recall actions send the selected journal entries for those requests. User-entered prompts may still contain personal data. A local Hermes host is a network service, not an on-device model.

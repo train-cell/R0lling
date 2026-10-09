@@ -1,22 +1,24 @@
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
 # R0lling — GOAL 100% Feature Matrix (DoD)
 
 ```yaml
-Last_Modified: 2026-10-06T19:35:00+03:00
+Last_Modified: 2026-10-09T02:05:33+03:00
 role: integrator-orchestrator
-canonical_audit: docs/AUDIT_FINAL.md
+current_authority: [docs/IMPLEMENTATION_STATUS.md, docs/CAPABILITY_MATRIX.md, docs/FINDINGS_REMEDIATION.md]
+historical_audit_snapshot: docs/AUDIT_FINAL.md
 plan: R0lling-Project-Plan.md §12 A01–A16
-policy: «100% ready» ≠ «wired» · wired = code path υπάρχει · ready = DoD checklist PASS
-git_commit: NONE (docs + SW residuals · no commit)
-sibling_rescan: 2026-10-06T19:35+03:00
+policy: source presence ≠ feature verification · no completion percentage without runtime evidence
+git_commit: NONE (local working tree)
 ```
 
-**Σκοπός:** Ενιαίο contract για parallel feature lanes. Κάθε agent κλείνει **ένα** feature μέχρι το DoD του — όχι «wired αρκετά».
+**Σκοπός:** Acceptance checklist και source inventory. A listed implementation path is not a claim that its feature passed tests or works on a device.
 
 **Legend readiness**
 
 | Tag | Σημασία |
 |---|---|
-| `SW` | Software-complete χωρίς Gen2/Mac runtime (μπορεί να κλείσει σε Windows + docs + static/Python) |
+| `SW` | Source work not requiring Gen2 hardware; still needs executable test evidence before calling it complete |
 | `MAC` | Απαιτεί `swift test` / Xcode / `AVAsset` runtime |
 | `DEV` | Απαιτεί iPhone / Gen2 / live credentials / Files picker / Watch |
 | `ORPHAN` | Wave-B/C χωρίς caller — DoD = wire **ή** Experimental/`#if` + honest docs |
@@ -38,7 +40,7 @@ sibling_rescan: 2026-10-06T19:35+03:00
 
 | ID | DoD «100% ready» | Layer | Owner lane hint | Blocker |
 |---|---|---|---|---|
-| **P0-01** | GHA `swift-ci` green **ή** local `swift test` PASS + log στο HANDOFF | `MAC` | mac-ci | Windows host · workflow ready |
+| **P0-01** | GHA `swift-ci` green **ή** local `swift test` PASS + log στο HANDOFF | `MAC` | mac-ci | WSL parser passes; Linux build stops at unavailable Apple `ImageIO`; Apple test proof pending |
 | **P0-02** | `DECISIONS.md` ρητό **v1 simulation-only** **ή** DAT SPM wired + non-sim connect χωρίς fake | `SW`/`DEV` | decisions-dat | ✅ sim-only |
 | **P0-05** | Installable app shell: Info.plist permissions + Xcode app target docs/scaffold (SPM library ≠ app) | `SW`/`MAC` | app-scaffold | ✅ `Apps/R0llingApp/` |
 | **P0-06** | Stage 6 **μόνο** με πραγματικό device failure report | `DEV` | stage6 | no device report |
@@ -68,9 +70,9 @@ sibling_rescan: 2026-10-06T19:35+03:00
 | | |
 |---|---|
 | **Plan scenario** | Φωτο/βίντεο/ήχος · thumbnails · playback · σωστές πηγές |
-| **Wired σήμερα** | Media paths/`MediaStorageService` · Photos picker 🚫 |
+| **Source path** | `PhotosMediaPickerButton` in `TodayView` passes Photos file representations or scoped Files URLs to file-backed `MediaStorageService` sandbox copies |
 | **DoD 100% ready** | (1) Photos/Files picker UI wired (2) πραγματικό αρχείο στο sandbox + thumbnail (3) playback από timeline (4) PathAsfaleia δεν σπάει attach |
-| **Layers** | `SW` partial · `DEV` picker |
+| **Layers** | `SW` picker/import path wired · `MAC` XCTest and `DEV` picker/preview smoke test pending |
 
 ### A04 — Voice note dedup
 | | |
@@ -93,7 +95,7 @@ sibling_rescan: 2026-10-06T19:35+03:00
 | | |
 |---|---|
 | **Plan scenario** | Clip πριν γεμίσει buffer · reconnect · καμία ψεύτικη επιτυχία |
-| **Wired σήμερα** | Warm-up math (Python) · concurrency device 🚫 |
+| **Wired σήμερα** | Swift rolling-buffer warm-up exports the captured interval and resets generation on disconnect; XCTest covers short warm-up · device concurrency proof pending |
 | **DoD 100% ready** | (1) XCTest shorter duration when buffer < target (2) disconnect mid-stream → clear state · νέο buffer μετά reconnect (3) no «Αποθηκεύτηκε» χωρίς file |
 | **Layers** | `SW`/`MAC` · `DEV` concurrency |
 
@@ -109,9 +111,9 @@ sibling_rescan: 2026-10-06T19:35+03:00
 | | |
 |---|---|
 | **Plan scenario** | Files picker · export δύο φορές · χωρίς διπλότυπα |
-| **Wired σήμερα** | Idempotent markers · Files picker 🚫 |
+| **Wired σήμερα** | `SettingsView.fileImporter` folder picker → Obsidian vault selection/bookmark; idempotent export markers |
 | **DoD 100% ready** | (1) UIDocumentPicker / security-scoped bookmark (2) 2× export = ίδια IDs (3) Markdown αναγνώσιμο χωρίς app |
-| **Layers** | `SW` export logic ✅ · `DEV` picker |
+| **Layers** | `SW` picker/export path wired · `MAC` tests and `DEV` repeat-export on a real vault pending |
 
 ### A09 — External conflict
 | | |
@@ -133,9 +135,9 @@ sibling_rescan: 2026-10-06T19:35+03:00
 | | |
 |---|---|
 | **Plan scenario** | Ένα καρέ → vision reply · ημερήσια σύνοψη |
-| **Wired σήμερα** | Path + `capturePhoto` · live vision 🚫 |
+| **Wired σήμερα** | Photos picker and `capturePhoto` paths; result can be saved on request or spoken with TTS. Live provider credentials and DAT multi-frame decoding remain unverified/unavailable |
 | **DoD 100% ready** | (1) Photo από glasses **ή** Photos picker fallback (2) real vision reply (3) optional save + TTS (4) όχι continuous stream to AI |
-| **Layers** | `SW` path · `DEV` vision |
+| **Layers** | `SW` photo picker/vision path · `DEV` configured endpoint credentials and live glasses/DAT |
 
 ### A12 — Memory recall
 | | |
@@ -286,7 +288,10 @@ python verification/verify_all_subsystems.py
 
 ```text
 THIS MATRIX     docs/GOAL_100_FEATURE_MATRIX.md
-CTO audit       docs/AUDIT_FINAL.md
+Current status  docs/IMPLEMENTATION_STATUS.md
+Capability map  docs/CAPABILITY_MATRIX.md
+Remediation     docs/FINDINGS_REMEDIATION.md
+Historical audit snapshot  docs/AUDIT_FINAL.md
 Status A-IDs    docs/IMPLEMENTATION_STATUS.md
 Device protocol docs/DEVICE_TESTS.md
 Handoff         docs/HANDOFF.md
@@ -301,57 +306,57 @@ Progress rollup docs/GOAL_100_PROGRESS.md   (integrator updates after re-scan)
 
 > Status από lane notes + FeatureReadinessRegistry + A15/A16/P0 scaffold + verify.
 
-### Plan A-IDs — software DoD (όχι device)
+### Plan A-IDs — source inventory (not completion status)
 
-| ID | SW DoD | Evidence lane / harness |
+The rows below identify code paths and outstanding proof. Their labels are not pass marks. No Swift XCTest, Apple build, iPhone, or Gen 2 verification ran in this checkout.
+
+| ID | Source path / current scope | Verification status |
 |---|---|---|
-| A01 | ✅ SW | stage5 A01 + Journal XCTest · `diagnose_journal_media_a01_a03` |
-| A02 | ✅ SW | EntryEditorSheet · search/TZ APIs · stage5 A02 |
-| A03 | ✅ SW | PhotosMediaPicker · MediaStorageTests · stage5 A03 |
-| A04 | ✅ SW | `LANE_VOICE_GAME` · SpeechStopResult · stage5 A04 |
-| A05 | ✅ SW sim | `LANE_CLIP_META` · placeholder playable · remux 3010 χωρίς NAL |
-| A06 | ✅ SW | warm-up + disconnect generation · concurrent 3012 |
-| A07 | ✅ SW policy | ScenePhase PAUSED · `promisesContinuousBackgroundCapture=false` |
-| A08 | ✅ SW | `LANE_OBSIDIAN` · Files picker + VaultBookmarkStore |
-| A09 | ✅ SW | conflict sidecar + hash persist · stage5 A08/A09 |
-| A10 | ✅ SW adapters | HermesEndpointAsfaleia SEC-004/007 · DECISIONS §3 · live creds = DEV |
-| A11 | ✅ SW path | OCR wired · live vision reply = DEV |
-| A12 | ✅ SW keyword | recall path · live AI polish = DEV |
-| A13 | ✅ SW | AgentFolder + PathAsfaleia · device accept/export = DEV |
-| A14 | ✅ SW | `LANE_VOICE_GAME` · fail-closed verdicts · Photos fallback |
-| A15 | ✅ SW | Backup+agent+media · clean restore XCTest · Files picker · PathAsfaleia |
-| A16 | ✅ SW | `AppErrorTaxonomy` · disk-full · `Apps/R0llingApp/Info.plist` privacy |
+| A01 | Journal persistence and restart path | XCTest/build not run |
+| A02 | Edit/search/date filtering | XCTest and UI smoke not run |
+| A03 | Photos/Files media import, sandbox storage and preview | XCTest/device picker smoke not run |
+| A04 | Speech transcription and command parsing | XCTest/device microphone check not run |
+| A05 | Simulation clip path; live DAT capture/remux remains unavailable | XCTest/AVFoundation/device checks not run |
+| A06 | Buffer warm-up and disconnect handling | XCTest/device concurrency check not run |
+| A07 | Background/lock pause policy | Device lifecycle check not run |
+| A08 | Obsidian vault export and scoped access | XCTest/Files provider check not run |
+| A09 | Obsidian conflict sidecars | XCTest/Files provider check not run |
+| A10 | Direct API/Hermes adapters and settings | XCTest/live endpoint check not run |
+| A11 | Photos vision/OCR fallback; DAT multi-frame path unavailable | XCTest/live reply check not run |
+| A12 | Keyword recall; semantic embeddings unavailable | XCTest/live AI polish not run |
+| A13 | Agent memory folder and preferences | XCTest/device export check not run |
+| A14 | Observation game and fail-closed evaluation | XCTest/device flow not run |
+| A15 | Plain JSON backup bundle, Files export/restore | XCTest/Files export and restore not run |
+| A16 | Error taxonomy and privacy declarations | XCTest/Apple build not run |
 
 **Device-proven:** ακόμα **0 / 16**.
 
 ### Wave-B/C via `FeatureReadinessRegistry`
 
-| ready=true (UI OK) | ready=false (hidden / orphan honesty) |
+| ready=true (source registry flag) | ready=false (source registry flag) |
 |---|---|
-| earcon · timeCapsule · highlightReel · podcast · canvas · KG · emotionTags · scavengerStreak · appleSpeech · onDeviceVisionOCR · entityTags · nutritionHeuristic · dataviewFrontmatter · adaptiveBattery | acoustic · headGesture · spatial · metal · watermark · fileWatcher · proximity · watch · pseudoVector · turnTaking · **mirror** · hyperlapse · whisperStub · multiFrameVision |
+| earcon · timeCapsule · highlightReel · podcast · canvas · KG · emotionTags · scavengerStreak · appleSpeech · onDeviceVisionOCR · entityTags · nutritionHeuristic · dataviewFrontmatter | acoustic · headGesture · spatial · metal · watermark · fileWatcher · proximity · watch · pseudoVector · turnTaking · **mirror** · hyperlapse · whisperStub · multiFrameVision · adaptiveBattery |
 
-C01 rename: `MobileCLIP*` → `PseudoLexicalVectorSearchEngine` ✅  
-Orphans P1-04: `Sources/R0lling/Experimental/` (Spatial · Metal · Watermark · FileWatcher) ✅  
-AppState P1-05: DEFERRED split · orphans off AppState · DECISIONS §6 ✅  
-Mirror: AUTH + Release kill · `ready=false` μέχρι TLS+frames ✅ honesty
+C01 rename and orphan placement are source-level changes; tests/build have not run.
+`adaptiveBattery` stays disabled until real battery telemetry and DAT are available.
+Mirror remains disabled until its live transport path is implemented and verified.
 
 ### P0 gates
 
 | ID | Status |
 |---|---|
-| P0-01 Mac/`swift test` | 🚫 BLOCKED — checklist `DEVICE_TESTS.md` §3 · workflow ready · **green log 🚫** |
-| P0-02 DAT vs sim | ✅ `DECISIONS.md` §2 simulation-only |
-| P0-05 App target / Info.plist | ✅ `Apps/R0llingApp/` scaffold + privacy plist + Mac README |
-| P0-06 Stage 6 | 🚫 no device failure report |
+| **P0-01** Mac/`swift test` | Apple build/XCTest NOT RUN. WSL Swift parser passes; Linux package build stops at unavailable Apple `ImageIO` |
+| P0-02 DAT vs sim | Simulation is declared; live DAT code remains a stub |
+| P0-05 App target / Info.plist | Project scaffold and privacy plist are present; Apple build not run |
+| P0-06 Stage 6 | NOT VERIFIED — no device failure report |
 
-### Software % (honest post CreateGoal SW close)
+### Completion status
 
-| Scope | % |
+| Scope | Status |
 |---|---|
-| Plan SW DoD (A01–A16 software rows) | **100%** (16/16 SW ✅ · DEV proofs ξεχωριστά) |
-| Wave-B/C honesty (Experimental + ready flags) | **100%** SW honesty (orphans Experimental · rename done) |
-| **Software objective (P0/P1 SW · χωρίς device/Mac runtime)** | **SATISFIED** — βλ. `GOAL_100_PROGRESS.md` |
-| Engineering soft-GO (needs P0-01 green) | **όχι** μέχρι GHA/`swift test` proof |
-| Product / Gen2 | **~5%** (0 device A-IDs) |
+| A01–A16 | Source inventory only; completion not established |
+| Swift/Xcode runtime | Not run on this host |
+| iPhone/Gen 2 behavior | Not verified; 0/16 device-proven A-IDs |
+| Overall software objective | **NOT VERIFIED / INCOMPLETE** |
 
-*CreateGoal SW close · Experimental orphans · no git commit · parent κρίνει UpdateGoal.*
+See [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md), [`FINDINGS_REMEDIATION.md`](FINDINGS_REMEDIATION.md), and [`DEVICE_TESTS.md`](DEVICE_TESTS.md) for current scope and next validation steps.

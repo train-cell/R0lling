@@ -212,6 +212,8 @@ public struct AISettings: Codable, Sendable, Equatable {
     public var directAPIKeyKeychainKey: String
     public var hermesBaseURL: String
     public var hermesTokenKeychainKey: String
+    public var includeJournalInChat: Bool
+    public var includeAgentMemoryInChat: Bool
     public var includeLocationInContext: Bool
     public var maxContextEntries: Int
 
@@ -222,8 +224,10 @@ public struct AISettings: Codable, Sendable, Equatable {
         directAPIKeyKeychainKey: String = "r0lling.direct_api_key",
         hermesBaseURL: String = "https://127.0.0.1:8080/v1",
         hermesTokenKeychainKey: String = "r0lling.hermes_token",
+        includeJournalInChat: Bool = false,
+        includeAgentMemoryInChat: Bool = false,
         includeLocationInContext: Bool = false,
-        maxContextEntries: Int = 10
+        maxContextEntries: Int = 5
     ) {
         self.activeProvider = activeProvider
         self.directAPIBaseURL = directAPIBaseURL
@@ -231,6 +235,8 @@ public struct AISettings: Codable, Sendable, Equatable {
         self.directAPIKeyKeychainKey = directAPIKeyKeychainKey
         self.hermesBaseURL = hermesBaseURL
         self.hermesTokenKeychainKey = hermesTokenKeychainKey
+        self.includeJournalInChat = includeJournalInChat
+        self.includeAgentMemoryInChat = includeAgentMemoryInChat
         self.includeLocationInContext = includeLocationInContext
         self.maxContextEntries = maxContextEntries
     }

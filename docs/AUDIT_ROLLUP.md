@@ -1,13 +1,14 @@
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
 # R0lling — Multi-Agent Audit Rollup (legacy lane merge)
 
-> ⚠ **CANONICAL CTO DOC:** [`docs/AUDIT_FINAL.md`](AUDIT_FINAL.md)  
-> Fresh from-scratch audit · 2026-10-06 ~18:35 EEST · HEAD `543320f` · verdict **CONDITIONAL**.  
-> Αυτό το ROLLUP (~18:05) **υπερκεράστηκε** — ιδίως SEC-001/002/003 πλέον CLOSED (stub) στο FINAL · TLS/Hermes residual παραμένουν.
+> **Historical pointer:** [`docs/AUDIT_FINAL.md`](AUDIT_FINAL.md) is an archived 2026-10-06 audit snapshot, not the current authority. Use [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md), [`CAPABILITY_MATRIX.md`](CAPABILITY_MATRIX.md), and [`FINDINGS_REMEDIATION.md`](FINDINGS_REMEDIATION.md) for current status.
+> The original rollup was superseded at the time by the 2026-10-06 FINAL snapshot; both documents are historical and do not describe the current checkout.
 
 **Ημερομηνία σύνθεσης (ιστορικό):** 2026-10-06 ~18:05 EEST · **GitHub refresh:** ~18:10 EEST  
 **Workspace:** `.`  
 **Synthesizer:** Rollup lane (pr-triage discipline · session_handoff · godmode severity)  
-**Git / Stage 6 (τότε):** own `.git` + `origin` → `https://github.com/train-cell/R0lling.git` · τότε `016d8b9` · **τώρα βλ. AUDIT_FINAL** · **χωρίς Stage 6** · βλ. `docs/GITHUB_FRESH_REVIEW.md`  
+**Git / Stage 6 (τότε):** own `.git` + `origin` → `https://github.com/train-cell/R0lling.git` · τότε `016d8b9` · το AUDIT_FINAL είναι επίσης ιστορικό · για σημερινή κατάσταση βλ. `IMPLEMENTATION_STATUS.md` / `CAPABILITY_MATRIX.md` / `FINDINGS_REMEDIATION.md` · **χωρίς Stage 6** · βλ. `docs/GITHUB_FRESH_REVIEW.md`
 
 
 
@@ -145,10 +146,13 @@ swift test
 ## 7. Pointer map
 
 ```text
-CANONICAL CTO                    docs/AUDIT_FINAL.md
+Current status                   docs/IMPLEMENTATION_STATUS.md
+Capability map                   docs/CAPABILITY_MATRIX.md
+Remediation and evidence         docs/FINDINGS_REMEDIATION.md
+Historical audit snapshot        docs/AUDIT_FINAL.md
 THIS FILE (legacy rollup)        docs/AUDIT_ROLLUP.md
 Architecture                     docs/AUDIT_ARCHITECTURE.md
-Security (stale OPEN SEC)        docs/AUDIT_SECURITY.md  → superseded by AUDIT_FINAL §5–6
+Historical security snapshot     docs/AUDIT_SECURITY.md
 Verification / ECC               docs/AUDIT_VERIFICATION.md
 Code quality + CQ fixes          docs/AUDIT_CODE_QUALITY.md
 Gemini vs plan                   docs/GEMINI_AUDIT.md
@@ -158,4 +162,4 @@ Session continuity               docs/HANDOFF.md
 
 ---
 
-*Legacy rollup · superseded by AUDIT_FINAL · χωρίς git commit στο audit pass.*
+*Legacy rollup · both this file and AUDIT_FINAL are historical snapshots; use IMPLEMENTATION_STATUS / CAPABILITY_MATRIX / FINDINGS_REMEDIATION for current status.*

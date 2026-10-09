@@ -1,3 +1,5 @@
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
 # R0lling — Clip Buffer + Meta Glasses Lane (`LANE_CLIP_META`)
 
 **Έργο:** `R0lling`  
@@ -7,32 +9,26 @@
 
 ---
 
-## 1. Τι είναι 100% software (χωρίς Gen 2)
+## 1. Software implementation present (χωρίς Gen 2 — validation pending)
 
 | Κομμάτι | Κατάσταση | Αρχεία |
 |---|---|---|
-| Rolling buffer 5–10s + keyframe align | ✅ | `RollingBufferService.swift` |
-| Warm-up clip (πραγματική μικρότερη διάρκεια) | ✅ | `triggerClip` + XCTest |
-| Disconnect / gap safety (stream generation) | ✅ | `markStreamInterrupted` · `streamGeneration` |
-| Concurrent export guard | ✅ | error `3012` |
-| Pause / resume (A07 software) | ✅ | `pauseBuffering` / `resumeBuffering` |
-| ScenePhase → PAUSED + honest toast | ✅ | `R0llingApp` · `AppState.handleScenePhaseChange` |
-| Reconnect policy (auto-resume foreground) | ✅ | `GlassesReconnectPolicy` · adapter |
-| Stage-4 playable placeholder MP4 + moov | ✅ **ΜΗΝ ΣΠΑΣΕΙΣ** | `PlayableClipExporter.grapsePlayablePlaceholderMP4` |
-| H.264 Annex-B remux pipeline | ✅ structure | `H264AnnexBRemuxer` — πετάει **3010** χωρίς SPS/PPS |
-| Meta protocol + simulation **ρητά labeled** | ✅ | `MetaGlassesAdapter` · `(SIMULATION — όχι φυσική συσκευή)` |
-| Non-sim χωρίς SDK → error **4002** | ✅ | R3-003 |
-| DAT bridge stubs `#if canImport` | ✅ | `MetaDATStreamBridge` — **4010** χωρίς SDK · **4011** μέχρι wire |
-| Acoustic / IMU feed API end-to-end | ✅ wired · triggers gated | adapter → `GlassesSensorFeedSink` → AppState |
+| Rolling buffer 5–10s + keyframe align | Implemented; XCTest/runtime validation pending | `RollingBufferService.swift` |
+| Warm-up clip (πραγματική μικρότερη διάρκεια) | Implemented; XCTest/runtime validation pending | `triggerClip` + XCTest source |
+| Disconnect / gap safety (stream generation) | Implemented; runtime validation pending | `markStreamInterrupted` · `streamGeneration` |
+| Concurrent export guard | Implemented; runtime validation pending | error `3012` |
+| Pause / resume (A07 software) | Implemented; runtime validation pending | `pauseBuffering` / `resumeBuffering` |
+| ScenePhase → PAUSED + honest toast | Implemented; runtime validation pending | `R0llingApp` · `AppState.handleScenePhaseChange` |
+| Reconnect policy (auto-resume foreground) | Implemented; runtime validation pending | `GlassesReconnectPolicy` · adapter |
+| Stage-4 placeholder MP4 | Source path present; AVFoundation validation pending | `PlayableClipExporter.grapsePlayablePlaceholderMP4` uses `AVURLAsset.load(.isPlayable)` |
+| H.264 Annex-B remux pipeline | Structure present; codec/runtime validation pending | `H264AnnexBRemuxer` — πετάει **3010** χωρίς SPS/PPS |
+| Meta protocol + simulation **ρητά labeled** | Implemented; runtime validation pending | `MetaGlassesAdapter` · `(SIMULATION — όχι φυσική συσκευή)` |
+| Non-sim χωρίς SDK → error **4002** | Implemented; runtime validation pending | R3-003 |
+| DAT bridge stubs `#if canImport` | Stub only | `MetaDATStreamBridge` — **4010** χωρίς SDK · **4011** μέχρι wire |
+| Acoustic / IMU feed API | ⚠️ synthetic adapter plumbing only; live DAT samples are not wired | `MetaGlassesAdapter` simulation · readiness false |
 | Auto-clip toasts | ⏸ gated | `FeatureReadinessRegistry.acoustic/headGesture.ready = false` |
 
-**Flip για auto-clip (χωρίς νέο wiring):**
-
-```swift
-// FeatureReadinessRegistry.swift
-public static let acoustic = Flag(..., ready: true, ...)
-public static let headGesture = Flag(..., ready: true, ...)
-```
+**Do not flip readiness flags from this historical example.** Current acoustic and head-gesture flags remain false. Enable them only after the corresponding real sensor capture, app flow, and device tests have been implemented and reviewed.
 
 ---
 
@@ -47,11 +43,13 @@ public static let headGesture = Flag(..., ready: true, ...)
 | `AVAsset.isPlayable` smoke | Χρειάζεται Mac/iOS runtime | XCTest σε GHA/Mac |
 | Continuous background capture | Meta sample συχνά κλείνει session | `promisesContinuousBackgroundCapture = false` μέχρι proof |
 | Hey Meta wake | Experimental SDK | Εκτός αυτού του lane |
-| Live acoustic/IMU από hardware | DAT mic/IMU hooks | Feed API έτοιμο · ready flags false |
+| Live acoustic/IMU από hardware | DAT mic/IMU hooks | Μόνο synthetic samples· το live bridge επιστρέφει nil και τα readiness flags μένουν false |
 
 ---
 
-## 3. Mac steps → flip σε 100% device path
+## 3. Future implementation outline (not an enablement checklist)
+
+The steps below describe engineering work that still needs to happen. They do not enable a live device path. Merely adding the DAT package does not make this bridge operational: the current `canImport` branch still throws `4011` for sessions/frames, `kleiseLiveSession` is empty, and audio/IMU pulls return `nil`. Do not switch the app to real mode until those hooks have a reviewed implementation and device evidence.
 
 ### Βήμα 0 — Προαπαιτούμενα
 1. macOS 14+ · Xcode 16+ · iPhone iOS 17.2+ · Meta Ray-Ban Gen 2  
@@ -81,11 +79,12 @@ targets: [
 ### Βήμα 2 — Wire `MetaDATStreamBridge`
 Άνοιξε `Sources/R0lling/Glasses/MetaDATStreamBridge.swift` μέσα στα `#if canImport(MetaWearablesDAT)` blocks:
 
-1. `anoixeLiveSession()` — αντικατέστησε το `throw 4011` με πραγματικό connect + `camera.startStreaming` από το **CameraAccess** sample.  
-2. `diavaseEpomenoVideoFrame()` — map DAT compressed frame → `BufferedSample` με Annex-B bytes + `isKeyframe` + timestamps.  
-3. `diavaseEpomenoAudioSample()` — αν το SDK δίνει sync audio.  
-4. `diavaseEpomenoIMU()` — αν εκτίθεται head tracking / IMU.  
-5. `kleiseLiveSession()` — stop + disconnect.
+1. Πριν το `camera.startStreaming`, επιβεβαίωσε ποιοι codecs υποστηρίζονται από το SDK και τα γυαλιά. Το παρόν `H264AnnexBRemuxer` δέχεται μόνο H.264 Annex-B (SPS/PPS NAL types 7/8). Αν το DAT δίνει μόνο HEVC, χρειάζεται ξεχωριστή HEVC remux διαδρομή ή τεκμηριωμένη ρύθμιση H.264· μην υποθέσεις ότι τα δύο formats είναι εναλλάξιμα.
+2. `anoixeLiveSession()` — αντικατέστησε το `throw 4011` με πραγματικό connect και `camera.startStreaming` από το **CameraAccess** sample, χρησιμοποιώντας τον codec που επαληθεύτηκε στο προηγούμενο βήμα.
+3. `diavaseEpomenoVideoFrame()` — map DAT compressed frame → `BufferedSample` με bytes στο format που υποστηρίζει ο αντίστοιχος remuxer + `isKeyframe` + timestamps.
+4. `diavaseEpomenoAudioSample()` — αν το SDK δίνει sync audio.
+5. `diavaseEpomenoIMU()` — αν εκτίθεται head tracking / IMU.
+6. `kleiseLiveSession()` — stop + disconnect.
 
 ### Βήμα 3 — Άνοιγμα real mode στο adapter
 ```swift
@@ -93,9 +92,9 @@ await glassesAdapter.toggleSimulationMode(enabled: false)
 try await glassesAdapter.connectDevice()
 try await glassesAdapter.startStreaming()
 ```
-Με DAT linked, το `canImport` path ενεργοποιείται· χωρίς επιτυχή session παραμένει error (όχι fake connected).
+Το παράδειγμα αυτό δεν συνδέεται στο παρόν checkout. Ακόμη και με DAT linked, το bridge σήμερα επιστρέφει `4011` και το app δεν μπαίνει σε real mode· το session και τα frame/sensor callbacks απαιτούν υλοποίηση πρώτα.
 
-### Βήμα 4 — Επαλήθευση A05 remux
+### Βήμα 4 — Μετά την υλοποίηση: επαλήθευση A05 remux
 1. Stream ≥ 10s με πραγματικά NAL (πρέπει να υπάρχουν SPS type 7 + PPS type 8).  
 2. `Clip` → `ClipExportResult.isSimulationPlaceholder == false`.  
 3. `AVAsset(url:).isPlayable == true` στο XCTest / device.  
@@ -109,20 +108,17 @@ try await glassesAdapter.startStreaming()
 | Background κατά LIVE | UI `PAUSED` · toast honest · buffer δεν γεμίζει (default policy) |
 | Lock screen | Ίδιο με background |
 | Foreground resume | Auto-resume αν `autoResumeStreamOnForeground` |
-| Αν DAT επιτρέπει background HEVC | Θέσε `promisesContinuousBackgroundCapture = true` **μόνο μετά** εμπειρική επιβεβαίωση |
+| Αν DAT επιτρέπει background capture | Θέσε `promisesContinuousBackgroundCapture = true` μόνο μετά από δοκιμή της πραγματικής codec διαδρομής και εμπειρική επιβεβαίωση σε συσκευή |
 
 ### Βήμα 6 — Acoustic / IMU product surface
-Μετά από πραγματικό mic/IMU από DAT:
-1. `FeatureReadinessRegistry.acoustic.ready = true`  
-2. `FeatureReadinessRegistry.headGesture.ready = true`  
-3. Χωρίς άλλο wiring — το sink είναι ήδη registered στο `AppState`.
+Το παρόν checkout δεν τεκμηριώνει πλήρη real-sensor διαδρομή. Υλοποίησε και έλεγξε capture, handoff, app behavior και device tests πριν αλλάξεις τα readiness flags. Μέχρι τότε κράτησέ τα `false`.
 
 ### Βήμα 7 — CI / P0-01 (checklist)
 
 **GHA (προτιμητέο):**
 1. GitHub → Actions → `R0lling CI (Cloud macOS)` → Run workflow (ή push `main`).
 2. Πράσινο: `python-verify` + `build-and-test`.
-3. Artifact `swift-test-log` → HANDOFF line.
+3. Artifact `swift-build-and-test-logs` → HANDOFF line.
 4. Λεπτομέρειες: `docs/DEVICE_TESTS.md` §3.
 
 **Τοπικό Mac:**
@@ -164,4 +160,4 @@ App/
   R0llingApp.swift                 onChange(scenePhase)
 ```
 
-*Lane complete on software side · Gen 2 remains external proof gate · no git commit in this pass.*
+*Software implementation is present; Apple runtime validation remains pending, and Gen 2 behavior requires device evidence. No git commit was made in this pass.*

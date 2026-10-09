@@ -1,3 +1,5 @@
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
 # 🔍 R0lling — Forensic Plan & Codebase Audit Report
 **Strict Self-Review, Zero-Guessing Audit & Blunder Extermination**
 *Audited under Master Protocols: `custom_prompt_crafter`, `code_reviewer`, `deep_code_analysis`, `tdd_guide`*  

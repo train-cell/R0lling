@@ -1,7 +1,9 @@
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
 # R0lling — LANE OBSIDIAN (A08 / A09) — Parallel lane note
 
 ```yaml
-Lane: Obsidian 100% software-ready
+Lane: Obsidian source path implemented; Apple XCTest/device validation pending
 Date: 2026-10-06
 Workspace: .
 Git_commit: NONE (user forbade)
@@ -22,7 +24,7 @@ AppState: surgical only (re-read under parallel lanes)
 | A09-2 | Hashes persist across restart | ✅ `R0llingMeta/export-hashes.json` |
 | A09-3 | Conflict toast + Settings list | ✅ `teleutaiaObsidianConflicts` |
 | SEC | PathAsfaleia σε notes / sidecar / Agent / canvas / KG | ✅ |
-| Tests | XCTest + `diagnose_stage5` A08/A09 suite | ✅ static · 🚫 `swift test` Windows |
+| Tests | XCTest source + historical `diagnose_stage5` A08/A09 check | Present; Apple execution unverified |
 | Device | Πραγματικό Obsidian vault σε iPhone Files | 🚫 εκκρεμεί Mac/device |
 
 ## Αρχεία lane
@@ -58,4 +60,4 @@ python verification/diagnose_stage5_finalize.py  # includes A08/A09 suite
 # swift test — UNAVAILABLE on Windows (GHA macOS / Mac local)
 ```
 
-*Lane complete for software DoD · no git commit · device vault proof ακόμα εκκρεμεί.*
+*Η σημείωση lane είναι ιστορική. Το source path υπάρχει, αλλά Apple XCTest/build και δοκιμή πραγματικού vault σε iPhone εκκρεμούν.*

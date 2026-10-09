@@ -1,43 +1,29 @@
 #!/usr/bin/env python3
-"""
-verify_theme_apple_meta_compliance.py
-
-Empirical verification script for:
-1. Discord x Twitch Dark Cold Aesthetic (Color token inspection & zero orange)
-2. Apple App Store Privacy Manifest & Permissions compliance (PrivacyInfo.xcprivacy, Info.plist, ATS)
-3. Meta Wearables Gen 2 Compliance (DAT lifecycle, hardware safety error codes, honesty)
+"""Source/config presence checks only.
+This does not render UI or exercise Apple privacy grants, DAT SDK, or devices.
+No compliance certification follows from substring or plist-key assertions.
 """
 
 import os
 import sys
 import xml.etree.ElementTree as ET
 import re
+import plistlib
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-def test_theme_discord_twitch():
-    print("[1] Verifying Discord x Twitch Theme Tokens...")
+def test_theme_bevel_inspired():
+    print("[1] Verifying Bevel-inspired wellness theme tokens...")
     theme_swift = os.path.join(REPO_ROOT, "Sources", "R0lling", "UI", "Theme.swift")
     assert os.path.exists(theme_swift), "Theme.swift not found"
     
     with open(theme_swift, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # Verify background and surface tokens
-    assert "0x16161D" in content, "Missing Discord dark background 0x16161D in Theme.swift"
-    assert "0x22232D" in content, "Missing Discord surface 0x22232D in Theme.swift"
-    assert "0x2C2D39" in content, "Missing Discord elevated surface 0x2C2D39 in Theme.swift"
-    assert "0x373948" in content, "Missing border token 0x373948 in Theme.swift"
-
-    # Verify Twitch and Discord purple/lavender/cyan accents
-    assert "0x7742DC" in content, "Missing Twitch Purple 0x7742DC in Theme.swift"
-    assert "0x9146FF" in content, "Missing Twitch Accent 0x9146FF in Theme.swift"
-    assert "0xA78BFA" in content, "Missing Lavender 0xA78BFA in Theme.swift"
-    assert "0x00E5FF" in content, "Missing Cyan 0x00E5FF in Theme.swift"
-
-    # Verify status tokens
-    assert "0x55D6A4" in content, "Missing Success 0x55D6A4 in Theme.swift"
-    assert "0xFF6B7A" in content, "Missing Error 0xFF6B7A in Theme.swift"
+    # Charcoal/slate surfaces, periwinkle and wellness metric colors.
+    for token in ("0x17181C", "0x2A2B32", "0x343640", "0x41434D",
+                  "0xF3BD55", "0xB8E34A", "0x79AFFF", "0x62C99A"):
+        assert token in content, f"Missing Bevel-inspired theme token {token} in Theme.swift"
 
     # Check that in active UI files, there are no active calls to stravaOrange or stravaFlame or .orange
     ui_files = [
@@ -66,7 +52,7 @@ def test_theme_discord_twitch():
             assert "stravaOrange" not in line, f"Found active stravaOrange in {uif}:{idx+1}: {line}"
             assert "stravaFlame" not in line, f"Found active stravaFlame in {uif}:{idx+1}: {line}"
 
-    print("    [OK] PASS: Discord x Twitch theme and zero orange in active UI verified.")
+    print("    [OK] Bevel-inspired palette tokens found; source scan does not prove visual fidelity.")
 
 def test_apple_privacy_and_permissions():
     print("[2] Verifying Apple Privacy Manifest & Permissions...")
@@ -86,32 +72,41 @@ def test_apple_privacy_and_permissions():
     assert "NSPrivacyAccessedAPICategoryDiskSpace" in privacy_text, "Missing DiskSpace category"
     assert "NSPrivacyAccessedAPICategoryUserDefaults" in privacy_text, "Missing UserDefaults category"
 
-    # Check Info.plist
+    # Check active Info.plist descriptions and require unavailable capabilities to stay
+    # explicitly reserved, rather than treating a privacy key as implementation evidence.
     info_plist = os.path.join(REPO_ROOT, "Apps", "R0llingApp", "Info.plist")
     assert os.path.exists(info_plist), "Info.plist not found"
-    with open(info_plist, "r", encoding="utf-8") as f:
-        info_text = f.read()
+    with open(info_plist, "rb") as f:
+        info = plistlib.load(f)
 
-    required_permissions = [
-        "NSCameraUsageDescription",
+    active_usage_keys = [
         "NSMicrophoneUsageDescription",
         "NSSpeechRecognitionUsageDescription",
         "NSPhotoLibraryUsageDescription",
+        "NSLocalNetworkUsageDescription",
+        "NSFaceIDUsageDescription",
+        "NSHealthShareUsageDescription",
+    ]
+    for key in active_usage_keys:
+        assert isinstance(info.get(key), str) and info[key].strip(), f"Missing active usage description {key}"
+
+    reserved_usage_keys = [
+        "NSCameraUsageDescription",
         "NSPhotoLibraryAddUsageDescription",
         "NSBluetoothAlwaysUsageDescription",
         "NSBluetoothPeripheralUsageDescription",
-        "NSLocalNetworkUsageDescription",
-        "NSHealthShareUsageDescription",
-        "NSHealthUpdateUsageDescription"
+        "NSHealthUpdateUsageDescription",
     ]
-    for perm in required_permissions:
-        assert perm in info_text, f"Missing required permission {perm} in Info.plist"
+    for key in reserved_usage_keys:
+        value = info.get(key)
+        assert isinstance(value, str) and any(
+            marker in value.lower() for marker in ("δεν είναι διαθέσιμη", "δεν είναι διαθέσιμο")
+        ), f"Reserved capability {key} must be described as unavailable"
 
     # Verify ATS local networking
-    assert "NSAppTransportSecurity" in info_text, "Missing NSAppTransportSecurity in Info.plist"
-    assert "NSAllowsLocalNetworking" in info_text, "Missing NSAllowsLocalNetworking in Info.plist"
+    assert "NSAllowsLocalNetworking" in info.get("NSAppTransportSecurity", {}), "Missing NSAllowsLocalNetworking in Info.plist"
 
-    print("    [OK] PASS: Apple PrivacyInfo.xcprivacy manifest and Info.plist permissions verified.")
+    print("    [OK] Privacy manifest structure and active/reserved usage descriptions found; this does not certify Apple policy compliance.")
 
 def test_meta_compliance():
     print("[3] Verifying Meta Wearables Gen 2 Compliance & Safety...")
@@ -137,20 +132,20 @@ def test_meta_compliance():
     # Verify honest battery reporting (nil on disconnect)
     assert "case .connected" in adapter_content, "Adapter must only report battery when connected"
 
-    print("    [OK] PASS: Meta Wearables Gen 2 hardware safety and compliance verified.")
+    print("    [OK] PASS: Meta Wearables Gen 2 hardware-related source markers found; runtime compliance not evaluated.")
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
 
 def main():
     print("=" * 70)
-    print("R0lling Theme, Apple & Meta Compliance Verification Suite")
+    print("R0lling Theme/Privacy/DAT Source Presence Checks")
     print("=" * 70)
-    test_theme_discord_twitch()
+    test_theme_bevel_inspired()
     test_apple_privacy_and_permissions()
     test_meta_compliance()
     print("=" * 70)
-    print("ALL COMPLIANCE CHECKS PASSED (100% SUCCESS).")
+    print("Source/config presence checks completed. No visual, Apple policy, or Meta hardware compliance certification.")
     print("=" * 70)
 
 if __name__ == "__main__":

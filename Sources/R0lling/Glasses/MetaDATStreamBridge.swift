@@ -10,6 +10,9 @@ import MetaWearablesDAT
 /// πετάει σαφές error — **ποτέ** ψευδή σύνδεση. Σε Mac με DAT linked (`#if canImport`),
 /// τα hooks γεμίζουν με πραγματικές session κλήσεις (βλ. `docs/LANE_CLIP_META.md`).
 public enum MetaDATStreamBridge {
+    /// Module presence does not imply a working camera/session integration.
+    public static let einaiLiveYlopoiimeno = false
+
     public static let errorDomain = "R0lling.Glasses.DAT"
     /// SDK δεν είναι linked στο τρέχον build.
     public static let kodikosSDKMiDiathesimo: Int = 4010
@@ -55,7 +58,8 @@ public enum MetaDATStreamBridge {
         //
         // Παράδειγμα δομής (ψευδοκώδικας — συμπλήρωσε με πραγματικά DAT types):
         //   let session = try await WearablesSession.shared.connect()
-        //   try await session.camera.startStreaming(codec: .hevc)
+        //   επιβεβαίωσε codec SDK/device και συμβατότητα remux πριν ξεκινήσει το stream
+        //   η τρέχουσα H264AnnexBRemuxer δέχεται H.264 Annex-B, όχι HEVC
         //   return LiveSessionHandle(deviceName: session.device.name, ...)
         //
         // Μέχρι να γίνει wire με πραγματικά σύμβολα SDK, ρίχνουμε 4011 ώστε
@@ -65,8 +69,8 @@ public enum MetaDATStreamBridge {
             code: kodikosSessionApotyxia,
             userInfo: [NSLocalizedDescriptionKey:
                 "MetaWearablesDAT είναι linked αλλά το live session hook δεν έχει γίνει wire ακόμα. " +
-                "Ολοκλήρωσε το CameraAccess startStreaming στο MetaDATStreamBridge.anoixeLiveSession — " +
-                "docs/LANE_CLIP_META.md βήμα 4."]
+                "Ολοκλήρωσε και έλεγξε το session/frame bridge πριν ενεργοποιήσεις real mode — " +
+                "docs/LANE_CLIP_META.md §3."]
         )
         #else
         throw NSError(

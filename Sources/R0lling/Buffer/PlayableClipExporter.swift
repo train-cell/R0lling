@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 import CoreVideo
 
-/// Παράγει πραγματικά playable MP4 μέσω AVAssetWriter (όχι ftyp+mdat χωρίς moov).
+/// Παράγει MP4 μέσω AVAssetWriter και ελέγχει το αποτέλεσμα με AVFoundation.
 /// Χρησιμοποιείται όταν τα buffered samples δεν είναι έγκυρα H.264 NAL (simulation / μη-DAT stream).
 ///
 /// **Stage-4 contract:** `grapsePlayablePlaceholderMP4` παραμένει η σταθερή playable διαδρομή.
@@ -16,8 +16,10 @@ public enum PlayableClipExporter {
     public static let platosEikonas: Int = 320
     /// Ύψος placeholder καρέ.
     public static let ypsosEikonas: Int = 240
+    /// Upper bound for a generated placeholder, preventing accidental unbounded frame allocation.
+    public static let maximumPlaceholderDurationSeconds: Double = 300
 
-    /// Συντονιστής A05: δοκιμάζει remux· σε αποτυχία → Stage-4 placeholder (πάντα playable + moov).
+    /// Συντονιστής A05: δοκιμάζει remux· σε αποτυχία → Stage-4 placeholder με AVFoundation validation.
     /// - Returns: `(isSimulationPlaceholder: Bool)` — `false` μόνο μετά επιτυχές remux.
     public static func grapsePlayableClipApoSamples(
         samples: [BufferedSample],
@@ -25,6 +27,7 @@ public enum PlayableClipExporter {
         destinationURL: URL,
         preferRemuxWhenNALPresent: Bool = true
     ) async throws -> Bool {
+        try Task.checkCancellation()
         let exeiNAL = samples.contains { sample in
             guard !sample.isAudio else { return false }
             let bytes = [UInt8](sample.data.prefix(4))
@@ -41,6 +44,8 @@ public enum PlayableClipExporter {
                 )
                 return false
             } catch {
+                // Cancellation is a control signal; do not turn it into a generated clip.
+                try Task.checkCancellation()
                 // Honest fallback — όχι silent fake remux success.
                 try await grapsePlayablePlaceholderMP4(
                     durationSeconds: durationSeconds,
@@ -65,6 +70,12 @@ public enum PlayableClipExporter {
         durationSeconds: Double,
         destinationURL: URL
     ) async throws {
+        try Task.checkCancellation()
+        guard durationSeconds.isFinite, durationSeconds <= maximumPlaceholderDurationSeconds else {
+            throw NSError(domain: "R0lling.Buffer", code: 3009, userInfo: [
+                NSLocalizedDescriptionKey: "Η διάρκεια του placeholder clip πρέπει να είναι πεπερασμένη και έως 5 λεπτά."
+            ])
+        }
         let diarkeia = max(elaxistiDiarkeiaDeuterolepta, durationSeconds)
         let synoloPlaision = max(1, Int(ceil(diarkeia * Double(plaisiaAnaDeuterolepto))))
 
@@ -72,7 +83,17 @@ public enum PlayableClipExporter {
             try FileManager.default.removeItem(at: destinationURL)
         }
 
+        var outputVerified = false
+        defer {
+            if !outputVerified {
+                try? FileManager.default.removeItem(at: destinationURL)
+            }
+        }
+
         let writer = try AVAssetWriter(outputURL: destinationURL, fileType: .mp4)
+        defer {
+            if writer.status != .completed { writer.cancelWriting() }
+        }
         let videoSettings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: platosEikonas,
@@ -111,7 +132,17 @@ public enum PlayableClipExporter {
 
         let timescale: CMTimeScale = 600
         for index in 0..<synoloPlaision {
+            try Task.checkCancellation()
+            let readinessDeadline = ProcessInfo.processInfo.systemUptime + 10
             while !input.isReadyForMoreMediaData {
+                try Task.checkCancellation()
+                guard writer.status == .writing,
+                      ProcessInfo.processInfo.systemUptime < readinessDeadline else {
+                    writer.cancelWriting()
+                    throw writer.error ?? NSError(domain: "R0lling.Buffer", code: 3090, userInfo: [
+                        NSLocalizedDescriptionKey: "Το video writer απέτυχε ή υπερέβη το όριο αναμονής."
+                    ])
+                }
                 try await Task.sleep(nanoseconds: 2_000_000)
             }
             let presentation = CMTime(value: CMTimeValue(index * (Int(timescale) / plaisiaAnaDeuterolepto)), timescale: timescale)
@@ -133,6 +164,7 @@ public enum PlayableClipExporter {
 
         input.markAsFinished()
         await writer.finishWriting()
+        try Task.checkCancellation()
 
         guard writer.status == .completed else {
             throw writer.error ?? NSError(
@@ -142,15 +174,15 @@ public enum PlayableClipExporter {
             )
         }
 
-        // Δομική επαλήθευση: playable MP4 πρέπει να περιέχει moov box.
-        let data = try Data(contentsOf: destinationURL)
-        guard data.range(of: Data("moov".utf8)) != nil else {
+        let asset = AVURLAsset(url: destinationURL)
+        guard try await asset.load(.isPlayable) else {
             throw NSError(
                 domain: "R0lling.Buffer",
                 code: 3008,
-                userInfo: [NSLocalizedDescriptionKey: "Το εξαγόμενο αρχείο δεν περιέχει moov — μη playable MP4."]
+                userInfo: [NSLocalizedDescriptionKey: "Το AVFoundation δεν αναγνωρίζει το εξαγόμενο αρχείο ως playable MP4."]
             )
         }
+        outputVerified = true
     }
 
     /// Δημιουργεί ARGB pixel buffer με σταθερό χρώμα (Discord-dark placeholder).

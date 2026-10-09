@@ -64,9 +64,8 @@ final class UIWorkflowIntegrationTests: XCTestCase {
 
     @MainActor
     func testStrategicVaultCardViews() {
-        let diaryCard = EncryptedDiaryCardView(secretContent: "Απόρρητο μήνυμα")
+        let diaryCard = EncryptedDiaryCardView()
         XCTAssertNotNil(diaryCard)
-        XCTAssertEqual(diaryCard.secretContent, "Απόρρητο μήνυμα")
 
         let decision = DecisionRecord(
             decisionText: "Αρχιτεκτονική απόφαση On-Device",

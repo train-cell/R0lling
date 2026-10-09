@@ -10,9 +10,8 @@ from __future__ import annotations
 import json
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -36,8 +35,16 @@ def check(name: str, condition: bool, detail: str) -> None:
 
 
 def make_date_key(dt: datetime, tz_name: str) -> str:
-    """Mirror JournalEntry.makeDateKey — YYYY-MM-dd in entry TZ."""
-    local = dt.astimezone(ZoneInfo(tz_name))
+    """Mirror two fixed-time-zone fixtures without requiring host tzdata."""
+    fixture_offsets = {
+        "Asia/Tokyo": timezone(timedelta(hours=9)),
+        "Europe/Athens": timezone(timedelta(hours=3)),
+    }
+    try:
+        fixture_zone = fixture_offsets[tz_name]
+    except KeyError as error:
+        raise ValueError(f"Unsupported fixed-offset fixture zone: {tz_name}") from error
+    local = dt.astimezone(fixture_zone)
     return local.strftime("%Y-%m-%d")
 
 
@@ -60,8 +67,10 @@ def test_a01_offline_restart() -> None:
     )
     check(
         "atomic write",
-        "options: .atomic" in storage or "options:.atomic" in storage,
-        "crash-safe flush",
+        "options: .atomic" in storage
+        or "options:.atomic" in storage
+        or "options: R0llingFileProtection.atomicWriteOptions" in storage,
+        "atomic flush with platform file-protection options",
     )
     check(
         "addNote error path",
@@ -213,7 +222,7 @@ def test_a03_media_attach_display() -> None:
     )
     check(
         "TodayView wires picker",
-        "PhotosMediaPickerButton" in today and "attachMediaData" in today,
+        "PhotosMediaPickerButton" in today and "attachMediaFile" in today,
         "composer media button",
     )
     check(

@@ -18,9 +18,17 @@ final class SovereignOSFeaturesTests: XCTestCase {
         XCTAssertEqual(tasks[1].priority, .medium)
         XCTAssertEqual(tasks[2].priority, .medium)
         XCTAssertEqual(tasks[3].priority, .low)
+        XCTAssertTrue(tasks.allSatisfy { $0.originEntryId == nil })
 
         let toggled = await service.toggleTask(id: tasks[0].id)
         XCTAssertTrue(toggled)
+    }
+
+    func testChiefOfStaffParsingKeepsOnlyAnExplicitSourceEntryID() async {
+        let service = ChiefOfStaffService()
+        let sourceEntryID = UUID()
+        let tasks = await service.parseTasks(from: "- Review the note", originId: sourceEntryID)
+        XCTAssertEqual(tasks.first?.originEntryId, sourceEntryID)
     }
 
     func testZettelkastenLinker() async {
@@ -41,7 +49,10 @@ final class SovereignOSFeaturesTests: XCTestCase {
     }
 
     func testDeepWorkSessionManager() async {
-        let manager = DeepWorkSessionManager()
+        let storageKey = "r0lling.tests.deepWork.lifecycle.\(UUID().uuidString)"
+        UserDefaults.standard.removeObject(forKey: storageKey)
+        defer { UserDefaults.standard.removeObject(forKey: storageKey) }
+        let manager = DeepWorkSessionManager(storageKey: storageKey)
         await manager.startSession(goal: "Swift 6 Concurrency Refactoring", durationMinutes: 25)
 
         let state = await manager.getState()
@@ -54,6 +65,158 @@ final class SovereignOSFeaturesTests: XCTestCase {
 
         let elapsed = await manager.completeSession(debrief: "Όλα τα tests πέρασαν με επιτυχία.")
         XCTAssertGreaterThanOrEqual(elapsed, 0)
+    }
+
+    func testDeepWorkSessionPersistsAndExpiresAcrossManagerInstances() async {
+        let storageKey = "r0lling.tests.deepWork.\(UUID().uuidString)"
+        UserDefaults.standard.removeObject(forKey: storageKey)
+        defer { UserDefaults.standard.removeObject(forKey: storageKey) }
+
+        let firstManager = DeepWorkSessionManager(storageKey: storageKey)
+        await firstManager.startSession(goal: "Focused work", durationMinutes: 3)
+
+        let firstState = await firstManager.getState()
+        guard case .active(let startedAt, let duration, let goal) = firstState else {
+            XCTFail("A started focus session should be active")
+            return
+        }
+
+        let reopenedManager = DeepWorkSessionManager(storageKey: storageKey)
+        let reopenedState = await reopenedManager.getState()
+        guard case .active(let restoredStart, let restoredDuration, let restoredGoal) = reopenedState else {
+            XCTFail("An active focus session should survive manager recreation")
+            return
+        }
+        XCTAssertEqual(restoredStart.timeIntervalSince(startedAt), 0, accuracy: 0.001)
+        XCTAssertEqual(restoredDuration, duration)
+        XCTAssertEqual(restoredGoal, goal)
+
+        let expiredState = await reopenedManager.getState(at: startedAt.addingTimeInterval(duration + 1))
+        guard case .completed(let elapsed, let completedGoal, _) = expiredState else {
+            XCTFail("An expired focus session should transition to completed")
+            return
+        }
+        XCTAssertEqual(elapsed, duration)
+        XCTAssertEqual(completedGoal, goal)
+
+        let thirdManager = DeepWorkSessionManager(storageKey: storageKey)
+        let persistedCompletion = await thirdManager.getState()
+        XCTAssertEqual(persistedCompletion, expiredState)
+    }
+
+    func testDeepWorkFocusHistoryPersistsAndDoesNotCountOnAnotherDay() async throws {
+        let storageKey = "r0lling.tests.deepWork.dailyHistory.\(UUID().uuidString)"
+        UserDefaults.standard.removeObject(forKey: storageKey)
+        defer { UserDefaults.standard.removeObject(forKey: storageKey) }
+
+        let firstManager = DeepWorkSessionManager(storageKey: storageKey)
+        let dayStart = Calendar.current.startOfDay(for: Date())
+        let firstStartedAt = try XCTUnwrap(Calendar.current.date(byAdding: .minute, value: 10, to: dayStart))
+        await firstManager.startSession(goal: "Daily focus", durationMinutes: 3, startedAt: firstStartedAt)
+        let activeState = await firstManager.getState(at: firstStartedAt)
+        guard case .active(let startedAt, let duration, _) = activeState else {
+            XCTFail("A started focus session should be active")
+            return
+        }
+        XCTAssertEqual(startedAt, firstStartedAt)
+        _ = await firstManager.getState(at: startedAt.addingTimeInterval(duration + 1))
+
+        let reopenedManager = DeepWorkSessionManager(storageKey: storageKey)
+        let todaySeconds = await reopenedManager.focusSeconds(on: startedAt)
+        let previousDay = Calendar.current.date(byAdding: .day, value: -1, to: startedAt)!
+        let previousDaySeconds = await reopenedManager.focusSeconds(on: previousDay)
+
+        XCTAssertEqual(todaySeconds, duration, accuracy: 0.001)
+        XCTAssertEqual(previousDaySeconds, 0, accuracy: 0.001)
+
+        let secondStartedAt = startedAt.addingTimeInterval(duration + 2 * 60)
+        await reopenedManager.startSession(goal: "Second focus", durationMinutes: 4, startedAt: secondStartedAt)
+        let activeTodayAt = secondStartedAt.addingTimeInterval(2 * 60)
+        let allTodaySeconds = await reopenedManager.focusSeconds(on: activeTodayAt)
+        let completedTodaySeconds = await reopenedManager.focusSeconds(on: activeTodayAt, includeActiveSession: false)
+        XCTAssertEqual(allTodaySeconds, 5 * 60, accuracy: 0.001)
+        XCTAssertEqual(completedTodaySeconds, 3 * 60, accuracy: 0.001)
+    }
+
+    func testDeepWorkReadsLegacySessionPayloadWithoutInventingHistory() async throws {
+        let activeKey = "r0lling.tests.deepWork.legacyActive.\(UUID().uuidString)"
+        let completedKey = "r0lling.tests.deepWork.legacyCompleted.\(UUID().uuidString)"
+        defer {
+            UserDefaults.standard.removeObject(forKey: activeKey)
+            UserDefaults.standard.removeObject(forKey: completedKey)
+        }
+
+        let dayStart = Calendar.current.startOfDay(for: Date())
+        let startedAt = try XCTUnwrap(Calendar.current.date(byAdding: .minute, value: 10, to: dayStart))
+        let legacyActive = DeepWorkSessionManager.SessionState.active(
+            startedAt: startedAt,
+            durationSeconds: 25 * 60,
+            goal: "Legacy active"
+        )
+        let legacyCompleted = DeepWorkSessionManager.SessionState.completed(
+            durationSeconds: 25 * 60,
+            goal: "Legacy completed",
+            debrief: nil
+        )
+        UserDefaults.standard.set(try JSONEncoder().encode(legacyActive), forKey: activeKey)
+        UserDefaults.standard.set(try JSONEncoder().encode(legacyCompleted), forKey: completedKey)
+
+        let activeManager = DeepWorkSessionManager(storageKey: activeKey)
+        let observedAt = startedAt.addingTimeInterval(5 * 60)
+        let restoredActive = await activeManager.getState(at: observedAt)
+        let restoredFocusSeconds = await activeManager.focusSeconds(on: observedAt)
+        XCTAssertEqual(restoredActive, legacyActive)
+        XCTAssertEqual(restoredFocusSeconds, 5 * 60, accuracy: 0.001)
+
+        let completedManager = DeepWorkSessionManager(storageKey: completedKey)
+        let restoredCompleted = await completedManager.getState()
+        let undatedLegacyFocusSeconds = await completedManager.focusSeconds(on: Date())
+        XCTAssertEqual(restoredCompleted, legacyCompleted)
+        XCTAssertEqual(undatedLegacyFocusSeconds, 0, accuracy: 0.001)
+    }
+
+    func testDeepWorkSessionRejectsEmptyGoalAndNonPositiveDuration() async {
+        let storageKey = "r0lling.tests.deepWork.invalid.\(UUID().uuidString)"
+        UserDefaults.standard.removeObject(forKey: storageKey)
+        defer { UserDefaults.standard.removeObject(forKey: storageKey) }
+        let manager = DeepWorkSessionManager(storageKey: storageKey)
+
+        await manager.startSession(goal: "   ", durationMinutes: 5)
+        let afterEmptyGoal = await manager.getState()
+        XCTAssertEqual(afterEmptyGoal, .idle)
+        await manager.startSession(goal: "Focus", durationMinutes: 0)
+        let afterInvalidDuration = await manager.getState()
+        XCTAssertEqual(afterInvalidDuration, .idle)
+        XCTAssertNil(UserDefaults.standard.data(forKey: storageKey))
+    }
+
+    func testCognitiveTelemetryIncludesElapsedActiveFocusWithoutChangingOtherScores() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let base = CognitiveTelemetryScore(cognitiveStrain: 3.2, focusMinutes: 0, readinessPercent: 88)
+        let deadline = now.addingTimeInterval(20 * 60)
+
+        let fiveMinutesIn = base.includingActiveFocus(deadline: deadline, at: now)
+        XCTAssertEqual(fiveMinutesIn.focusMinutes, 5)
+        XCTAssertEqual(fiveMinutesIn.cognitiveStrain, base.cognitiveStrain)
+        XCTAssertEqual(fiveMinutesIn.readinessPercent, base.readinessPercent)
+
+        let dailyFocus = base.includingActiveFocus(
+            deadline: deadline,
+            at: now,
+            completedFocusSeconds: 20 * 60
+        )
+        XCTAssertEqual(dailyFocus.focusMinutes, 25)
+
+        let sessionExpired = base.includingActiveFocus(deadline: deadline, at: now.addingTimeInterval(30 * 60))
+        XCTAssertEqual(sessionExpired.focusMinutes, 25)
+
+        let localDayStart = Calendar.current.startOfDay(for: now)
+        let crossDayDeadline = localDayStart.addingTimeInterval(15 * 60)
+        let twoMinutesIntoNextDay = base.includingActiveFocus(
+            deadline: crossDayDeadline,
+            at: localDayStart.addingTimeInterval(2 * 60)
+        )
+        XCTAssertEqual(twoMinutesIntoNextDay.focusMinutes, 2)
     }
 
     func testDecisionJournalEngine() async {
@@ -79,8 +242,57 @@ final class SovereignOSFeaturesTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(score.cognitiveStrain, 0.0)
         XCTAssertLessThanOrEqual(score.cognitiveStrain, 21.0)
         XCTAssertEqual(score.focusMinutes, 60)
-        XCTAssertGreaterThanOrEqual(score.readinessPercent, 15)
-        XCTAssertLessThanOrEqual(score.readinessPercent, 100)
+        let readiness = try XCTUnwrap(score.readinessPercent)
+        XCTAssertGreaterThanOrEqual(readiness, 15)
+        XCTAssertLessThanOrEqual(readiness, 100)
+    }
+
+    func testCognitiveReadinessDoesNotInventScoreWithoutInputs() async {
+        let score = await CognitiveReadinessCalculator().computeTelemetry(entriesCount: 0, deepWorkSeconds: 0)
+        XCTAssertNil(score.readinessPercent)
+    }
+
+    func testCognitiveReadinessSanitizesInvalidTelemetryInputs() async {
+        let score = await CognitiveReadinessCalculator().computeTelemetry(
+            entriesCount: -3,
+            deepWorkSeconds: .nan,
+            vocalStressFactor: .infinity
+        )
+        XCTAssertEqual(score.cognitiveStrain, 0)
+        XCTAssertEqual(score.focusMinutes, 0)
+        XCTAssertNil(score.readinessPercent)
+
+        let huge = await CognitiveReadinessCalculator().computeTelemetry(
+            entriesCount: Int.max,
+            deepWorkSeconds: .greatestFiniteMagnitude,
+            vocalStressFactor: .greatestFiniteMagnitude
+        )
+        XCTAssertEqual(huge.cognitiveStrain, 21)
+        XCTAssertGreaterThan(huge.focusMinutes, 0)
+        XCTAssertEqual(huge.readinessPercent, Optional(21))
+    }
+
+    func testHealthKitSnapshotPreservesSampleTimeAndSource() throws {
+        let measuredAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let metadata = HealthKitReadingMetadata(measuredAt: measuredAt, sourceName: "Apple Watch")
+        let temperatureMetadata = HealthKitReadingMetadata(measuredAt: measuredAt, sourceName: "Health app")
+        let snapshot = HealthKitTelemetrySnapshot(
+            hrvMs: 42,
+            hrvMetadata: metadata,
+            bodyTemperatureCelsius: 36.7,
+            bodyTemperatureMetadata: temperatureMetadata,
+            queriedAt: measuredAt.addingTimeInterval(600)
+        )
+
+        let encoded = try JSONEncoder().encode(snapshot)
+        let decoded = try JSONDecoder().decode(HealthKitTelemetrySnapshot.self, from: encoded)
+
+        XCTAssertEqual(decoded.hrvMetadata, metadata)
+        XCTAssertEqual(decoded.bodyTemperatureCelsius, 36.7)
+        XCTAssertEqual(decoded.bodyTemperatureMetadata, temperatureMetadata)
+        XCTAssertTrue(decoded.hasReadings)
+        XCTAssertEqual(decoded.queriedAt, snapshot.queriedAt)
+        XCTAssertTrue(HealthKitTelemetrySnapshot(bodyTemperatureCelsius: 36.7).hasReadings)
     }
 
     func testFutureLetterboxEngine() async {
@@ -115,14 +327,22 @@ final class SovereignOSFeaturesTests: XCTestCase {
         XCTAssertFalse(daily.quote.isEmpty)
     }
 
-    func testBinauralSynthesizer() async {
+    func testBinauralBeatPresetsUseStereoFrequencyOffsets() async throws {
         let synth = BinauralFocusSynthesizer()
-        await synth.setBeat(.gamma40Hz)
-        let isPlaying = await synth.togglePlayback()
-        XCTAssertTrue(isPlaying)
-
+        try await synth.setBeat(.alpha10Hz)
         let status = await synth.getStatus()
-        XCTAssertEqual(status.currentBeat, .gamma40Hz)
+        XCTAssertFalse(status.isPlaying, "The service must remain stopped until playback actually starts")
+        XCTAssertEqual(status.currentBeat, .alpha10Hz)
+        XCTAssertEqual(
+            status.currentBeat.rightChannelFrequencyHz - status.currentBeat.leftChannelFrequencyHz,
+            status.currentBeat.beatFrequencyHz,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            (status.currentBeat.rightChannelFrequencyHz + status.currentBeat.leftChannelFrequencyHz) / 2,
+            200,
+            accuracy: 0.0001
+        )
     }
 
     func testCircadianRhythmCoach() async {
@@ -163,18 +383,18 @@ final class SovereignOSFeaturesTests: XCTestCase {
         let coord = HealthKitTelemetryCoordinator()
         let snap = await coord.getLatestSnapshot()
 
-        XCTAssertGreaterThan(snap.hrvMs, 0)
-        XCTAssertGreaterThan(snap.restingHRBpm, 0)
-        XCTAssertGreaterThan(snap.recoveryScore, 0)
+        if let hrv = snap.hrvMs { XCTAssertGreaterThan(hrv, 0) }
+        if let rhr = snap.restingHRBpm { XCTAssertGreaterThan(rhr, 0) }
+        XCTAssertNil(snap.recoveryScore, "No unvalidated recovery score is emitted")
     }
 
     func testHealthKitService() async {
         let service = HealthKitService.shared
         let _ = await service.isAvailable()
         let snap = await service.fetchLiveTelemetrySnapshot()
-        XCTAssertGreaterThan(snap.hrvMs, 0)
-        XCTAssertGreaterThan(snap.restingHRBpm, 0)
-        XCTAssertGreaterThan(snap.recoveryScore, 0)
+        if let hrv = snap.hrvMs { XCTAssertGreaterThan(hrv, 0) }
+        if let rhr = snap.restingHRBpm { XCTAssertGreaterThan(rhr, 0) }
+        XCTAssertNil(snap.recoveryScore, "No unvalidated recovery score is emitted")
     }
 
     func testChronoPaletteEngine() async {
@@ -259,11 +479,6 @@ final class SovereignOSFeaturesTests: XCTestCase {
     }
 
     func testCategory3CryptoAndDefensiveEngines() async {
-        let shamir = ShamirKeyShardEngine()
-        let shards = await shamir.splitSecretIntoQuorum(secret: "SovereignMasterKey")
-        let isQuorum = await shamir.verifyQuorum(shards: [shards.shardA, shards.shardB])
-        XCTAssertTrue(isQuorum)
-
         let leak = AcousticLeakDetector()
         let hasLeak = await leak.scanHighFrequencies(maxDetectedFrequencyHz: 19500.0)
         XCTAssertTrue(hasLeak)

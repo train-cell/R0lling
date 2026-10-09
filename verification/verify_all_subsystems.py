@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 """
-R0lling Subsystem Verification Harness (Empirical Evidence)
-Validates:
-1. Data Model Schema & JSON Serialization (A01, A02)
-2. Media Attachment & Manifest Integrity (A03)
-3. Voice Command Regex Parser (A04)
-4. Rolling Buffer Circular Window & Keyframe Snapping Math (A05, A06)
-5. Obsidian Markdown & ID Tag Generation (A08, A09)
-6. Backup & Restore Deduplication Logic (A15)
-7. Error Handling & Bounds Checking (A16)
+Historical Python model examples, retained for illustration.
+These functions execute independent Python fixtures/formulas, not R0lling Swift.
+Their success is not product readiness, security/compliance, UI, or device evidence.
+Use the actual macOS Swift build/tests and Apple device checks for those claims.
 """
 
 import sys
@@ -146,7 +141,7 @@ def test_rolling_buffer_math():
     warmup_duration = short_latest - short_start["timestamp"]
     assert warmup_duration > 2.8 and warmup_duration <= 3.1, f"Warmup duration {warmup_duration}s mismatch"
 
-    print(f"    {PASS}: Keyframe alignment & warm-up buffer math verified.")
+    print(f"    {PASS}: Keyframe alignment & warm-up buffer math example assertions completed.")
 
 def test_obsidian_markdown_generation():
     print("[4] Testing Obsidian Vault Export & Conflict Hash...")
@@ -197,7 +192,7 @@ def test_obsidian_markdown_generation():
     assert updated_content in updated_doc, "Updated content not merged"
     assert updated_doc.count(marker_start) == 1, "Duplicate markers detected"
 
-    print(f"    {PASS}: Idempotent markdown merging & SHA256 hashing verified.")
+    print(f"    {PASS}: Idempotent markdown merging & SHA256 hashing example assertions completed.")
 
 def test_backup_restore_deduplication():
     print("[5] Testing Backup Manifest & Deduplication Logic...")
@@ -228,7 +223,7 @@ def test_backup_restore_deduplication():
     print(f"    {PASS}: Deduplication prevented collision & restored clean entry.")
 
 def test_super_features_20():
-    print("[6] Testing 20 Super Features Core Logic & Algorithms...")
+    print("[6] Running 20 illustrative Python examples for feature concepts (not Swift tests)...")
 
     # 1. Acoustic Trigger RMS Math
     samples = [0.05, -0.05, 0.08, -0.08, 0.9, -0.9, 0.85]
@@ -239,7 +234,7 @@ def test_super_features_20():
     threshold = -15.0
     is_triggered = dbfs > threshold
     assert is_triggered, f"Acoustic trigger should fire on loud burst ({dbfs:.1f} dBFS > {threshold} dBFS)"
-    print(f"    {PASS} [1/20] AcousticTrigger: RMS dBFS ({dbfs:.1f} dBFS) calculation & threshold verified.")
+    print(f"    {PASS} [1/20] AcousticTrigger: RMS dBFS ({dbfs:.1f} dBFS) calculation & threshold example assertions completed.")
 
     # 2. Head Double Nod Gesture Detection
     # Pitch angles over time: resting (~0) -> down (-18) -> up (+5) -> down (-17) -> up (0)
@@ -253,7 +248,7 @@ def test_super_features_20():
         elif p > -5.0 and in_nod:
             in_nod = False
     assert nods == 2, f"Double nod detector should register exactly 2 downward pitch oscillations, got {nods}"
-    print(f"    {PASS} [2/20] HeadGestureDetector: Pitch oscillation double-nod detector verified.")
+    print(f"    {PASS} [2/20] HeadGestureDetector: Pitch oscillation double-nod detector example assertions completed.")
 
     # 3. Spatial Audio Panning Math
     pan = 0.5  # 50% right
@@ -263,7 +258,7 @@ def test_super_features_20():
     power = (left_gain ** 2) + (right_gain ** 2)
     assert abs(power - 1.0) < 1e-4, "Equal-power spatial panning must preserve constant energy (L^2 + R^2 = 1.0)"
     assert right_gain > left_gain, "Pan to the right must produce higher right gain"
-    print(f"    {PASS} [3/20] SpatialAudioProcessor: Equal-power stereo spatialization math verified.")
+    print(f"    {PASS} [3/20] SpatialAudioProcessor: Equal-power stereo spatialization math example assertions completed.")
 
     # 4. Adaptive Battery Saver Streaming Strategy
     def get_stream_config(battery_level, is_charging):
@@ -279,7 +274,7 @@ def test_super_features_20():
     cfg_normal = get_stream_config(0.85, False)
     assert cfg_low["fps"] == 15 and cfg_low["bitrate_kbps"] == 1200, "Low battery must downgrade stream"
     assert cfg_normal["fps"] == 30, "Normal battery must keep 30fps"
-    print(f"    {PASS} [4/20] AdaptiveBatterySaver: Dynamic framerate and bitrate scaling verified.")
+    print(f"    {PASS} [4/20] AdaptiveBatterySaver: Dynamic framerate and bitrate scaling example assertions completed.")
 
     # 5. Earcon Audio Feedback Enums
     earcon_mappings = {
@@ -290,7 +285,7 @@ def test_super_features_20():
         "gameMissionAccomplished": 1025
     }
     assert len(earcon_mappings) == 5 and all(isinstance(v, int) for v in earcon_mappings.values())
-    print(f"    {PASS} [5/20] EarconFeedbackService: System sound mappings verified.")
+    print(f"    {PASS} [5/20] EarconFeedbackService: System sound mappings example assertions completed.")
 
     # 6. On-Device Vision OCR Bounding Box & Text Filter
     ocr_detections = [
@@ -300,7 +295,7 @@ def test_super_features_20():
     ]
     cleaned_tokens = [d["text"].strip() for d in ocr_detections if d["confidence"] >= 0.70 and len(d["text"].strip()) > 1]
     assert cleaned_tokens == ["STOP", "ODOS ERMOU"]
-    print(f"    {PASS} [6/20] OnDeviceVisionService: OCR confidence thresholding and token cleaning verified.")
+    print(f"    {PASS} [6/20] OnDeviceVisionService: OCR confidence thresholding and token cleaning example assertions completed.")
 
     # 7. Multi-Frame Keyframe Synthesis
     total_frames = 180  # 6 seconds at 30fps
@@ -309,7 +304,7 @@ def test_super_features_20():
     selected_indices = [step * (i + 1) for i in range(requested_samples)]
     assert len(selected_indices) == 4
     assert selected_indices == [36, 72, 108, 144]
-    print(f"    {PASS} [7/20] MultiFrameSynthesizer: Uniform temporal keyframe sampling verified.")
+    print(f"    {PASS} [7/20] MultiFrameSynthesizer: Uniform temporal keyframe sampling example assertions completed.")
 
     # 8. Jarvis Proximity Alerts Cooldown
     now = datetime.utcnow().timestamp()
@@ -324,7 +319,7 @@ def test_super_features_20():
     assert can_alert("Car approaching", now), "First alert should trigger"
     assert not can_alert("Car approaching", now + 30), "Repeated alert within cooldown must be suppressed"
     assert can_alert("Car approaching", now + 121), "Alert after cooldown must trigger"
-    print(f"    {PASS} [8/20] ProximityAlertManager: Deduplication cooldown mechanics verified.")
+    print(f"    {PASS} [8/20] ProximityAlertManager: Deduplication cooldown mechanics example assertions completed.")
 
     # 9. Voice Emotion Tagging (Prosody Scoring)
     def estimate_emotion(pitch_hz, energy_rms):
@@ -339,7 +334,7 @@ def test_super_features_20():
     assert estimate_emotion(280, 0.6) == "excited"
     assert estimate_emotion(110, 0.08) == "calm"
     assert estimate_emotion(170, 0.25) == "neutral"
-    print(f"    {PASS} [9/20] VoiceEmotionAnalyzer: Acoustic prosody classifier verified.")
+    print(f"    {PASS} [9/20] VoiceEmotionAnalyzer: Acoustic prosody classifier example assertions completed.")
 
     # 10. Local Entity Recognizer & Privacy Scrubber
     raw_transcript = "Συνάντησα τον Γιάννη στο τηλέφωνο 6971234567 και IBAN GR1201101250000000123456789"
@@ -347,7 +342,7 @@ def test_super_features_20():
     scrubbed = re.sub(r"\bGR\d{25}\b", "[IBAN_REDACTED]", scrubbed)
     assert "[PHONE_REDACTED]" in scrubbed and "[IBAN_REDACTED]" in scrubbed
     assert "6971234567" not in scrubbed
-    print(f"    {PASS} [10/20] LocalEntityRecognizer: PII redaction and entity regex parser verified.")
+    print(f"    {PASS} [10/20] LocalEntityRecognizer: PII redaction and entity regex parser example assertions completed.")
 
     # 11. Obsidian Canvas JSON Generation
     canvas_entries = [
@@ -376,7 +371,7 @@ def test_super_features_20():
     doc_content_modified = doc_content + "\n- Another bullet point."
     content_hash_2 = hashlib.sha256(doc_content_modified.encode("utf-8")).hexdigest()
     assert content_hash_1 != content_hash_2
-    print(f"    {PASS} [12/20] ObsidianFileWatcher: Hash-based content difference detection verified.")
+    print(f"    {PASS} [12/20] ObsidianFileWatcher: Hash-based content difference detection example assertions completed.")
 
     # 13. Dataview YAML Frontmatter
     frontmatter = """---
@@ -393,7 +388,7 @@ emotion: excited
     assert yaml_lines[0] == "---" and yaml_lines[-1] == "---"
     assert any("duration: 10.5" in l for l in yaml_lines)
     assert any("emotion: excited" in l for l in yaml_lines)
-    print(f"    {PASS} [13/20] DataviewYAMLFrontmatter: Standard Obsidian YAML metadata compliance verified.")
+    print(f"    {PASS} [13/20] DataviewYAMLFrontmatter: Standard Obsidian YAML metadata compliance example assertions completed.")
 
     # 14. Daily Audio Digest Podcast Script Generation
     entries_for_day = [
@@ -405,7 +400,7 @@ emotion: excited
     podcast_outro = "Αυτή ήταν η ημέρα σου. Καλή ξεκούραση!"
     full_script = podcast_intro + podcast_body + podcast_outro
     assert "09:15" in full_script and "14:20" in full_script
-    print(f"    {PASS} [14/20] DailyPodcastGenerator: Script synthesis and narration flow verified.")
+    print(f"    {PASS} [14/20] DailyPodcastGenerator: Script synthesis and narration flow example assertions completed.")
 
     # 15. Scavenger Hunt Streak State Machine
     class StreakTracker:
@@ -439,7 +434,7 @@ emotion: excited
     assert st.streak == 7 and "Silver Scout (7d)" in st.badges
     st.record(10)  # Missed days 8, 9
     assert st.streak == 1, "Streak should reset after missed days"
-    print(f"    {PASS} [15/20] ScavengerHuntStreakManager: Daily continuity, streak break, & badge rewards verified.")
+    print(f"    {PASS} [15/20] ScavengerHuntStreakManager: Daily continuity, streak break, & badge rewards example assertions completed.")
 
     # 16. Time Capsule Engine
     today_dt = datetime(2026, 10, 6)
@@ -456,7 +451,7 @@ emotion: excited
     assert len(capsule_hits) == 2
     assert capsule_hits[0][0] == "entry-2025" and "1 έτη" in capsule_hits[0][1]
     assert capsule_hits[1][0] == "entry-2024" and "2 έτη" in capsule_hits[1][1]
-    print(f"    {PASS} [16/20] TimeCapsuleEngine: 'Σαν Σήμερα' anniversary lookup verified.")
+    print(f"    {PASS} [16/20] TimeCapsuleEngine: 'Σαν Σήμερα' anniversary lookup example assertions completed.")
 
     # 17. Highlight Reel Muxing Composition Math
     clips = [
@@ -475,7 +470,7 @@ emotion: excited
             acc_dur += c["duration"]
     assert len(reel) == 3  # c1 (10s) + c3 (15s) + c2 (5s) = 30.0s <= 30.0s
     assert acc_dur == 30.0
-    print(f"    {PASS} [17/20] HighlightReelMuxer: Top-rated clips composition algorithm verified.")
+    print(f"    {PASS} [17/20] HighlightReelMuxer: Top-rated clips composition algorithm example assertions completed.")
 
     # 18. P2P Watermark Metadata Burn-in Structure
     export_metadata = {
@@ -488,7 +483,7 @@ emotion: excited
     }
     assert export_metadata["appName"] == "R0lling v1.0"
     assert export_metadata["overlayPosition"] == "bottom-right"
-    print(f"    {PASS} [18/20] ClipWatermarkExporter: Metadata burn-in schema and positioning verified.")
+    print(f"    {PASS} [18/20] ClipWatermarkExporter: Metadata burn-in schema and positioning example assertions completed.")
 
     # 19. Metal Zero-Copy Frame Pool Circular Buffer
     pool_size = 16
@@ -504,7 +499,7 @@ emotion: excited
     # Recycle slot 0
     pool[0]["in_use"] = False
     assert pool[0]["in_use"] is False
-    print(f"    {PASS} [19/20] MetalFrameBufferPool: Circular zero-copy allocation & release verified.")
+    print(f"    {PASS} [19/20] MetalFrameBufferPool: Circular zero-copy allocation & release example assertions completed.")
 
     # 20. Apple Watch Connectivity Message Protocol
     watch_packet = {
@@ -517,10 +512,10 @@ emotion: excited
     decoded_packet = json.loads(packet_json)
     assert decoded_packet["opCode"] == "TRIGGER_CLIP"
     assert decoded_packet["requestedSeconds"] == 10.0
-    print(f"    {PASS} [20/20] WatchConnectivityCoordinator: Binary/JSON WCSession packet contract verified.")
+    print(f"    {PASS} [20/20] WatchConnectivityCoordinator: Binary/JSON WCSession packet contract example assertions completed.")
 
 def test_nextgen_batch_7():
-    print("[7] Testing 7 Next-Gen Super Features (3, 4, 8, 11, 12, 13, 16)...")
+    print("[7] Running 7 illustrative Python examples for next-gen concepts (not Swift tests)...")
 
     # [1/7] Idea 3: Pseudo lexical vector search (FNV · όχι MobileCLIP weights)
     import math
@@ -535,7 +530,7 @@ def test_nextgen_batch_7():
 
     assert abs(cosine_sim(vec_a, vec_b) - 1.0) < 1e-5, "Identical normalized vectors must yield 1.0"
     assert abs(cosine_sim(vec_a, vec_c)) < 1e-5, "Orthogonal vectors must yield 0.0 similarity"
-    print(f"    {PASS} [1/7] PseudoLexicalVectorSearchEngine: 512-dim Cosine similarity & ranking verified.")
+    print(f"    {PASS} [1/7] PseudoLexicalVectorSearchEngine: 512-dim Cosine similarity & ranking example assertions completed.")
 
     # [2/7] Idea 4: Conversational Turn-Taking Guard
     silence_threshold_ms = 600.0
@@ -548,7 +543,7 @@ def test_nextgen_batch_7():
     current_time_2 = 1000.650 # 650ms elapsed
     can_speak_2 = (not speech_active) or ((current_time_2 - last_speech_time) * 1000.0 >= silence_threshold_ms)
     assert can_speak_2, "Jarvis MUST be allowed to speak after >600ms silence"
-    print(f"    {PASS} [2/7] TurnTakingGuard: Natural pause silence window (600ms) logic verified.")
+    print(f"    {PASS} [2/7] TurnTakingGuard: Natural pause silence window (600ms) logic example assertions completed.")
 
     # [3/7] Idea 8: Remote Mirror Stream Server (Packet serialization)
     packet_body = {
@@ -568,7 +563,7 @@ def test_nextgen_batch_7():
     received_json = json.loads(wire_bytes[9:9+received_len].decode("utf-8"))
     assert received_json["sequenceNumber"] == 42
     assert received_json["payloadBase64"] == "SGVsbG8gVmlzaW9uIFBybw=="
-    print(f"    {PASS} [3/7] RemoteMirrorStreamServer: Low-latency frame framing & wire protocol verified.")
+    print(f"    {PASS} [3/7] RemoteMirrorStreamServer: Low-latency frame framing & wire protocol example assertions completed.")
 
     # [4/7] Idea 11: Associative Knowledge Graph (RDF Triples)
     triples = [
@@ -583,7 +578,7 @@ def test_nextgen_batch_7():
     mermaid_doc = "\n".join(mermaid_lines)
     assert 'User["User"] -->|"metWith"| Andreas["Andreas"]' in mermaid_doc
     assert 'graph TD' in mermaid_doc
-    print(f"    {PASS} [4/7] AssociativeKnowledgeGraphEngine: Semantic RDF Triples & Mermaid graph syntax verified.")
+    print(f"    {PASS} [4/7] AssociativeKnowledgeGraphEngine: Semantic RDF Triples & Mermaid graph syntax example assertions completed.")
 
     # [5/7] Idea 12: Hyper-lapse Trip Compressor
     def haversine_dist(lat1, lon1, lat2, lon2):
@@ -608,7 +603,7 @@ def test_nextgen_batch_7():
         if d >= min_disp:
             selected_points.append(pt)
     assert len(selected_points) == 3, f"Expected 3 points after 12m decimation, got {len(selected_points)}"
-    print(f"    {PASS} [5/7] HyperlapseTripCompressor: GPS geographic decimation (12m filter) verified.")
+    print(f"    {PASS} [5/7] HyperlapseTripCompressor: GPS geographic decimation (12m filter) example assertions completed.")
 
     # [6/7] Idea 13: Local Whisper Offline Fallback
     pcm_bytes = b"\x00" * 32000 # 32000 bytes = 16000 samples = exactly 1.0 second at 16kHz 16-bit mono
@@ -616,7 +611,7 @@ def test_nextgen_batch_7():
     bytes_per_sample = 2
     audio_duration_sec = len(pcm_bytes) / (sample_rate * bytes_per_sample)
     assert audio_duration_sec == 1.0, f"Expected 1.0s, got {audio_duration_sec}s"
-    print(f"    {PASS} [6/7] LocalWhisperOfflineService: 16kHz PCM audio buffer duration math verified.")
+    print(f"    {PASS} [6/7] LocalWhisperOfflineService: 16kHz PCM audio buffer duration math example assertions completed.")
 
     # [7/7] Idea 16: Meal & Nutrition Visual Logger
     food_tokens = ["salad", "chicken", "coffee"]
@@ -633,10 +628,10 @@ def test_nextgen_batch_7():
     assert abs(tot_prot - 61.2) < 1e-4
     assert abs(tot_carbs - 12.8) < 1e-4
     assert abs(tot_fat - 29.1) < 1e-4
-    print(f"    {PASS} [7/7] MealNutritionVisionLogger: Macronutrient aggregation (615 kcal) verified.")
+    print(f"    {PASS} [7/7] MealNutritionVisionLogger: Macronutrient aggregation (615 kcal) example assertions completed.")
 
 def test_sovereign_life_os_30():
-    print("[8] Testing Sovereign Life OS (Bevel x Discord 30 Active Features Suite)...")
+    print("[8] Running 15 illustrative Python examples for Sovereign Life OS concepts (not active feature tests)...")
     
     # 1. Chief of Staff Jarvis parsing
     stream = "! Urgent: Finish Swift 6 refactoring\n- Verify Bevel rings\nRegular note"
@@ -650,14 +645,14 @@ def test_sovereign_life_os_30():
         else:
             priorities.append("low")
     assert priorities == ["high", "medium", "low"]
-    print(f"    {PASS} [1/15] ChiefOfStaffService: Stream of consciousness priority classification verified.")
+    print(f"    {PASS} [1/15] ChiefOfStaffService: Stream of consciousness priority classification example assertions completed.")
 
     # 2. Zettelkasten Linker lexical similarity
     query_tokens = {"software", "architecture", "principles", "design"}
     note_tokens = {"principles", "of", "software", "architecture"}
     jaccard = len(query_tokens.intersection(note_tokens)) / len(query_tokens.union(note_tokens))
     assert jaccard > 0.4
-    print(f"    {PASS} [2/15] ZettelkastenLinkerActor: Lexical Jaccard association indexing verified.")
+    print(f"    {PASS} [2/15] ZettelkastenLinkerActor: Lexical Jaccard association indexing example assertions completed.")
 
     # 3. Cognitive Readiness Bevel Telemetry Math
     entries_count = 5
@@ -667,20 +662,20 @@ def test_sovereign_life_os_30():
     readiness = max(15, min(100, 100 - int(strain * 3.8)))
     assert strain == 11.2
     assert readiness == 58
-    print(f"    {PASS} [3/15] CognitiveReadinessCalculator: Bevel 3-Ring strain (11.2) & readiness (58%) telemetry verified.")
+    print(f"    {PASS} [3/15] CognitiveReadinessCalculator: Bevel 3-Ring strain (11.2) & readiness (58%) telemetry example assertions completed.")
 
     # 4. Decision Journal 90-day audit date math
     now = datetime(2026, 10, 8)
     review_date = datetime(2027, 1, 6) # ~90 days
     delta_days = (review_date - now).days
     assert delta_days == 90
-    print(f"    {PASS} [4/15] DecisionJournalEngine: 90-day bias audit calendar scheduling verified.")
+    print(f"    {PASS} [4/15] DecisionJournalEngine: 90-day bias audit calendar scheduling example assertions completed.")
 
     # 5. Future Letterbox sealed state
     unlock_date = datetime(2026, 12, 1)
     is_unlocked = now >= unlock_date
     assert is_unlocked is False
-    print(f"    {PASS} [5/15] FutureLetterboxEngine: Temporal sealed cryptographic gating verified.")
+    print(f"    {PASS} [5/15] FutureLetterboxEngine: Temporal sealed cryptographic gating example assertions completed.")
 
     # 6. Circadian Rhythm Huberman offsets
     wake = datetime(2026, 10, 8, 7, 0)
@@ -688,7 +683,7 @@ def test_sovereign_life_os_30():
     melatonin_window = wake.replace(hour=21, minute=0) # 14 hours
     assert (caffeine_cutoff - wake).total_seconds() == 9 * 3600
     assert (melatonin_window - wake).total_seconds() == 14 * 3600
-    print(f"    {PASS} [6/15] CircadianRhythmCoach: Light exposure & caffeine cutoff intervals verified.")
+    print(f"    {PASS} [6/15] CircadianRhythmCoach: Light exposure & caffeine cutoff intervals example assertions completed.")
 
     # 7. Gym Iron Volume Tonnage Math
     sets = [
@@ -698,17 +693,17 @@ def test_sovereign_life_os_30():
     ]
     tot_tonnage = sum(s["weight"] * s["reps"] for s in sets)
     assert tot_tonnage == 2160.0
-    print(f"    {PASS} [7/15] GymVoiceLoggerService: Rep-by-weight iron tonnage (2,160 kg) verified.")
+    print(f"    {PASS} [7/15] GymVoiceLoggerService: Rep-by-weight iron tonnage (2,160 kg) example assertions completed.")
 
     # 8. Box Breathing 4-Phase Cyclic State Machine
     phases = ["Inhale (4s)", "Hold (4s)", "Exhale (4s)", "Hold Empty (4s)"]
     assert len(phases) == 4
-    print(f"    {PASS} [8/15] BoxBreathingGuide: 4x4 cyclic autonomic regulation sequence verified.")
+    print(f"    {PASS} [8/15] BoxBreathingGuide: 4x4 cyclic autonomic regulation sequence example assertions completed.")
 
     # 9. HealthKit Telemetry Snapshot Contract
     health = {"hrv": 68.0, "rhr": 54, "spo2": 98.5, "score": 88}
     assert health["score"] >= 80 and health["spo2"] > 95
-    print(f"    {PASS} [9/15] HealthKitTelemetryCoordinator: Biomarker telemetry normalization verified.")
+    print(f"    {PASS} [9/15] HealthKitTelemetryCoordinator: Biomarker telemetry normalization example assertions completed.")
 
     # 10. Chrono-Palette Solar Hue Interpolation
     def get_chrono_color(hour):
@@ -721,7 +716,7 @@ def test_sovereign_life_os_30():
     assert get_chrono_color(12) == "#00E5FF"
     assert get_chrono_color(20) == "#A78BFA"
     assert get_chrono_color(23) == "#7742DC"
-    print(f"    {PASS} [10/15] ChronoPaletteEngine: Diurnal circadian accent color shifting verified.")
+    print(f"    {PASS} [10/15] ChronoPaletteEngine: Diurnal circadian accent color shifting example assertions completed.")
 
     # 11. Multi-Format Content Transformation
     idea = "Execution eats strategy for breakfast."
@@ -729,7 +724,7 @@ def test_sovereign_life_os_30():
     linkedin_post = f"💡 Thought: {idea}"
     newsletter = f"## Weekly: {idea}"
     assert len(linkedin_post) > len(idea)
-    print(f"    {PASS} [11/15] ContentFormatTransformer: 3-way multi-platform syntax generation verified.")
+    print(f"    {PASS} [11/15] ContentFormatTransformer: 3-way multi-platform syntax generation example assertions completed.")
 
     # 12. Spatial Audio Memory Proximity Trigger
     def distance_m(lat1, lon1, lat2, lon2):
@@ -740,21 +735,21 @@ def test_sovereign_life_os_30():
     user_lat, user_lon = 37.9755, 23.7362
     dist = distance_m(mem_lat, mem_lon, user_lat, user_lon)
     assert dist < 30.0 # triggers proximity beacon
-    print(f"    {PASS} [12/15] GeoAudioMemoryCoordinator: 2D Spatial distance earcon triggering verified.")
+    print(f"    {PASS} [12/15] GeoAudioMemoryCoordinator: 2D Spatial distance earcon triggering example assertions completed.")
 
     # 13. Subconscious Dream Pattern Extractor
     dream_str = "Ονειρεύτηκα ότι πετούσα πάνω από τη θάλασσα και έγραφα κώδικα"
     stems = ["θάλασσ", "κώδικ", "πετ"]
     matched_stems = [s for s in stems if s in dream_str]
     assert len(matched_stems) == 3
-    print(f"    {PASS} [13/15] DreamPatternMatcher: Subconscious recurrent keyword clustering verified.")
+    print(f"    {PASS} [13/15] DreamPatternMatcher: Subconscious recurrent keyword clustering example assertions completed.")
 
     # 14. Logic Fallacy Auditor
     arg = "Όλοι οι άνθρωποι κάνουν πάντα το ίδιο λάθος αφού έχω ήδη ξοδέψει τόσα χρήματα."
     has_black_white = "πάντα" in arg or "όλοι" in arg
     has_sunk_cost = "έχω ήδη ξοδέψει" in arg
     assert has_black_white and has_sunk_cost
-    print(f"    {PASS} [14/15] LogicFallacyChecker: Black-or-white & Sunk-cost bias detection verified.")
+    print(f"    {PASS} [14/15] LogicFallacyChecker: Black-or-white & Sunk-cost bias detection example assertions completed.")
 
     # 15. Discord x Bevel Theme Token Integrity
     tokens = {
@@ -772,11 +767,11 @@ def test_sovereign_life_os_30():
     assert tokens["bgPrimary"] == "#16161D"
     assert tokens["accentCyan"] == "#00E5FF"
     assert tokens["statusError"] == "#FF6B7A"
-    print(f"    {PASS} [15/15] R0llingTheme: Full Bevel x Discord token adherence (0 orange in UI) verified.")
+    print(f"    {PASS} [15/15] R0llingTheme: Full Bevel x Discord token adherence (0 orange in UI) example assertions completed.")
 
 def test_sovereign_extended_40():
-    print("[9] Testing 40 Sovereign Extended Engines Suite across 5 Categories...")
-    # Category 1: Neuro-Cognitive (8 Engines)
+    print("[9] Running 40 illustrative Python examples for Extended feature concepts (not Swift actor tests)...")
+    # Category 1: Neuro-Cognitive (8 illustrative examples)
     # 1. DopaminePacer
     switches = 16
     state = "Dopamine Reset Advised" if switches > 15 else "Regulated"
@@ -805,7 +800,7 @@ def test_sovereign_extended_40():
     wake_h = 7.0
     focus_start = wake_h + 2.5
     assert focus_start == 9.5
-    print(f"    {PASS} [Cat 1: 8/8] Neuro-Cognitive Engines verified.")
+    print(f"    {PASS} [Cat 1: 8/8] Neuro-Cognitive model examples completed.")
 
     # Category 2: Biomechanical & Athletic (8 Engines)
     # 9. BarbellVelocity
@@ -836,7 +831,7 @@ def test_sovereign_extended_40():
     fast_h = 18.5
     stage = "Autophagy Active (16-24h)" if fast_h >= 16.0 else "Mild Ketosis"
     assert stage == "Autophagy Active (16-24h)"
-    print(f"    {PASS} [Cat 2: 8/8] Biomechanical & Athletic Engines verified.")
+    print(f"    {PASS} [Cat 2: 8/8] Biomechanical & Athletic model examples completed.")
 
     # Category 3: Cryptography & Defensive (8 Engines)
     # 17. ShamirKeyShard
@@ -865,7 +860,7 @@ def test_sovereign_extended_40():
     # 24. ProofOfExistence
     sha = "SHA256-DIGEST-OK"
     assert sha.startswith("SHA256")
-    print(f"    {PASS} [Cat 3: 8/8] Cryptography & Defensive Engines verified.")
+    print(f"    {PASS} [Cat 3: 8/8] Cryptography & Defensive model examples completed.")
 
     # Category 4: Executive Operations (8 Engines)
     # 25. NegotiationRehearsal
@@ -894,7 +889,7 @@ def test_sovereign_extended_40():
     wins = 4
     pts = wins * 10
     assert pts == 40
-    print(f"    {PASS} [Cat 4: 8/8] Executive Operations Engines verified.")
+    print(f"    {PASS} [Cat 4: 8/8] Executive Operations model examples completed.")
 
     # Category 5: Sensory & Creative (8 Engines)
     # 33. AcousticSoundscape
@@ -922,10 +917,10 @@ def test_sovereign_extended_40():
     # 40. GenerationalLegacy
     seal = "LEGACY-SEAL-ARCHIVE"
     assert seal.startswith("LEGACY")
-    print(f"    {PASS} [Cat 5: 8/8] Sensory & Creative Engines verified.")
+    print(f"    {PASS} [Cat 5: 8/8] Sensory & Creative model examples completed.")
 
 def test_personalized_sovereign_40():
-    print("[10] Testing 40 Personalized Sovereign Engines Suite (SW, ECE, SOV, BIO, WEAR)...")
+    print("[10] Running 40 illustrative Python examples for Personalized concepts (not Swift actor tests)...")
 
     # Pillar 1: Swim & Kinetic Mastery (SW-01 to SW-08)
     # SW-01: DPS & Cadence
@@ -958,7 +953,7 @@ def test_personalized_sovereign_40():
     carbs = int(650 * 0.15)
     protein = carbs // 4
     assert carbs >= 90 and protein >= 20
-    print(f"    {PASS} [Pillar 1: 8/8] Swim & Kinetic Mastery Engines verified.")
+    print(f"    {PASS} [Pillar 1: 8/8] Swim & Kinetic Mastery model examples completed.")
 
     # Pillar 2: ECE & System Architecture (ECE-01 to ECE-08)
     # ECE-01: Datapath Signals
@@ -989,7 +984,7 @@ def test_personalized_sovereign_40():
     # ECE-08: Virtual Memory EAT
     eat = 0.98 * (10.0 + 100.0) + 0.02 * (10.0 + 200.0 + 0.001 * 8000000.0)
     assert eat > 100.0
-    print(f"    {PASS} [Pillar 2: 8/8] ECE & System Architecture Engines verified.")
+    print(f"    {PASS} [Pillar 2: 8/8] ECE & System Architecture model examples completed.")
 
     # Pillar 3: Sovereign OS Core (SOV-01 to SOV-08)
     # SOV-01: Obsidian Atomizer
@@ -1016,7 +1011,7 @@ def test_personalized_sovereign_40():
     # SOV-08: Git Semantic Commits
     commit_msg = "feat(swim-core): add stroke cadence pacer"
     assert commit_msg.startswith("feat(")
-    print(f"    {PASS} [Pillar 3: 8/8] Sovereign OS Core Engines verified.")
+    print(f"    {PASS} [Pillar 3: 8/8] Sovereign OS Core model examples completed.")
 
     # Pillar 4: Circadian & Autonomic Telemetry (BIO-01 to BIO-08)
     # BIO-01: Autonomic Tone
@@ -1043,7 +1038,7 @@ def test_personalized_sovereign_40():
     # BIO-08: Blue Light Shield
     is_blue_shield = (22 * 60) >= (21 * 60 + 30)
     assert is_blue_shield is True
-    print(f"    {PASS} [Pillar 4: 8/8] Circadian & Autonomic Telemetry Engines verified.")
+    print(f"    {PASS} [Pillar 4: 8/8] Circadian & Autonomic Telemetry model examples completed.")
 
     # Pillar 5: Wearable Augmentation (WEAR-01 to WEAR-08)
     # WEAR-01: Head Gestures
@@ -1071,11 +1066,12 @@ def test_personalized_sovereign_40():
     # WEAR-08: Emergency Privacy Cloak
     cloak_active = True
     assert cloak_active is True
-    print(f"    {PASS} [Pillar 5: 8/8] Wearable Augmentation Engines verified.")
+    print(f"    {PASS} [Pillar 5: 8/8] Wearable Augmentation model examples completed.")
 
 def main():
     print("=" * 70)
-    print("⚡ R0lling Empirical Subsystem Verification Suite")
+    print("R0lling Python Model Examples (no Swift execution)")
+    print("WARNING: independent Python examples; no Swift modules or hardware are exercised.")
     print("=" * 70)
     test_data_model_and_json()
     test_voice_command_parser()
@@ -1088,7 +1084,7 @@ def main():
     test_sovereign_extended_40()
     test_personalized_sovereign_40()
     print("=" * 70)
-    print("🎉 ALL 10 TEST PHASES (122 MODULES TOTAL) PASSED EMPIRICALLY (100% SUCCESS).")
+    print("Python example assertions completed. Swift behavior, security, UI and hardware remain unverified by this script.")
     print("=" * 70)
 
 if __name__ == "__main__":

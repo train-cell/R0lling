@@ -144,9 +144,9 @@ def test_g5_001_highlight_no_byte_concat() -> None:
         "exports via AVAssetExportSession",
     )
     check(
-        "moov guard",
-        "moov" in src and "3105" in src,
-        "fail-closed without moov",
+        "AVFoundation playability guard",
+        "load(.isPlayable)" in src and "3105" in src,
+        "fail-closed when exported composition is not playable",
     )
 
 
@@ -294,7 +294,8 @@ def test_sec_surgical_patches() -> None:
     )
     check(
         "Settings validates URLs",
-        "validateHermesURL" in settings and "validateDirectURL" in settings,
+        ("validateHermesURL" in settings and "validateDirectURL" in settings)
+        or ("validateEndpointForSaving" in settings and "validateEndpointForSaving" in read("Sources/R0lling/AI/AIRouter.swift")),
         "UI fail-closed before persist",
     )
     check(
@@ -449,7 +450,13 @@ def test_a04_a14_voice_game_ready() -> None:
 
     check("A04 dedup state", "lastHandledTranscript" in voice and "paraThyroDedupDeuterolepta" in voice, "dedup")
     check("A04 SpeechStopResult", "SpeechStopResult" in voice and "commandHandled" in voice, "stop result enum")
-    check("A04 final-only speech", "result.isFinal" in speech and "didDispatchCommandThisUtterance" in speech, "final gate")
+    check(
+        "A04 final-only speech",
+        "result.isFinal" in speech
+        and "processFinalTranscript" in speech
+        and "utteranceResolver.stop(transcript:" in speech,
+        "final callback and one-shot stop resolution",
+    )
     check(
         "A04 iOS Speech not Meta mic",
         "SFSpeechRecognizer" in speech
@@ -524,16 +531,22 @@ def test_obsidian_a08_a09_ready() -> None:
         "UI conflict flow",
     )
     check(
-        "A09 Agent PathAsfaleia",
-        "PathAsfaleia.asfalhs_resolved_url" in agent and "asfales_agent_file_url" in agent,
-        "agent folder guarded",
+        "A09 Agent descriptor-relative no-follow access",
+        "openat" in agent
+        and "O_NOFOLLOW" in agent
+        and "renameat" in agent
+        and "linkat" in agent
+        and "pinnedVaultIdentity" in agent
+        and "expectedVaultIdentity" in agent,
+        "Agent reads/writes stay descriptor-relative and reject a replaced pinned vault",
     )
     check(
         "A08/A09 XCTest coverage",
         "testHashPersistenceDetectsConflictAfterRestart" in tests
         and "testA08DoubleExportIdempotentBatch" in tests
-        and "testPathAsfaleiaRejectsTraversalOnVaultWrite" in tests,
-        "restart + double export + traversal",
+        and "testPathAsfaleiaRejectsTraversalOnVaultWrite" in tests
+        and "testAgentMemoryRejectsVaultDirectoryReplacement" in tests,
+        "restart + double export + traversal + Agent vault replacement",
     )
     check(
         "Canvas/KG via PathAsfaleia",
@@ -582,7 +595,7 @@ def test_a15_a16_backup_permissions_ready() -> None:
         "A15 XCTest clean sandbox + media + agent",
         "testRestorePreservesIdsMediaAndAgentMemory" in tests
         and "testSecondRestoreDoesNotDuplicateIds" in tests
-        and "testRestoreSkipsTraversalMediaPaths" in tests,
+        and "testRestoreRejectsTraversalMediaPathsAtomically" in tests,
         "restore DoD tests",
     )
     check(
@@ -600,13 +613,16 @@ def test_a15_a16_backup_permissions_ready() -> None:
         "disk full path",
     )
     check(
-        "A16/P0-05 Info.plist privacy strings",
-        "NSCameraUsageDescription" in plist
-        and "NSMicrophoneUsageDescription" in plist
+        "A16/P0-05 active and reserved Info.plist privacy strings",
+        "NSMicrophoneUsageDescription" in plist
         and "NSSpeechRecognitionUsageDescription" in plist
+        and "NSPhotoLibraryUsageDescription" in plist
         and "NSLocalNetworkUsageDescription" in plist
-        and "NSBluetoothAlwaysUsageDescription" in plist,
-        "installable app privacy keys",
+        and "NSHealthShareUsageDescription" in plist
+        and "NSCameraUsageDescription" in plist
+        and "NSBluetoothAlwaysUsageDescription" in plist
+        and "δεν είναι διαθέσιμη" in plist,
+        "implemented flow descriptions and explicitly unavailable future capabilities; presence is not implementation evidence",
     )
     check(
         "P0-05 Apps/R0llingApp scaffold README",
@@ -617,7 +633,8 @@ def test_a15_a16_backup_permissions_ready() -> None:
         "P0-01 GHA swift test + python verify",
         "swift test" in gha
         and "python-verify" in gha
-        and "diagnose_stage5_finalize.py" in gha
+        and "verify_all_subsystems.py" in gha
+        and "verify_theme_apple_meta_compliance.py" in gha
         and "upload-artifact" in gha,
         "CI workflow ready for Mac proof",
     )

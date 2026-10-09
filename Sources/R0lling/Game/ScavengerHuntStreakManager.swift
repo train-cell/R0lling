@@ -17,14 +17,29 @@ public final class ScavengerHuntStreakManager: @unchecked Sendable {
     }
 
     private var streakData: StreakData
-    private let userDefaultsKey = "r0lling.scavenger_streak_data"
+    private let userDefaults: UserDefaults
+    private let userDefaultsKey: String
+    private let canPersist: Bool
 
-    public init() {
-        if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
-           let decoded = try? JSONDecoder().decode(StreakData.self, from: data) {
-            self.streakData = decoded
+    public init(
+        userDefaults: UserDefaults = .standard,
+        storageKey: String = "r0lling.scavenger_streak_data"
+    ) {
+        self.userDefaults = userDefaults
+        self.userDefaultsKey = storageKey
+        if let data = userDefaults.data(forKey: storageKey) {
+            do {
+                self.streakData = try JSONDecoder().decode(StreakData.self, from: data)
+                self.canPersist = true
+            } catch {
+                // Keep unreadable persisted bytes intact instead of replacing history with defaults.
+                self.streakData = StreakData()
+                self.canPersist = false
+                print("[ScavengerHunt] Stored streak data could not be decoded: \(error.localizedDescription)")
+            }
         } else {
             self.streakData = StreakData()
+            self.canPersist = true
         }
     }
 
@@ -41,8 +56,12 @@ public final class ScavengerHuntStreakManager: @unchecked Sendable {
     }
 
     /// Καταγραφή ολοκλήρωσης σημερινής αποστολής (ημερολογιακά κλειδιά σε ρητό TimeZone).
-    /// `didPersist` = false αν το UserDefaults encode απέτυχε (όχι silent data loss).
+    /// `didPersist` = false αν υπάρχει corrupt persisted state ή το UserDefaults encode απέτυχε.
     public func recordMissionCompleted(date: Date = Date(), timeZone: TimeZone = .current) -> (newStreak: Int, newlyUnlockedBadge: String?, didPersist: Bool) {
+        guard canPersist else {
+            return (streakData.currentStreak, nil, false)
+        }
+
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -89,9 +108,10 @@ public final class ScavengerHuntStreakManager: @unchecked Sendable {
 
     @discardableResult
     private func save() -> Bool {
+        guard canPersist else { return false }
         do {
             let encoded = try JSONEncoder().encode(streakData)
-            UserDefaults.standard.set(encoded, forKey: userDefaultsKey)
+            userDefaults.set(encoded, forKey: userDefaultsKey)
             return true
         } catch {
             print("[ScavengerHunt] Persist failed: \(error.localizedDescription)")

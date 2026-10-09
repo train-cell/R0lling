@@ -1,4 +1,8 @@
-# R0lling — Code Quality / Debt Audit
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
+# R0lling — Historical Code Quality / Debt Audit (2026-10-06)
+
+> Archived snapshot: counts, source findings, and statuses below describe an earlier checkout and are not current. Use `IMPLEMENTATION_STATUS.md`, `CAPABILITY_MATRIX.md`, and `FINDINGS_REMEDIATION.md` for current evidence.
 
 **Lane:** Code quality · honesty bugs · dead code · AppState · tests · Gemini scaffolding  
 **Ημερομηνία:** 2026-10-06 ~17:50 EEST  
@@ -101,7 +105,7 @@ Force unwrap / try?   ████
 | Site | Risk | Priority |
 |---|---|---|
 | `JSONFileStorageService` / `AgentFolderManager` / `MediaStorage` `.first!` για Documents | Crash αν sandbox σπάσει (σπάνιο) | P2 → `guard let` |
-| `HighlightReelMuxer` `"moov".data(using:)!` | Static ASCII — πρακτικά safe | P2 |
+| `HighlightReelMuxer` `"moov".data(using:)!` | Resolved: byte sniff removed; AVFoundation validates the exported asset with `isPlayable` | Closed in current source |
 | `RollingBufferService` `samples.last!` μετά `guard !isEmpty` | Τοπικά ασφαλές | OK |
 | `OnDeviceVisionService` `try? handler.perform` | Silent vision fail | P1 |
 | `ScavengerHuntStreakManager` encode `try?` | Χάσιμο streak χωρίς σήμα | P1 |
@@ -202,7 +206,7 @@ Force unwrap / try?   ████
 1. `MobileCLIPVectorSearchEngine.cosineSimilarity` → `zip` + `reduce` (ίδια συμπεριφορά).  
 2. `AssociativeKnowledgeGraphEngine.sanitizeIdentifier` → `CharacterSet` filter once.  
 3. AppState clip/note Obsidian export → ιδιωτικό `exportToObsidianOrWarn(_:)`.  
-4. Μην «απλοποιήσεις» μακριά τα fail-closed guards (Whisper stub, moov probe, empty KG).
+4. Μην «απλοποιήσεις» μακριά τα fail-closed guards (Whisper stub, AVFoundation playability validation, empty KG).
 
 ---
 

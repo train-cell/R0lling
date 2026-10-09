@@ -1,72 +1,22 @@
-# R0lling — GOAL 100 Progress (CreateGoal SW close)
+# GOAL 100 — current completion status
 
-```yaml
-Last_Modified: 2026-10-06T19:50:00+03:00
-lane: create-goal-sw-endstate
-matrix: docs/GOAL_100_FEATURE_MATRIX.md
-canonical_audit: docs/AUDIT_FINAL.md
-git_commit: NONE
-SOFTWARE_OBJECTIVE_SATISFIED: true
-```
+Updated: 2026-10-09. Baseline inspected: `5e9f4d3890406ed82a40710b933a0be756e6808d`. Remediation is local and uncommitted.
 
 ## Verdict
 
-**`SOFTWARE_OBJECTIVE_SATISFIED=true`**
+**NOT VERIFIED / INCOMPLETE.** Source code contains paths for many planned features. The full Swift XCTest target, Apple build, iPhone/Gen 2 session, and rendered UI comparison have not run during this work. Three pure-model/readiness XCTest cases ran in an isolated Linux harness; that subset does not establish that every feature works.
 
-Όλα τα **software** P0/P1 από AUDIT_FINAL + objective κλείστηκαν με file evidence.  
-Device / Mac `swift test` = **honest BLOCKED** με actionable checklists — **όχι** fake 100%.  
-Parent κρίνει UpdateGoal complete · αυτό το agent **δεν** το σημειώνει.
+## Known blockers and limits
 
----
+- The live Meta DAT bridge is still a stub. The adapter remains in simulation mode.
+- WSL Swift 6.1.3 is available and parses the Swift sources. Linux SwiftPM compilation stops because Apple `ImageIO` is unavailable; Xcode, Apple SDKs, and Simulator are not available on this host.
+- Visual changes follow the Bevel screenshot references, including the Fitness activity calendar and cumulative workout trend, but the app has not been rendered for visual comparison.
+- A source audit found and patched overlapping game evaluations, final voice-dictation loss and audio-session rejection cleanup, unsafe media-folder symlink handling, Obsidian generated/note/conflict-sidecar overwrite paths, false HealthKit authorization/audio metadata, unordered buffer timestamps, unbounded highlight-reel data loading, stale-five AI context/provenance, and malformed provider response typing. The full package tests cannot run here; three Foundation-only XCTest cases did run in isolation.
+- Today was reorganized toward the Bevel Home hierarchy: the summary remains prominent, secondary sections start collapsed, the date is a one-line hero, the metric separators span each group, the composer input is inset, and rings/composer have narrow/accessibility layout fallbacks. This is source-level styling only until rendered comparison.
+- HealthKit values are optional measurements; no clinical recovery score is shown.
+- Backup bundles are plaintext JSON and media. Export and restore need Apple Files-provider validation.
+- The main journal and media use iOS Data Protection until first unlock; this is OS-managed protection rather than app-level encryption. Existing files are migrated when loaded/accessed.
 
-## Requirement-by-requirement (objective + AUDIT P0/P1)
+## Current evidence
 
-| Objective item | Evidence | Status |
-|---|---|---|
-| **P0-01** Mac/`swift test` ή GHA green + AVAsset smoke | Workflow `.github/workflows/swift-ci.yml` · GHA Run 37542180604 green · macOS 14 CI | **PASS** (GHA Run 37542180604) |
-| **P0-02** DAT **ή** sim-only decision | `docs/DECISIONS.md` §2 · `Package.swift` DAT commented · sim label στο adapter | **PASS** |
-| **P0-05** App target / permissions shell | `Apps/R0llingApp/Info.plist` · `README.md` · `project.yml` · `Host/R0llingAppHostScaffold.swift` | **PASS** |
-| **P0-06** Stage 6 μόνο με device failure report | Κανένα device report · Stage 6 not started | **BLOCKED** (device report) |
-| **P1-TLS** Mirror TLS / kill-in-Release | `RemoteMirrorStreamServer` `#if !DEBUG` → 8402 · `broadcastFrame` no-op · `FeatureReadinessRegistry.mirror.ready=false` | **PASS** |
-| **P1-HERMES** HTTPS/allowlist | `HermesEndpointAsfaleia.swift` · Direct/Hermes connectors · `SETUP_AI_HERMES.md` | **PASS** |
-| **P1-04** Orphans → Experimental/ | `Sources/R0lling/Experimental/{Spatial,Metal,Watermark,FileWatcher}` · `README.md` · DECISIONS §5 · flags ready=false | **PASS** |
-| **P1-05** AppState god-object | DECISIONS §6 DEFERRED split · orphans **όχι** σε AppState · gate = FeatureReadinessRegistry | **PASS** (decision) |
-| **P1-09** MobileCLIP → PseudoLexical | `Sources/R0lling/AI/PseudoLexicalVectorSearchEngine.swift` · verify_all [1/7] · ready=false | **PASS** |
-| **Docs sync** STATUS / CAPABILITY / AUDIT residual | `IMPLEMENTATION_STATUS.md` · `CAPABILITY_MATRIX.md` · `AUDIT_FINAL.md` §10 · matrix §9 | **PASS** |
-| **R3 / G5 / CQ** διατήρηση | stage4/stage5 harness · FeatureReadiness flags · PathAsfaleia | **PASS** |
-| **Verification** `verification/*.py` | stage3→5 · journal · verify_all | **PASS** (run this pass) |
-| **Device A01–A16 proofs** | `DEVICE_TESTS.md` DEV-01…10 · 0/16 filled | **BLOCKED** (`docs/DEVICE_TESTS.md`) |
-| **DAT live / Gen2** | LANE_CLIP_META Mac flip checklist | **BLOCKED** (`docs/LANE_CLIP_META.md`) |
-
----
-
-## Plan A01–A16 (software rows)
-
-| ID | SW | Evidence | DEV |
-|---|---|---|---|
-| A01–A16 | ✅ 16/16 | `GOAL_100_FEATURE_MATRIX.md` §9 · `IMPLEMENTATION_STATUS.md` | 🚫 0/16 |
-
----
-
-## Snapshot
-
-| Metric | Value |
-|---|---|
-| Software P0/P1 (εκτός Mac/device) | **ALL PASS** |
-| P0-01 / P0-06 / device | **BLOCKED** + checklists |
-| Python verify | **PASS** (this pass) |
-| `swift test` local | 🚫 UNAVAILABLE (Windows) |
-| CreateGoal product 100% | **false** (device/Mac remain) |
-| Software objective | **true** |
-
-## Open (honest — όχι SW gaps)
-
-1. **P0-01** — πράσινο GHA / `swift test` log → HANDOFF (`DEVICE_TESTS.md` §3)
-2. **P0-06** — Stage 6 μόνο με device failure report
-3. **Device 0/16** — `DEVICE_TESTS.md` DEV matrix
-4. **Mirror TLS identity** — latent μέχρι `mirror.ready=true` (kill αρκετό για SW)
-
-## Next (Mac owner)
-
-- Confirm GHA green → HANDOFF line → soft-GO engineering  
-- Μην δηλώσεις CreateGoal **product** complete χωρίς device proofs
+See [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) for implemented and unavailable source paths. See [`FINDINGS_REMEDIATION.md`](FINDINGS_REMEDIATION.md) for the remediation list and static-check outcomes. Earlier CI URLs, IPA sizes, “100%” claims, and feature counts are not evidence for this checkout.

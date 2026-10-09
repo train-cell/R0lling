@@ -7,6 +7,7 @@ public struct AssistantView: View {
     @State private var inputPrompt: String = ""
     @State private var isShowingMemorySheet: Bool = false
     @State private var isShowingGameSheet: Bool = false
+    @State private var selectedVisionPhoto: PhotosPickerItem?
 
     public var body: some View {
         VStack(spacing: 0) {
@@ -53,11 +54,11 @@ public struct AssistantView: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Προσωπικός Βοηθός")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.title3.weight(.bold))
                     .foregroundColor(R0llingTheme.textPrimary)
 
-                Text("Συνδεδεμένος: \(appState.activeProvider == .hermes ? "Hermes (Home PC)" : "Direct AI API")")
-                    .font(.system(size: 12))
+                Text("Πάροχος: \(appState.activeProvider == .hermes ? "Hermes (Home PC)" : "Direct AI API")")
+                    .font(.caption)
                     .foregroundColor(R0llingTheme.accentLavender)
             }
 
@@ -67,14 +68,16 @@ public struct AssistantView: View {
                 Image(systemName: "brain.head.profile")
                     .font(.system(size: 18))
                     .foregroundColor(R0llingTheme.accentLavender)
-                    .padding(8)
+                    .frame(width: 44, height: 44)
                     .background(R0llingTheme.bgElevated)
                     .clipShape(Circle())
+                    .r0llingBevelCapsule()
             }
+            .accessibilityLabel("Μνήμη βοηθού")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(R0llingTheme.bgSurface)
+        .background(R0llingTheme.bgPrimary)
     }
 
     private var quickActionsBar: some View {
@@ -89,13 +92,89 @@ public struct AssistantView: View {
                             Image(systemName: "eye.fill")
                             Text("Τι βλέπω;")
                         }
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(.footnote, design: .rounded).weight(.bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
+                        .frame(minHeight: 44)
                         .background(R0llingTheme.primaryButtonGradient)
                         .clipShape(Capsule())
-                        .shadow(color: R0llingTheme.accentPurple.opacity(0.3), radius: 6, x: 0, y: 2)
+                        .r0llingBevelCapsule()
+                    }
+
+                    PhotosPicker(
+                        selection: $selectedVisionPhoto,
+                        matching: .images,
+                        photoLibrary: .shared()
+                    ) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "photo")
+                            Text("Ανάλυση φωτογραφίας")
+                        }
+                        .font(.system(.footnote, design: .rounded).weight(.semibold))
+                        .foregroundColor(R0llingTheme.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .frame(minHeight: 44)
+                        .background(R0llingTheme.bgElevated)
+                        .clipShape(Capsule())
+                        .r0llingBevelCapsule()
+                        .overlay(Capsule().stroke(R0llingTheme.borderSubtle, lineWidth: 1))
+                    }
+                    .onChange(of: selectedVisionPhoto) { _, item in
+                        guard let item else { return }
+                        Task { await analyzeSelectedVisionPhoto(item) }
+                    }
+                    .accessibilityLabel("Ανάλυση φωτογραφίας από Photos")
+
+                    if appState.pendingVisionNote != nil {
+                        Button(action: {
+                            Task { await appState.savePendingVisionNote() }
+                        }) {
+                            Label(
+                                appState.pendingVisionNoteIsSaved ? "Αποθηκεύτηκε" : "Αποθήκευση",
+                                systemImage: appState.pendingVisionNoteIsSaved ? "checkmark" : "square.and.arrow.down"
+                            )
+                                .font(.system(.footnote, design: .rounded).weight(.semibold))
+                                .foregroundColor(R0llingTheme.textPrimary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .frame(minHeight: 44)
+                                .background(R0llingTheme.bgElevated)
+                                .clipShape(Capsule())
+                                .r0llingBevelCapsule()
+                                .overlay(Capsule().stroke(R0llingTheme.borderSubtle, lineWidth: 1))
+                        }
+                        .accessibilityLabel("Αποθήκευση αποτελέσματος Vision στο ημερολόγιο")
+                        .disabled(appState.isSavingVisionNote || appState.pendingVisionNoteIsSaved)
+
+                        Button(action: { appState.speakPendingVisionNote() }) {
+                            Label("Εκφώνηση", systemImage: "speaker.wave.2")
+                                .font(.system(.footnote, design: .rounded).weight(.semibold))
+                                .foregroundColor(R0llingTheme.textPrimary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .frame(minHeight: 44)
+                                .background(R0llingTheme.bgElevated)
+                                .clipShape(Capsule())
+                                .r0llingBevelCapsule()
+                                .overlay(Capsule().stroke(R0llingTheme.borderSubtle, lineWidth: 1))
+                        }
+                        .accessibilityLabel("Εκφώνηση αποτελέσματος Vision")
+                        .disabled(appState.isSavingVisionNote)
+
+                        Button(action: { appState.discardPendingVisionNote() }) {
+                            Image(systemName: "xmark")
+                        .font(.caption.weight(.bold))
+                                .foregroundColor(R0llingTheme.textMuted)
+                                .padding(10)
+                                .frame(width: 44, height: 44)
+                                .background(R0llingTheme.bgElevated)
+                                .clipShape(Circle())
+                                .r0llingBevelCapsule()
+                        }
+                        .accessibilityLabel("Απόρριψη αποτελέσματος Vision")
+                        .disabled(appState.isSavingVisionNote)
                     }
 
                     Button(action: {
@@ -108,12 +187,14 @@ public struct AssistantView: View {
                                 .foregroundColor(R0llingTheme.bevelCyan)
                             Text("Ανάκληση")
                         }
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(.footnote, design: .rounded).weight(.semibold))
                         .foregroundColor(R0llingTheme.textPrimary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
+                        .frame(minHeight: 44)
                         .background(R0llingTheme.bgElevated)
                         .clipShape(Capsule())
+                        .r0llingBevelCapsule()
                     }
 
                     Button(action: {
@@ -124,12 +205,14 @@ public struct AssistantView: View {
                                 .foregroundColor(R0llingTheme.statusError)
                             Text("Άκυρο")
                         }
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(.footnote, design: .rounded).weight(.semibold))
                         .foregroundColor(R0llingTheme.textPrimary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
+                        .frame(minHeight: 44)
                         .background(R0llingTheme.bgElevated)
                         .clipShape(Capsule())
+                        .r0llingBevelCapsule()
                     }
 
                     Button(action: {
@@ -157,12 +240,14 @@ public struct AssistantView: View {
                             .foregroundColor(R0llingTheme.bevelCyan)
                         Text("Σύνοψη ημέρας")
                     }
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(.footnote, design: .rounded).weight(.semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
+                    .frame(minHeight: 44)
                     .background(R0llingTheme.bgElevated)
                     .clipShape(Capsule())
+                    .r0llingBevelCapsule()
                 }
 
                 Button(action: {
@@ -175,12 +260,14 @@ public struct AssistantView: View {
                             .foregroundColor(R0llingTheme.accentPurple)
                         Text("🎬 Highlight Reel")
                     }
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(.footnote, design: .rounded).weight(.semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
+                    .frame(minHeight: 44)
                     .background(R0llingTheme.bgElevated)
                     .clipShape(Capsule())
+                    .r0llingBevelCapsule()
                 }
 
                 Button(action: {
@@ -193,12 +280,14 @@ public struct AssistantView: View {
                             .foregroundColor(R0llingTheme.bevelEmerald)
                         Text("🎙️ Podcast")
                     }
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(.footnote, design: .rounded).weight(.semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
+                    .frame(minHeight: 44)
                     .background(R0llingTheme.bgElevated)
                     .clipShape(Capsule())
+                    .r0llingBevelCapsule()
                 }
 
                 Button(action: {
@@ -211,12 +300,14 @@ public struct AssistantView: View {
                             .foregroundColor(R0llingTheme.bevelCyan)
                         Text("🎨 Canvas")
                     }
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(.footnote, design: .rounded).weight(.semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
+                    .frame(minHeight: 44)
                     .background(R0llingTheme.bgElevated)
                     .clipShape(Capsule())
+                    .r0llingBevelCapsule()
                 }
 
                 Button(action: {
@@ -229,12 +320,14 @@ public struct AssistantView: View {
                             .foregroundColor(R0llingTheme.accentLavender)
                         Text("🧠 Graph")
                     }
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(.footnote, design: .rounded).weight(.semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
+                    .frame(minHeight: 44)
                     .background(R0llingTheme.bgElevated)
                     .clipShape(Capsule())
+                    .r0llingBevelCapsule()
                 }
 
                 // Mirror: FeatureReadinessRegistry.mirror.ready == false (TLS + frame pipeline)
@@ -246,12 +339,14 @@ public struct AssistantView: View {
                             Image(systemName: appState.isMirrorStreaming ? "airplayvideo.fill" : "airplayvideo")
                             Text(appState.isMirrorStreaming ? "🪞 On (\(appState.activeMirrorClientsCount))" : "🪞 Mirror")
                         }
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(.footnote, design: .rounded).weight(.semibold))
                         .foregroundColor(appState.isMirrorStreaming ? R0llingTheme.bevelEmerald : R0llingTheme.textPrimary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
+                        .frame(minHeight: 44)
                         .background(R0llingTheme.bgElevated)
                         .clipShape(Capsule())
+                        .r0llingBevelCapsule()
                     }
                 }
 
@@ -261,16 +356,19 @@ public struct AssistantView: View {
                             .foregroundColor(R0llingTheme.bevelAmber)
                         Text("Παιχνίδι")
                     }
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(.footnote, design: .rounded).weight(.semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
+                    .frame(minHeight: 44)
                     .background(R0llingTheme.bgElevated)
                     .clipShape(Capsule())
+                    .r0llingBevelCapsule()
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
+            .frame(minHeight: 44)
         }
         .background(R0llingTheme.bgSurface.opacity(0.8))
     }
@@ -278,12 +376,13 @@ public struct AssistantView: View {
     private var chatComposer: some View {
         HStack(spacing: 10) {
             TextField("Ρώτησε κάτι τον βοηθό...", text: $inputPrompt)
-                .font(.system(size: 15))
+                .textFieldStyle(.plain)
+                .font(.body)
                 .foregroundColor(R0llingTheme.textPrimary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .background(R0llingTheme.bgElevated)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .frame(minHeight: 44)
+                .r0llingBevelInsetSurface(cornerRadius: 14)
                 .onSubmit {
                     let prompt = inputPrompt
                     guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -310,18 +409,32 @@ public struct AssistantView: View {
                             : R0llingTheme.primaryButtonGradient
                     )
                     .clipShape(Circle())
-                    .shadow(
-                        color: inputPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            ? Color.clear
-                            : R0llingTheme.accentPurple.opacity(0.35),
-                        radius: 6, x: 0, y: 2
-                    )
+                    .r0llingBevelCapsule()
             }
+            .accessibilityLabel("Αποστολή μηνύματος")
             .disabled(inputPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(R0llingTheme.bgSurface)
+        .r0llingBevelSurface(cornerRadius: 18)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(R0llingTheme.bgPrimary)
+    }
+
+    private func analyzeSelectedVisionPhoto(_ item: PhotosPickerItem) async {
+        defer { selectedVisionPhoto = nil }
+        do {
+            guard let imported = try await item.loadTransferable(type: ImportedVisionPhoto.self) else {
+                appState.showToast("Αδυναμία φόρτωσης φωτογραφίας από Photos.")
+                return
+            }
+            defer { try? FileManager.default.removeItem(at: imported.url) }
+            let imageData = try imported.loadVisionData()
+            await appState.executeWhatAmISeeing(imageData: imageData)
+        } catch {
+            appState.showToast("Αποτυχία ανάγνωσης φωτογραφίας: \(error.localizedDescription)")
+        }
     }
 }
 
@@ -336,7 +449,7 @@ public struct ChatMessageBubble: View {
 
             VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
                 Text(text)
-                    .font(.system(size: 15))
+                    .font(.body)
                     .foregroundColor(.white)
                     .padding(12)
                     .background(isUser ? R0llingTheme.accentPurple : R0llingTheme.bgSurface)
@@ -350,6 +463,7 @@ public struct ChatMessageBubble: View {
             if !isUser { Spacer(minLength: 40) }
         }
     }
+
 }
 
 public struct AgentMemorySheet: View {
@@ -375,6 +489,7 @@ public struct AgentMemorySheet: View {
                         .frame(height: 100)
                 }
             }
+            .r0llingFormSurface()
             .navigationTitle("Μνήμη Agent")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -425,20 +540,21 @@ public struct ObservationGameSheet: View {
                 // Score & Streak
                 HStack(spacing: 16) {
                     Label("\(appState.scavengerStreak)d Σερί", systemImage: "sparkles")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.headline.weight(.bold))
                         .foregroundColor(R0llingTheme.accentCyan)
 
                     Label("\(appState.gameScore) πόντοι", systemImage: "star.fill")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.headline.weight(.bold))
                         .foregroundColor(R0llingTheme.accentLavender)
 
                     Text(sessionStateLabel)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundColor(R0llingTheme.textSecondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(R0llingTheme.bgElevated)
                         .clipShape(Capsule())
+                        .r0llingBevelCapsule()
                 }
 
                 if !appState.scavengerBadges.isEmpty {
@@ -446,11 +562,12 @@ public struct ObservationGameSheet: View {
                         HStack(spacing: 8) {
                             ForEach(appState.scavengerBadges, id: \.self) { badge in
                                 Text(badge)
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(.caption.weight(.medium))
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 4)
                                     .background(R0llingTheme.bgElevated)
                                     .clipShape(Capsule())
+                                    .r0llingBevelCapsule()
                             }
                         }
                     }
@@ -459,29 +576,29 @@ public struct ObservationGameSheet: View {
                 if let mission = appState.currentMission {
                     VStack(spacing: 12) {
                         Image(systemName: "target")
-                            .font(.system(size: 40))
+                            .font(.largeTitle)
                             .foregroundColor(R0llingTheme.accentPurple)
 
                         Text("Τρέχουσα Αποστολή:")
-                            .font(.system(size: 15))
+                            .font(.body)
                             .foregroundColor(R0llingTheme.textSecondary)
 
                         Text(mission.prompt)
-                            .font(.system(size: 22, weight: .bold))
+                            .font(.title3.weight(.bold))
                             .foregroundColor(R0llingTheme.textPrimary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
 
                         if mission.isCompleted {
                             Text("Ολοκληρώθηκε")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.footnote.weight(.semibold))
                                 .foregroundColor(R0llingTheme.bevelEmerald)
                         }
                     }
                     .r0llingCard()
                 } else {
                     Text("Καμία ενεργή αποστολή — πάτησε «Επόμενη Αποστολή».")
-                        .font(.system(size: 14))
+                        .font(.subheadline)
                         .foregroundColor(R0llingTheme.textSecondary)
                         .multilineTextAlignment(.center)
                 }
@@ -489,10 +606,10 @@ public struct ObservationGameSheet: View {
                 if let evaluation = appState.lastGameEvaluation {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(evaluationHonestyLabel(evaluation))
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.caption.weight(.bold))
                             .foregroundColor(R0llingTheme.accentLavender)
                         Text(evaluation.feedback)
-                            .font(.system(size: 13))
+                            .font(.footnote)
                             .foregroundColor(R0llingTheme.textSecondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -516,7 +633,7 @@ public struct ObservationGameSheet: View {
                             Image(systemName: "camera.fill")
                             Text("Έλεγχος με Κάμερα Γυαλιών")
                         }
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.headline.weight(.bold))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -535,7 +652,7 @@ public struct ObservationGameSheet: View {
                             Image(systemName: "photo.on.rectangle")
                             Text("Επιλογή Φωτογραφίας (χωρίς γυαλιά)")
                         }
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundColor(R0llingTheme.textPrimary)
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -560,7 +677,7 @@ public struct ObservationGameSheet: View {
                         }
                     }) {
                         Text("Χειροκίνητη Επιβεβαίωση (Χωρίς AI)")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.subheadline.weight(.medium))
                             .foregroundColor(R0llingTheme.textSecondary)
                     }
                     .disabled(isEvaluating)
@@ -571,7 +688,7 @@ public struct ObservationGameSheet: View {
                         }
                     }) {
                         Text("Επόμενη Αποστολή ➡️")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundColor(R0llingTheme.accentLavender)
                     }
                     .disabled(isEvaluating)
@@ -628,10 +745,12 @@ public struct ObservationGameSheet: View {
             selectedPhotoItem = nil
         }
         do {
-            guard let data = try await item.loadTransferable(type: Data.self), !data.isEmpty else {
+            guard let imported = try await item.loadTransferable(type: ImportedVisionPhoto.self) else {
                 appState.showToast("Αδυναμία φόρτωσης φωτογραφίας.")
                 return
             }
+            defer { try? FileManager.default.removeItem(at: imported.url) }
+            let data = try imported.loadVisionData()
             let epityxia = await appState.evaluateGameCapture(imageData: data)
             guard epityxia else { return }
             _ = appState.recordGameStreakAfterSuccess()

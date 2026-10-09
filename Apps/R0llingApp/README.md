@@ -1,73 +1,43 @@
-# R0llingApp — iOS Host Target Scaffold (P0-05)
+# R0llingApp — iOS host target
 
-Το `Package.swift` παράγει **SPM library** (`R0lling`). Αυτός ο φάκελος είναι το **installable app shell**: Info.plist με privacy strings (A16) + οδηγίες Mac build.
+`Package.swift` defines the reusable `R0lling` Swift package. `project.yml` defines the iOS app target through XcodeGen, `Host/` contains the app entry point, and `Info.plist` contains app metadata and privacy usage descriptions. The generated `.xcodeproj` is not checked in.
 
-> Δεν υπάρχει committed `.xcodeproj` (αποφυγή merge thrash). Δημιούργησε το app target σε Mac μία φορά με τα βήματα κάτω.
+## Build the app on macOS
 
-## Απαιτήσεις
-
-- macOS 14.4+ · Xcode 16+ · iPhone iOS 17.2+ (ή Simulator)
-- Apple Developer Team για device signing
-
-## Γρήγορο build (SPM library smoke)
-
-```bash
-cd /path/to/R0lling
-swift build
-swift test
-```
-
-Το library target περιέχει ήδη `@main` `R0llingApp` για macOS SPM run. Για **iOS device/simulator** χρειάζεται App target (κάτω).
-
-## Δημιουργία iOS App target σε Xcode
-
-1. **File → New → Project → iOS → App**
-   - Product Name: `R0llingApp`
-   - Bundle ID: `com.personal.r0lling` (ή δικό σου)
-   - Interface: SwiftUI · Language: Swift · Storage: None
-2. **Κλείσε** το default `ContentView` / `@main` App αρχείο του template (θα χρησιμοποιήσεις το package).
-3. **File → Add Package Dependencies… → Add Local…** → επίλεξε το root `R0lling/` (όπου είναι το `Package.swift`).
-4. Στο App target → **General → Frameworks** → πρόσθεσε το product `R0lling`.
-5. **Info** του App target → άνοιξε / αντικατέστησε με `Apps/R0llingApp/Info.plist`
-   - ή κάνε Copy Keys από αυτό το plist στα Custom iOS Target Properties.
-6. **Signing & Capabilities** → Personal Team · μοναδικό Bundle ID.
-7. (Προαιρετικό) Meta DAT: βλ. `docs/LANE_CLIP_META.md` · `docs/DECISIONS.md` §2 (v1 simulation-only OK).
-8. Scheme → iPhone / Simulator → **⌘R**.
-
-### Εναλλακτικό: XcodeGen
-
-Αν έχεις `xcodegen`:
+Requirements are an Apple toolchain compatible with the declared iOS 17.2 deployment target, XcodeGen, and an iOS Simulator or device. The repo's CI generates the project and builds both generic iOS and Simulator targets; inspect the CI run to learn which Xcode version actually ran.
 
 ```bash
 cd Apps/R0llingApp
-xcodegen generate   # διαβάζει project.yml
-open R0llingApp.xcodeproj
+xcodegen generate
+xcodebuild build -project R0llingApp.xcodeproj -scheme R0llingApp \
+  -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO
 ```
 
-## Privacy keys (A16) — ήδη στο Info.plist
+To run on a physical device, select a signing team and device in Xcode. This build setup does not imply that the current uncommitted remediation has been built or exercised on an Apple device.
 
-| Key | Σκοπός |
+## Privacy usage descriptions
+
+The current `Info.plist` declares:
+
+| Key | Purpose |
 |---|---|
-| `NSCameraUsageDescription` | Photos / game / glasses |
-| `NSMicrophoneUsageDescription` | Voice notes / clip audio |
-| `NSSpeechRecognitionUsageDescription` | On-device STT |
-| `NSPhotoLibraryUsageDescription` | A03 media attach |
-| `NSBluetoothAlwaysUsageDescription` | Meta Gen 2 |
-| `NSLocalNetworkUsageDescription` | Hermes LAN |
+| `NSCameraUsageDescription` | Reserved for future camera capture; this version has no camera capture flow |
+| `NSMicrophoneUsageDescription` | Speech notes; this version does not capture or synchronize clip audio |
+| `NSSpeechRecognitionUsageDescription` | Speech-to-text |
+| `NSPhotoLibraryUsageDescription` | Importing media |
+| `NSPhotoLibraryAddUsageDescription` | Reserved for future Photos-library export; current media import uses pickers and does not write to Photos |
+| `NSBluetoothAlwaysUsageDescription`, `NSBluetoothPeripheralUsageDescription` | Reserved for future glasses pairing; this version has no CoreBluetooth transport and live Meta DAT remains unavailable |
+| `NSLocalNetworkUsageDescription` | Outgoing connection to a manually configured local Hermes endpoint; Bonjour discovery is not implemented |
+| `NSFaceIDUsageDescription` | Private diary unlock |
+| `NSHealthShareUsageDescription` | Reading five optional HealthKit measurements, sleep intervals, and recorded workouts for the Health and Fitness screens |
+| `NSHealthUpdateUsageDescription` | Reserved for future HealthKit writes; current HealthKit service requests read-only access |
 
-Deny path: UI δείχνει typed error μέσω `AppErrorTaxonomy` — χωρίς silent success.
+Several usage keys are retained for planned capabilities and do not represent working product flows. This version has no camera capture, Photos-library write, CoreBluetooth glasses transport, clip-audio capture/synchronization, or HealthKit write path. Photos and Files picker imports are implemented; speech notes and HealthKit measurement, sleep, and workout reads are separate implemented paths. Live Meta DAT is unavailable. No permission prompt or denial flow has been verified on-device.
 
-## Disk full (A16)
+## Disk space
 
-`MediaStorageService` ελέγχει `ELAXISTOS_ELEUTHEROS_XOROS_BYTES` (50MB) πριν εγγραφή · ρίχνει `MediaApothikeusiError.anepikisXoros` → `AppErrorTaxonomy.diskFull`.
+`MediaStorageService` checks `ELAXISTOS_ELEUTHEROS_XOROS_BYTES` (50 MB) before a media write and reports `MediaApothikeusiError.anepikisXoros` through `AppErrorTaxonomy.diskFull`.
 
-## Verification
+## Verification boundaries
 
-```bash
-# Windows / οποιοδήποτε host
-python verification/diagnose_stage5_finalize.py
-python verification/verify_all_subsystems.py
-
-# Mac only
-swift test
-```
+The Python scripts are independent examples or source/config checks. They do not execute the Swift app, test OS permission prompts, or render the UI. Current Apple build/XCTest status is in [`docs/IMPLEMENTATION_STATUS.md`](../../docs/IMPLEMENTATION_STATUS.md); the manual device checklist is in [`docs/DEVICE_TESTS.md`](../../docs/DEVICE_TESTS.md).

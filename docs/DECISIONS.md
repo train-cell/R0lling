@@ -1,3 +1,5 @@
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
 # R0lling — Αποφάσεις & Προεπιλογές (Decisions & Defaults Log) v1.0
 
 **Έργο:** `R0lling`  
@@ -29,7 +31,7 @@
 | **Windows / no DAT vendor** | Simulation-only path + πλήρες protocol/adapter/remux structure | Το MetaWearablesDAT δεν vendor-άρεται αξιόπιστα σε Windows SPM. |
 | **Simulation labeling** | Device name περιέχει `SIMULATION — όχι φυσική συσκευή` | Αποφυγή LIVE hardware claims χωρίς Gen 2. |
 | **Non-sim χωρίς SDK** | Error `4002` · ποτέ fake `.connected` | R3-003 / plan honesty. |
-| **Playable clip χωρίς NAL** | Stage-4 `PlayableClipExporter` placeholder + moov | A05 software-complete · remux όταν υπάρχουν SPS/PPS. |
+| **Playable clip χωρίς NAL** | Stage-4 `PlayableClipExporter` placeholder validated with `AVURLAsset.load(.isPlayable)` | A05 software path · real remux requires actual DAT samples and SPS/PPS. |
 | **Background capture promise** | `promisesContinuousBackgroundCapture = false` default | Μέχρι εμπειρικό DAT proof στο device. |
 | **Acoustic/IMU product** | Feed API wired · `FeatureReadinessRegistry.*.ready = false` | Flip flag = auto-clip χωρίς νέο wiring. |
 | **Mac flip path** | `docs/LANE_CLIP_META.md` | Ακριβή βήματα για DAT SPM + bridge wire. |
@@ -54,7 +56,7 @@
 | **SPM library ≠ app** | Installable shell στο `Apps/R0llingApp/` (Info.plist + README + XcodeGen yml) | Χωρίς committed `.xcodeproj` (merge thrash). |
 | **Privacy strings** | Όλα τα NS*UsageDescription στο `Apps/R0llingApp/Info.plist` | A16 SW scaffolding πριν device deny prompts. |
 | **Disk full** | `ELAXISTOS_ELEUTHEROS_XOROS_BYTES` + `AppErrorTaxonomy.diskFull` | Typed error · data safe. |
-| **P0-01** | GHA `.github/workflows/swift-ci.yml` = contract · green log = HANDOFF proof | Windows host δεν τρέχει `swift test`. |
+| **P0-01** | GHA `.github/workflows/swift-ci.yml` = contract · green log = HANDOFF proof | WSL Swift 6.1.3 parses; Linux `swift test` stops at unavailable Apple `ImageIO`; Apple XCTest/build evidence still pending. |
 
 ---
 

@@ -27,11 +27,42 @@ final class JournalStorageTests: XCTestCase {
         )
 
         try await storage.saveEntry(entry)
-        let retrieved = await storage.getEntry(id: entry.id)
+        let retrieved = try await storage.getEntry(id: entry.id)
 
         XCTAssertNotNil(retrieved)
         XCTAssertEqual(retrieved?.title, "Δοκιμαστική Σημείωση")
         XCTAssertEqual(retrieved?.tags, ["test", "dev"])
+    }
+
+    #if os(iOS)
+    func testJournalFileUsesDataProtectionUntilFirstUnlock() async throws {
+        try await storage.saveEntry(JournalEntry(content: "protected journal fixture"))
+
+        let fileURL = tempDirectory.appendingPathComponent("journal.json")
+        let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        XCTAssertEqual(
+            attributes[.protectionKey] as? FileProtectionType,
+            .completeUntilFirstUserAuthentication
+        )
+    }
+    #endif
+
+    func testAtomicRestoreInsertKeepsExistingIDsAndAddsNewEntries() async throws {
+        let existing = JournalEntry(id: UUID(), content: "original")
+        try await storage.saveEntry(existing)
+
+        let conflictingBackupEntry = JournalEntry(id: existing.id, content: "backup must not overwrite")
+        let newBackupEntry = JournalEntry(content: "new backup entry")
+        let insertedIDs = try await storage.insertEntriesIfAbsentAtomically([
+            conflictingBackupEntry,
+            newBackupEntry
+        ])
+
+        XCTAssertEqual(insertedIDs, [newBackupEntry.id])
+        let preservedEntry = try await storage.getEntry(id: existing.id)
+        let allEntries = try await storage.getAllEntries()
+        XCTAssertEqual(preservedEntry?.content, "original")
+        XCTAssertEqual(allEntries.count, 2)
     }
 
     func testSearchEntries() async throws {
@@ -41,11 +72,11 @@ final class JournalStorageTests: XCTestCase {
         try await storage.saveEntry(entry1)
         try await storage.saveEntry(entry2)
 
-        let results = await storage.searchEntries(query: "Μαρία", tag: nil, source: nil)
+        let results = try await storage.searchEntries(query: "Μαρία", tag: nil, source: nil)
         XCTAssertEqual(results.count, 1)
         XCTAssertEqual(results.first?.id, entry1.id)
 
-        let tagResults = await storage.searchEntries(query: "", tag: "εργασία", source: nil)
+        let tagResults = try await storage.searchEntries(query: "", tag: "εργασία", source: nil)
         XCTAssertEqual(tagResults.count, 1)
         XCTAssertEqual(tagResults.first?.id, entry2.id)
     }
@@ -55,7 +86,7 @@ final class JournalStorageTests: XCTestCase {
         try await storage.saveEntry(entry)
 
         try await storage.deleteEntry(id: entry.id)
-        let retrieved = await storage.getEntry(id: entry.id)
+        let retrieved = try await storage.getEntry(id: entry.id)
         XCTAssertNil(retrieved)
     }
 
@@ -91,7 +122,7 @@ final class JournalStorageTests: XCTestCase {
         queryTokyo.hour = 12
         let tokyoNoon = queryTokyo.date!
 
-        let onTokyoDay = await storage.getEntriesForDate(
+        let onTokyoDay = try await storage.getEntriesForDate(
             tokyoNoon,
             displayTimeZone: TimeZone(identifier: "Asia/Tokyo")!
         )
@@ -108,7 +139,7 @@ final class JournalStorageTests: XCTestCase {
         athensOct5.hour = 12
         let athensDay = athensOct5.date!
 
-        let onAthensOct5 = await storage.getEntriesForDate(
+        let onAthensOct5 = try await storage.getEntriesForDate(
             athensDay,
             displayTimeZone: TimeZone(identifier: "Europe/Athens")!
         )
@@ -129,7 +160,7 @@ final class JournalStorageTests: XCTestCase {
         try await writer.saveEntry(entry)
 
         let reader = JSONFileStorageService(storageURL: fileURL)
-        let retrieved = await reader.getEntry(id: entry.id)
+        let retrieved = try await reader.getEntry(id: entry.id)
 
         XCTAssertNotNil(retrieved)
         XCTAssertEqual(retrieved?.content, entry.content)
@@ -155,9 +186,9 @@ final class JournalStorageTests: XCTestCase {
         updated.lastModified = Date()
         try await storage.saveEntry(updated)
 
-        let all = await storage.getAllEntries()
+        let all = try await storage.getAllEntries()
         XCTAssertEqual(all.filter { $0.id == entry.id }.count, 1)
-        let retrieved = await storage.getEntry(id: entry.id)
+        let retrieved = try await storage.getEntry(id: entry.id)
         XCTAssertEqual(retrieved?.title, "Μετά")
         XCTAssertEqual(retrieved?.content, "Νέο κείμενο")
         XCTAssertEqual(retrieved?.tags, ["final"])
@@ -190,18 +221,18 @@ final class JournalStorageTests: XCTestCase {
         corrected.lastModified = Date()
         try await storage.saveEntry(corrected)
 
-        let retrieved = await storage.getEntry(id: entry.id)
+        let retrieved = try await storage.getEntry(id: entry.id)
         XCTAssertEqual(retrieved?.dateKey, "2026-10-06")
-        let allEntries = await storage.getAllEntries()
+        let allEntries = try await storage.getAllEntries()
         XCTAssertEqual(allEntries.filter { $0.id == entry.id }.count, 1)
 
-        let onOct6 = await storage.getEntriesForDate(
+        let onOct6 = try await storage.getEntriesForDate(
             oct6,
             displayTimeZone: TimeZone(identifier: "Europe/Athens")!
         )
         XCTAssertEqual(onOct6.map(\.id), [entry.id])
 
-        let onOct5 = await storage.getEntriesForDate(
+        let onOct5 = try await storage.getEntriesForDate(
             oct5,
             displayTimeZone: TimeZone(identifier: "Europe/Athens")!
         )
@@ -229,7 +260,7 @@ final class JournalStorageTests: XCTestCase {
         try await writer.saveEntry(entry)
 
         let reader = JSONFileStorageService(storageURL: fileURL)
-        let retrieved = await reader.getEntry(id: entry.id)
+        let retrieved = try await reader.getEntry(id: entry.id)
         XCTAssertEqual(retrieved?.attachments.count, 1)
         XCTAssertEqual(retrieved?.attachments.first?.relativePath, attachment.relativePath)
         XCTAssertEqual(retrieved?.attachments.first?.mediaType, .photo)
@@ -244,7 +275,7 @@ final class JournalStorageTests: XCTestCase {
             source: .manual
         )
         try await storage.saveEntry(entry)
-        let results = await storage.searchEntries(query: "Ρώμης", tag: nil, source: nil)
+        let results = try await storage.searchEntries(query: "Ρώμης", tag: nil, source: nil)
         XCTAssertEqual(results.count, 1)
         XCTAssertEqual(results.first?.id, entry.id)
     }

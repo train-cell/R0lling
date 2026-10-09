@@ -1,43 +1,27 @@
-# R0lling — Εξαρτήσεις & Toolchain (Dependencies & Toolchain) v1.0
+# R0lling — Declared Dependencies and Toolchain
 
-**Έργο:** `R0lling`  
-**Ημερομηνία:** 6 Οκτωβρίου 2026  
+Updated: 2026-10-09. This page describes the current package and app scaffold, not the superseded design proposal from 2026-10-06.
 
----
+## Declared platform and language settings
 
-## 1. Toolchain & Ελάχιστες Απαιτήσεις
+| Setting | Current declaration | What it does not prove |
+|---|---|---|
+| Swift tools version | 5.10 (`Package.swift`) | It is not a promise that every Swift 5.10/Xcode combination builds the project. |
+| Swift language mode | 5.0 in the XcodeGen app target; the package uses Swift 5 mode with the `StrictConcurrency` upcoming feature | The package does not declare Swift 6 language mode. |
+| Swift package platforms | iOS 17, macOS 14 | A successful Apple build has not been recorded for the current remediation. |
+| iOS host deployment target | iOS 17.2 (`Apps/R0llingApp/project.yml`) | The minimum does not establish device or simulator validation. |
+| CI runner | `macos-14`; workflow selects an available Xcode, preferring Xcode 16.x and falling back to 15.4 | The fallback is an availability path, not a certified minimum. Check the run logs for the exact Xcode and results. |
 
-| Εργαλείο / Πλατφόρμα | Ελάχιστη Έκδοση | Προτεινόμενη Έκδοση | Σημειώσεις |
-|---|---|---|---|
-| **macOS (για Build/Sign)** | macOS 14.4 Sonoma | macOS 15.0+ Sequoia | Απαιτείται για Xcode και Apple Developer Signing. |
-| **Xcode** | Xcode 16.0 | Xcode 16.2 / 26.4+ | Swift 6 strict concurrency mode υποστήριξη. |
-| **iOS Deployment Target** | iOS 17.2 | iOS 18.0+ | Υποστήριξη SwiftData / Modern AVFoundation APIs. |
-| **Swift Toolchain** | Swift 6.0 | Swift 6.0+ | Strict Concurrency checks (`Sendable`). |
+## Package dependencies
 
----
+`Package.swift` currently declares no external Swift package dependencies. The Meta Wearables DAT package and product entries are commented out. The real DAT bridge remains unavailable; the app identifies glasses mode as simulation.
 
-## 2. Επίσημες Εξαρτήσεις (Dependencies)
+The app uses Apple frameworks conditionally where available, including SwiftUI, AVFoundation/AVKit, Speech, HealthKit, LocalAuthentication, Security/Keychain, and ImageIO. The journal and backup format use JSON and files; SwiftData, Core Data, and SQLite are not current persistence dependencies.
 
-### 2.1 Meta Wearables Device Access Toolkit (DAT) SDK
-- **URL Αποθετηρίου:** `https://github.com/facebook/meta-wearables-dat-ios.git`
-- **Εκδοχή (Tag/Branch):** `1.0.0` (ή νεότερη συμβατή έκδοση)
-- **Χρήση:** Σύνδεση με Meta Glasses Gen 2, λήψη compressed video streams και έλεγχος session.
-- **Fallbacks:** `MetaGlassesAdapterMock` και ενσωματωμένος προσομοιωτής για δοκιμές σε περιβάλλον χωρίς φυσική συσκευή.
+## Host app and permissions
 
-### 2.2 Ενσωματωμένα iOS Frameworks (Zero 3rd-Party Bloat)
-Για μέγιστη σταθερότητα, ασφάλεια και απόλυτη ταχύτητα, το R0lling χρησιμοποιεί αποκλειστικά τα επίσημα frameworks της Apple για τις βασικές λειτουργίες του:
-- **`AVFoundation`**: Διαχείριση καμερών, συμπίεση H.264/HEVC, εγγραφή MP4 (`AVAssetWriter`), αναπαραγωγή ήχου/βίντεο.
-- **`Speech` & `AVFAudio`**: Τοπική μετατροπή ομιλίας σε κείμενο (on-device speech recognition) με υποστήριξη Ελληνικών και Αγγλικών.
-- **`SwiftData` / `CoreData` / `SQLite3`**: Τοπική βάση δεδομένων με schema versioning και migrations.
-- **`Security` (Keychain)**: Ασφαλής αποθήκευση API keys για το OpenAI και το Hermes token.
-- **`UniformTypeIdentifiers` & `UIKit`**: Ασφαλής επιλογή φακέλων Obsidian με security-scoped bookmarks.
+`Apps/R0llingApp/project.yml` defines an XcodeGen iOS app target and `Info.plist` contains its usage descriptions. CI generates and builds the target on macOS. Permission strings and build configuration do not establish that each prompt or denial path has been exercised on a device. See [the host target README](../Apps/R0llingApp/README.md) and [device test checklist](DEVICE_TESTS.md).
 
----
+## Verification
 
-## 3. Άδειες Χρήστη (Info.plist Permissions)
-
-1. `NSCameraUsageDescription`: "Το R0lling χρησιμοποιεί την κάμερα για λήψη φωτογραφιών, παιχνίδια παρατήρησης και σύνδεση με τα γυαλιά."
-2. `NSMicrophoneUsageDescription`: "Το R0lling χρησιμοποιεί το μικρόφωνο για φωνητικές σημειώσεις («note this») και συγχρονισμό ήχου στα clips."
-3. `NSSpeechRecognitionUsageDescription`: "Το R0lling μετατρέπει τη φωνή σας σε κείμενο για αυτόματη καταγραφή στο ημερολόγιο."
-4. `NSBluetoothAlwaysUsageDescription`: "Το R0lling συνδέεται ασύρματα με τα Meta Glasses Gen 2 μέσω Bluetooth."
-5. `NSLocalNetworkUsageDescription`: "Το R0lling συνδέεται με τον τοπικό βοηθό Hermes στο οικιακό σας δίκτυο (Home PC)."
+The current Windows/WSL environment can parse Swift source but cannot run the Apple build or XCTest suite because Apple's SDK frameworks are absent. See [implementation status](IMPLEMENTATION_STATUS.md) for the current verification boundary and [CI workflow](../.github/workflows/swift-ci.yml) for the Apple jobs.

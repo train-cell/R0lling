@@ -1,3 +1,5 @@
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
 # R0lling — Lane Voice + Observation Game (A04 / A14)
 
 ```yaml
@@ -8,7 +10,9 @@ git_commit: NONE
 host: Windows · Swift UNAVAILABLE · Python diagnostics OK
 ```
 
-## Definition of Done — «100% ready» (software)
+## Current source status (historical lane checklist)
+
+The checkmarks below record the original lane's source assertions; they are not runtime verification. The current checkout has XCTest source for voice/game paths, but no Apple XCTest run or device validation has been recorded during remediation. The Python diagnostics are source/model checks only.
 
 | # | DoD | Status |
 |---|---|---|
@@ -22,8 +26,8 @@ host: Windows · Swift UNAVAILABLE · Python diagnostics OK
 | 8 | Evaluation honesty: `.aiVision` / `.manual` / `.unavailable` · UI labels | ✅ |
 | 9 | Score + streak persistence · streak μόνο σε success (G5-002) · `didPersist` toast | ✅ |
 | 10 | UI: glasses capture + PhotosPicker fallback + manual (όχι AI) + session badge | ✅ |
-| 11 | XCTest: VoiceCommandParser + ObservationGameEngine fail-closed | ✅ (Mac/`swift test`) |
-| 12 | Python stage5 A04/A14 suite | ✅ |
+| 11 | XCTest source: VoiceCommandParser + ObservationGameEngine fail-closed | Present; execution unverified |
+| 12 | Python stage5 A04/A14 diagnostics | Legacy/source check; not runtime evidence |
 
 ### Εκτός DoD (ρητά)
 
@@ -31,8 +35,8 @@ host: Windows · Swift UNAVAILABLE · Python diagnostics OK
 |---|---|
 | Meta «Hey Meta» wake | Experimental / DAT — όχι iOS API |
 | Live Vision AI απόδειξη σε device | Απαιτεί API key + κάμερα/γυαλιά |
-| Mic permission Info.plist στο `.app` | SPM library μόνο — host app target εκκρεμεί |
-| `swift test` σε αυτό το host | Windows · UNAVAILABLE |
+| Mic permission denial flow on iPhone | Usage string is present; prompt and denial flow not device-verified |
+| Apple build / `swift test` for current remediation | Not run on this Windows/WSL host; see `IMPLEMENTATION_STATUS.md` |
 
 ## Files
 

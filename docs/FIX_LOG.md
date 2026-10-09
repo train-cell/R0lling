@@ -1,3 +1,5 @@
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
 ﻿# R0lling — Αρχείο Διορθώσεων (FIX_LOG) · Stage 4 + Stage 5
 
 **Στάδια:** 4 (Gemini/Composer P0–P1) · 5 (GPT Finalize steward)  

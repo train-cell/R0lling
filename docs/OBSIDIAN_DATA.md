@@ -1,3 +1,5 @@
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
 # R0lling — Δομή Δεδομένων Obsidian & Αντίγραφα Ασφαλείας (OBSIDIAN_DATA)
 
 **Έργο:** `R0lling`  
@@ -21,7 +23,7 @@ R0lling/
 └── Attachments/
     ├── Photos/            # Φωτογραφίες υψηλής ανάλυσης
     ├── Videos/            # Πλήρη βίντεο
-    ├── Clips/             # 5-10s rolling clips από τα Meta Glasses
+    ├── Clips/             # Παράδειγμα φακέλου· τα τρέχοντα clips είναι video-only placeholders
     └── Audio/             # Ηχητικά αρχεία φωνητικών σημειώσεων
 ```
 
@@ -29,15 +31,15 @@ R0lling/
 
 ## 2. Μορφή Ημερήσιας Σημείωσης Markdown
 
-Κάθε ημερήσια σημείωση περιέχει σχόλια οριοθέτησης για ασφαλές idempotency:
+Το παρακάτω είναι ενδεικτικό παράδειγμα μορφής, όχι πραγματικό export ή λήψη από Meta Glasses. Το DAT capture δεν έχει υλοποιηθεί· τα διαθέσιμα clip exports προέρχονται από simulation/video-only paths:
 
 ```markdown
 # 2026-10-06
 
 <!-- r0lling:id:C3E25B81-54A7-4632-B831-29E572B7E1B0 -->
-### [14:32] Rolling Clip
+### [14:32] Παράδειγμα Clip (simulation)
 
-Rolling Clip (10.0s) από τα Meta Glasses.
+Ενδεικτικό video-only placeholder clip (10.0s), χωρίς live λήψη από Meta Glasses.
 
 #clip #glasses
 
@@ -47,7 +49,7 @@ Rolling Clip (10.0s) από τα Meta Glasses.
 <!-- r0lling:id:F128A992-62C1-4BD8-842B-1804B32A9951 -->
 ### [15:10] Φωνητική
 
-Να πω στη Μαρία για το ταξίδι.
+Παράδειγμα σημείωσης για το ημερολόγιο.
 
 #σημαντικό #ταξίδι
 <!-- /r0lling:id:F128A992-62C1-4BD8-842B-1804B32A9951 -->

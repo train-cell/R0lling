@@ -36,6 +36,26 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(result, .note(text: "Να πω στη Μαρία για το ταξίδι"))
     }
 
+    func testNoteBodyContainingClipRemainsDictationInEnglishAndGreek() {
+        XCTAssertEqual(
+            parser.parse(transcript: "note this: clip the paragraph about my trip"),
+            .note(text: "Clip the paragraph about my trip")
+        )
+
+        parser.resetDedup()
+        XCTAssertEqual(
+            parser.parse(transcript: "σημείωσε: το clip για το ταξίδι"),
+            .note(text: "Το clip για το ταξίδι")
+        )
+    }
+
+    func testMentioningClipDoesNotTriggerClipCommand() {
+        XCTAssertEqual(
+            parser.parse(transcript: "I found a clip about the trip"),
+            .unknown(raw: "I found a clip about the trip")
+        )
+    }
+
     func testWhatAmISeeingCommand() {
         let resultEn = parser.parse(transcript: "What am I seeing?")
         XCTAssertEqual(resultEn, .whatAmISeeing)
@@ -58,6 +78,39 @@ final class VoiceCommandParserTests: XCTestCase {
     func testUnknownDictation() {
         let result = parser.parse(transcript: "Καλημέρα πώς είσαι;")
         XCTAssertEqual(result, .unknown(raw: "Καλημέρα πώς είσαι;"))
+    }
+
+    func testFinalUnknownTranscriptIsReturnedAsDictationDespiteParserDedup() {
+        let resolver = VoiceCommandUtteranceResolver(parser: parser)
+        resolver.beginUtterance()
+        let transcript = "Καλημέρα πώς είσαι;"
+
+        XCTAssertNil(resolver.processFinalTranscript(transcript), "Dictation must not dispatch as a command")
+        let stopped = resolver.stop(transcript: transcript)
+
+        XCTAssertEqual(stopped.result, .dictation(transcript))
+        XCTAssertNil(stopped.commandToDispatch)
+    }
+
+    func testFinalCommandIsReturnedAndDispatchedOnlyOnce() {
+        let resolver = VoiceCommandUtteranceResolver(parser: parser)
+        resolver.beginUtterance()
+        let transcript = "note this: buy flight tickets"
+
+        XCTAssertEqual(resolver.processFinalTranscript(transcript), .note(text: "Buy flight tickets"))
+        let stopped = resolver.stop(transcript: transcript)
+
+        XCTAssertEqual(stopped.result, .commandHandled(.note(text: "Buy flight tickets")))
+        XCTAssertNil(stopped.commandToDispatch, "The final callback already dispatched the command")
+    }
+
+    func testStopWithoutFinalCallbackDispatchesCommandOnce() {
+        let resolver = VoiceCommandUtteranceResolver(parser: parser)
+        resolver.beginUtterance()
+        let stopped = resolver.stop(transcript: "note this: buy flight tickets")
+
+        XCTAssertEqual(stopped.result, .commandHandled(.note(text: "Buy flight tickets")))
+        XCTAssertEqual(stopped.commandToDispatch, .note(text: "Buy flight tickets"))
     }
 
     /// R3-006: Δύο ίδια final transcripts → μία εντολή μέσα στο dedup window.

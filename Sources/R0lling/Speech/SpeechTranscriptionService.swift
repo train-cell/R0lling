@@ -12,22 +12,36 @@ public protocol SpeechTranscriptionServiceProtocol: AnyObject, Sendable {
 /// iOS Speech Framework (el-GR → en-US fallback). Χωρίς Meta mic / Hey Meta wake.
 /// A04: εντολές μόνο σε final transcript · dedup · χωρίς διπλή σημείωση.
 public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtocol, @unchecked Sendable {
-    public private(set) var isListening: Bool = false
+    private var listening = false
+    public var isListening: Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return listening
+    }
+    private var recognitionGeneration = UUID()
+    private var hasInputTap = false
 
-    private let parser = VoiceCommandParser()
+    private let utteranceResolver = VoiceCommandUtteranceResolver()
     private var commandHandler: (@Sendable (VoiceCommandType) -> Void)?
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
     private var accumulatedTranscript: String = ""
-    /// Αποτρέπει διπλό dispatch (final callback + stopListening).
-    private var didDispatchCommandThisUtterance: Bool = false
-    private let stateLock = NSLock()
+    private let stateLock = NSRecursiveLock()
+    #if os(iOS)
+    private var previousAudioSession: (
+        category: AVAudioSession.Category,
+        mode: AVAudioSession.Mode,
+        options: AVAudioSession.CategoryOptions
+    )?
+    #endif
 
     public init() {}
 
     public func setCommandHandler(_ handler: @escaping @Sendable (VoiceCommandType) -> Void) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
         self.commandHandler = handler
     }
 
@@ -46,6 +60,7 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
         } else {
             let fallback = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
             guard let fallback, fallback.isAvailable else {
+                deactivateAudioSession()
                 throw NSError(
                     domain: "R0lling.Speech",
                     code: 5001,
@@ -56,6 +71,7 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
         }
 
         guard let recognizer = speechRecognizer else {
+            deactivateAudioSession()
             throw NSError(
                 domain: "R0lling.Speech",
                 code: 5001,
@@ -63,108 +79,100 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
             )
         }
 
-        parser.resetDedup()
+        utteranceResolver.beginUtterance()
         accumulatedTranscript = ""
-        didDispatchCommandThisUtterance = false
-        isListening = true
+        listening = true
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.taskHint = .dictation
-        // On-device όταν διαθέσιμο — μειώνει cloud leakage· όχι Meta path.
-        if #available(iOS 13, macOS 10.15, *) {
-            request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
+        // Fail closed rather than silently sending dictation to Apple servers.
+        guard recognizer.supportsOnDeviceRecognition else {
+            listening = false
+            deactivateAudioSession()
+            throw NSError(domain: "R0lling.Speech", code: 5004, userInfo: [
+                NSLocalizedDescriptionKey: "Η τοπική αναγνώριση ομιλίας δεν υποστηρίζεται για αυτή τη γλώσσα/συσκευή."
+            ])
         }
+        request.requiresOnDeviceRecognition = true
         recognitionRequest = request
 
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
-        inputNode.removeTap(onBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
-            self?.recognitionRequest?.append(buffer)
+        if hasInputTap { inputNode.removeTap(onBus: 0); hasInputTap = false }
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+            request.append(buffer)
         }
+        hasInputTap = true
 
         audioEngine.prepare()
-        try audioEngine.start()
+        do { try audioEngine.start() }
+        catch {
+            tearDownEnginePreservingTranscript()
+            throw error
+        }
+        recognitionGeneration = UUID()
+        let generation = recognitionGeneration
 
         recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
             guard let self = self else { return }
+            self.stateLock.lock()
+            defer { self.stateLock.unlock() }
+            guard generation == self.recognitionGeneration else { return }
 
             if let result = result {
                 self.accumulatedTranscript = result.bestTranscription.formattedString
                 // A04: ΜΟΝΟ final — ποτέ command από partial (αποφυγή πολλαπλών notes).
                 if result.isFinal {
-                    self.dispatchCommandIfNeeded(from: self.accumulatedTranscript)
+                    if let command = self.utteranceResolver.processFinalTranscript(self.accumulatedTranscript) {
+                        self.commandHandler?(command)
+                    }
                     self.tearDownEnginePreservingTranscript()
                 }
             }
 
-            if error != nil {
+            if error != nil && self.listening {
                 self.tearDownEnginePreservingTranscript()
             }
         }
     }
 
-    /// Σταματά ακρόαση. Επιστρέφει `commandHandled` αν ήδη δρομολογήθηκε εντολή (όχι δεύτερο addNote).
+    /// Σταματά ακρόαση. Επιστρέφει το αποθηκευμένο final result ή αναλύει μία φορά το τελευταίο transcript.
     @discardableResult
     public func stopListening() -> SpeechStopResult {
         stateLock.lock()
-        let wasListening = isListening
+        defer { stateLock.unlock() }
+        let wasListening = listening
         let transcript = accumulatedTranscript
-        let alreadyDispatched = didDispatchCommandThisUtterance
-        stateLock.unlock()
-
         guard wasListening || !transcript.isEmpty else { return .empty }
 
         tearDownEnginePreservingTranscript()
-
-        if alreadyDispatched {
-            return .commandHandled(.unknown(raw: transcript))
-        }
-
-        // nil = κενό ή R3-006 dedup → ποτέ δεύτερη σημείωση (A04).
-        guard let command = parser.parse(transcript: transcript) else {
-            return .empty
-        }
-
-        switch command {
-        case .unknown(let raw):
-            return raw.isEmpty ? .empty : .dictation(raw)
-        default:
-            didDispatchCommandThisUtterance = true
+        let resolution = utteranceResolver.stop(transcript: transcript)
+        if let command = resolution.commandToDispatch {
             commandHandler?(command)
-            return .commandHandled(command)
         }
+        return resolution.result
     }
 
     // MARK: - Private
 
-    private func dispatchCommandIfNeeded(from transcript: String) {
+    private func tearDownEnginePreservingTranscript() {
         stateLock.lock()
         defer { stateLock.unlock() }
-        guard !didDispatchCommandThisUtterance else { return }
-        guard let command = parser.parse(transcript: transcript) else { return }
-
-        switch command {
-        case .unknown:
-            // Dictation: αποθήκευση στο stopListening / UI toggle — όχι εδώ.
-            break
-        default:
-            didDispatchCommandThisUtterance = true
-            commandHandler?(command)
-        }
-    }
-
-    private func tearDownEnginePreservingTranscript() {
+        recognitionGeneration = UUID()
         if audioEngine.isRunning {
             audioEngine.stop()
         }
-        audioEngine.inputNode.removeTap(onBus: 0)
+        if hasInputTap {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            hasInputTap = false
+        }
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
         recognitionRequest = nil
         recognitionTask = nil
-        isListening = false
+        listening = false
+        deactivateAudioSession()
     }
 
     private func ensureSpeechAuthorized() throws {
@@ -198,8 +206,31 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
     private func configureAudioSession() throws {
         #if os(iOS)
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
+        if previousAudioSession == nil {
+            previousAudioSession = (session.category, session.mode, session.categoryOptions)
+        }
+        do {
+            try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch {
+            deactivateAudioSession()
+            throw error
+        }
+        #endif
+    }
+
+    private func deactivateAudioSession() {
+        #if os(iOS)
+        let session = AVAudioSession.sharedInstance()
+        try? session.setActive(false, options: [.notifyOthersOnDeactivation])
+        if let previousAudioSession {
+            try? session.setCategory(
+                previousAudioSession.category,
+                mode: previousAudioSession.mode,
+                options: previousAudioSession.options
+            )
+            self.previousAudioSession = nil
+        }
         #endif
     }
 }

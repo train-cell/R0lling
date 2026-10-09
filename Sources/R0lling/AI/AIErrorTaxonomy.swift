@@ -14,6 +14,8 @@ public enum AIErrorTaxonomy {
     public static let directEmptyKey = 7004
     public static let directInsecureEndpoint = 7005
     public static let directRetryExhausted = 7006
+    public static let directInvalidResponse = 7007
+    public static let directResponseTooLarge = 7008
 
     // Hermes
     public static let hermesInvalidURL = 7101
@@ -22,6 +24,8 @@ public enum AIErrorTaxonomy {
     public static let hermesEmptyToken = 7104
     public static let hermesEndpointDenied = 7105
     public static let hermesRetryExhausted = 7106
+    public static let hermesInvalidResponse = 7107
+    public static let hermesResponseTooLarge = 7108
 
     // Router / vision
     public static let routerDirectMissing = 7201

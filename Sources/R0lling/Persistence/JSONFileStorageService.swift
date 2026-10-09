@@ -32,66 +32,102 @@ public actor JSONFileStorageService: JournalStorageProtocol {
         }
     }
 
-    private func ensureLoaded() {
+    private func ensureLoaded() throws {
         guard !isLoaded else { return }
-        isLoaded = true
 
         guard FileManager.default.fileExists(atPath: storageURL.path) else {
             entriesCache = [:]
+            isLoaded = true
             return
         }
 
         do {
+            try R0llingFileProtection.apply(to: storageURL)
             let data = try Data(contentsOf: storageURL)
             let decoder = JSONDecoder()
             // R3-001: encode χρησιμοποιεί .iso8601 — το decode πρέπει να ταιριάζει αλλιώς χάνεται το journal στο restart.
             decoder.dateDecodingStrategy = .iso8601
             let container = try decoder.decode(StorageContainer.self, from: data)
+            guard container.schemaVersion == 1,
+                  Set(container.entries.map(\.id)).count == container.entries.count else {
+                throw NSError(domain: "R0lling.Journal", code: 1, userInfo: [
+                    NSLocalizedDescriptionKey: "Μη υποστηριζόμενο schema ή διπλότυπα IDs. Το journal διατηρήθηκε άθικτο."
+                ])
+            }
             entriesCache = Dictionary(uniqueKeysWithValues: container.entries.map { ($0.id, $0) })
+            isLoaded = true
         } catch {
-            print("[JSONFileStorageService] Σφάλμα φόρτωσης αρχείου: \(error). Δημιουργία καθαρού cache.")
-            entriesCache = [:]
+            throw NSError(domain: "R0lling.Journal", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "Αδυναμία φόρτωσης journal. Η εγγραφή αποκλείστηκε για προστασία των δεδομένων.",
+                NSUnderlyingErrorKey: error
+            ])
         }
     }
 
-    private func flushToDisk() throws {
-        let container = StorageContainer(entries: Array(entriesCache.values))
+    private func flushToDisk(entries: [UUID: JournalEntry]) throws {
+        let container = StorageContainer(entries: Array(entries.values))
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(container)
 
         // Ατομική εγγραφή για προστασία από διακοπές ρεύματος / crashes
-        try data.write(to: storageURL, options: .atomic)
+        try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try R0llingFileProtection.apply(to: storageURL.deletingLastPathComponent())
+        try data.write(to: storageURL, options: R0llingFileProtection.atomicWriteOptions)
     }
 
     public func saveEntry(_ entry: JournalEntry) throws {
-        ensureLoaded()
-        entriesCache[entry.id] = entry
-        try flushToDisk()
+        try ensureLoaded()
+        var updated = entriesCache
+        updated[entry.id] = entry
+        try flushToDisk(entries: updated)
+        entriesCache = updated
+    }
+
+    public func insertEntriesIfAbsentAtomically(_ entries: [JournalEntry]) throws -> Set<UUID> {
+        guard !entries.isEmpty else { return [] }
+        try ensureLoaded()
+        guard Set(entries.map(\.id)).count == entries.count else {
+            throw NSError(domain: "R0lling.Journal", code: 3, userInfo: [
+                NSLocalizedDescriptionKey: "Η μαζική εγγραφή περιέχει διπλότυπα IDs."
+            ])
+        }
+
+        let additions = entries.filter { entriesCache[$0.id] == nil }
+        guard !additions.isEmpty else { return [] }
+        var updated = entriesCache
+        for entry in additions {
+            updated[entry.id] = entry
+        }
+        try flushToDisk(entries: updated)
+        entriesCache = updated
+        return Set(additions.map(\.id))
     }
 
     public func deleteEntry(id: UUID) throws {
-        ensureLoaded()
-        entriesCache.removeValue(forKey: id)
-        try flushToDisk()
+        try ensureLoaded()
+        var updated = entriesCache
+        updated.removeValue(forKey: id)
+        try flushToDisk(entries: updated)
+        entriesCache = updated
     }
 
-    public func getEntry(id: UUID) -> JournalEntry? {
-        ensureLoaded()
+    public func getEntry(id: UUID) throws -> JournalEntry? {
+        try ensureLoaded()
         return entriesCache[id]
     }
 
     /// Protocol witness — default display TZ = τρέχουσα συσκευής.
-    public func getEntriesForDate(_ date: Date) -> [JournalEntry] {
-        getEntriesForDate(date, displayTimeZone: .current)
+    public func getEntriesForDate(_ date: Date) throws -> [JournalEntry] {
+        try getEntriesForDate(date, displayTimeZone: .current)
     }
 
     /// R3-009: φιλτράρει με `entry.dateKey` (TZ εγγραφής) έναντι UI day key σε `displayTimeZone`.
     /// Πολιτική: η εγγραφή ανήκει στην ημερολογιακή ημέρα της ζώνης καταγραφής· το UI day
     /// υπολογίζεται ρητά στη ζώνη προβολής, όχι με σιωπηλό DateFormatter.
-    public func getEntriesForDate(_ date: Date, displayTimeZone: TimeZone) -> [JournalEntry] {
-        ensureLoaded()
+    public func getEntriesForDate(_ date: Date, displayTimeZone: TimeZone) throws -> [JournalEntry] {
+        try ensureLoaded()
         let targetKey = JournalEntry.makeDateKey(for: date, timeZone: displayTimeZone)
 
         return entriesCache.values
@@ -99,13 +135,13 @@ public actor JSONFileStorageService: JournalStorageProtocol {
             .sorted { $0.timestamp < $1.timestamp }
     }
 
-    public func getAllEntries() -> [JournalEntry] {
-        ensureLoaded()
+    public func getAllEntries() throws -> [JournalEntry] {
+        try ensureLoaded()
         return Array(entriesCache.values).sorted { $0.timestamp > $1.timestamp }
     }
 
-    public func searchEntries(query: String, tag: String?, source: EntrySource?) -> [JournalEntry] {
-        ensureLoaded()
+    public func searchEntries(query: String, tag: String?, source: EntrySource?) throws -> [JournalEntry] {
+        try ensureLoaded()
         let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
         return entriesCache.values.filter { entry in
@@ -126,8 +162,8 @@ public actor JSONFileStorageService: JournalStorageProtocol {
         }.sorted { $0.timestamp > $1.timestamp }
     }
 
-    public func getDatesWithEntries() -> Set<String> {
-        ensureLoaded()
+    public func getDatesWithEntries() throws -> Set<String> {
+        try ensureLoaded()
         return Set(entriesCache.values.map { $0.dateKey })
     }
 }

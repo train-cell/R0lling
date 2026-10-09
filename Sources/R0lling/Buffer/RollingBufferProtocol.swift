@@ -17,7 +17,7 @@ public struct ClipExportResult: Sendable, Equatable {
     public let hasAudio: Bool
     public let frameCount: Int
     public let timestamp: Date
-    /// `true` μόνο όταν το αρχείο είναι δομικά playable MP4 (περιέχει moov / AVAssetWriter).
+    /// `true` μόνο αφού το AVFoundation επιβεβαιώσει ότι το αρχείο είναι playable.
     public let isPlayable: Bool
     /// `true` όταν το media είναι placeholder (simulation / χωρίς πραγματικό NAL stream).
     public let isSimulationPlaceholder: Bool

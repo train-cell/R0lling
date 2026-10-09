@@ -36,17 +36,30 @@ public enum ObservationGameSessionState: Sendable, Equatable {
     case failed
 }
 
+/// Small seam for deterministic game evaluation tests and an honest boundary around vision.
+public protocol ObservationVisionEvaluating: Sendable {
+    func evaluateObservation(imageData: Data, question: String) async throws -> String
+}
+
+extension AIRouter: ObservationVisionEvaluating {
+    public func evaluateObservation(imageData: Data, question: String) async throws -> String {
+        try await askWhatAmISeeing(imageData: imageData, customQuestion: question)
+    }
+}
+
 /// Μηχανή παιχνιδιού παρατήρησης («Βρες κάτι κόκκινο») — session + fail-closed score + persistence.
 public actor ObservationGameEngine {
     public static let pontosAIEpityxias: Int = 10
     public static let pontosXeirokinitis: Int = 5
-    private static let scoreDefaultsKey = "r0lling.observation_game_score"
+    public static let scoreDefaultsKey = "r0lling.observation_game_score"
 
     private var currentMission: ObservationMission?
     private var score: Int = 0
     private var sessionState: ObservationGameSessionState = .idle
     private var lastEvaluation: ObservationEvaluationResult?
-    private let aiRouter: AIRouter
+    private let visionEvaluator: any ObservationVisionEvaluating
+    private let scoreDefaults: UserDefaults
+    private let scoreStorageKey: String
 
     private let presetMissions = [
         ("Βρες κάτι κόκκινο γύρω σου", "κόκκινο αντικείμενο"),
@@ -59,8 +72,25 @@ public actor ObservationGameEngine {
     ]
 
     public init(aiRouter: AIRouter) {
-        self.aiRouter = aiRouter
+        self.visionEvaluator = aiRouter
+        self.scoreDefaults = .standard
+        self.scoreStorageKey = Self.scoreDefaultsKey
         if let saved = UserDefaults.standard.object(forKey: Self.scoreDefaultsKey) as? Int, saved >= 0 {
+            self.score = saved
+        }
+        self.currentMission = nil
+        self.sessionState = .idle
+    }
+
+    public init(
+        visionEvaluator: any ObservationVisionEvaluating,
+        userDefaults: UserDefaults = .standard,
+        scoreStorageKey: String = "r0lling.observation_game_score"
+    ) {
+        self.visionEvaluator = visionEvaluator
+        self.scoreDefaults = userDefaults
+        self.scoreStorageKey = scoreStorageKey
+        if let saved = userDefaults.object(forKey: scoreStorageKey) as? Int, saved >= 0 {
             self.score = saved
         }
         self.currentMission = nil
@@ -97,6 +127,14 @@ public actor ObservationGameEngine {
 
     /// Αξιολόγηση φωτογραφίας (γυαλιά ή Photos picker). Fail-closed: ασαφές/σφάλμα AI → 0 πόντοι.
     public func evaluateCapturedPhoto(imageData: Data) async -> ObservationEvaluationResult {
+        guard sessionState != .evaluating else {
+            return ObservationEvaluationResult(
+                success: false,
+                feedback: "Η αξιολόγηση αυτής της αποστολής βρίσκεται ήδη σε εξέλιξη.",
+                source: .unavailable,
+                awardedPoints: 0
+            )
+        }
         guard var mission = currentMission, !mission.isCompleted else {
             let result = ObservationEvaluationResult(
                 success: false,
@@ -122,6 +160,7 @@ public actor ObservationGameEngine {
         }
 
         sessionState = .evaluating
+        let evaluationMissionID = mission.id
 
         let evaluationQuestion = """
         Εξέτασε την εικόνα. Περιέχει \(mission.targetDescription);
@@ -129,10 +168,15 @@ public actor ObservationGameEngine {
         """
 
         do {
-            let reply = try await aiRouter.askWhatAmISeeing(
+            let reply = try await visionEvaluator.evaluateObservation(
                 imageData: imageData,
-                customQuestion: evaluationQuestion
+                question: evaluationQuestion
             )
+            guard currentMission?.id == evaluationMissionID,
+                  sessionState == .evaluating,
+                  currentMission?.isCompleted == false else {
+                return staleEvaluationResult()
+            }
             let verdict = Self.parseFailClosedVerdict(reply)
 
             switch verdict {
@@ -182,6 +226,11 @@ public actor ObservationGameEngine {
                 return result
             }
         } catch {
+            guard currentMission?.id == evaluationMissionID,
+                  sessionState == .evaluating,
+                  currentMission?.isCompleted == false else {
+                return staleEvaluationResult()
+            }
             let fallbackFeedback = """
             Το Vision AI δεν ήταν διαθέσιμο (\(error.localizedDescription)). \
             Χρησιμοποίησε χειροκίνητη επιβεβαίωση — δεν είναι αξιολόγηση AI. Δεν απονεμήθηκαν πόντοι από AI.
@@ -201,6 +250,14 @@ public actor ObservationGameEngine {
     /// Χειροκίνητη επιβεβαίωση χρήστη — ρητά ΟΧΙ AI αξιολόγηση (A14 honesty).
     @discardableResult
     public func confirmManually() -> ObservationEvaluationResult {
+        guard sessionState != .evaluating else {
+            return ObservationEvaluationResult(
+                success: false,
+                feedback: "Η αξιολόγηση AI βρίσκεται ήδη σε εξέλιξη. Περίμενε να ολοκληρωθεί πριν επιβεβαιώσεις χειροκίνητα.",
+                source: .manual,
+                awardedPoints: 0
+            )
+        }
         guard var mission = currentMission, !mission.isCompleted else {
             let result = ObservationEvaluationResult(
                 success: false,
@@ -264,7 +321,16 @@ public actor ObservationGameEngine {
     }
 
     private func persistScore() {
-        UserDefaults.standard.set(score, forKey: Self.scoreDefaultsKey)
+        scoreDefaults.set(score, forKey: scoreStorageKey)
+    }
+
+    private func staleEvaluationResult() -> ObservationEvaluationResult {
+        ObservationEvaluationResult(
+            success: false,
+            feedback: "Η αποστολή άλλαξε όσο περίμενε η αξιολόγηση. Δεν απονεμήθηκαν πόντοι.",
+            source: .unavailable,
+            awardedPoints: 0
+        )
     }
 }
 

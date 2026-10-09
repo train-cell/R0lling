@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 // MARK: - =====================================================================
 // MARK: [PILLAR 1] Κολυμβητική & Αθλητική Υπεραπόδοση (Swim & Kinetic Mastery)
@@ -414,19 +415,35 @@ public actor ExecutiveEnergyROIScheduler {
     }
 }
 
-/// [SOV-04] Zero-Knowledge Local Cryptographic Enclave
+/// [SOV-04] Local AES-GCM encryption with a device-bound Keychain key.
+/// Legacy type name retained; no Secure Enclave or zero-knowledge claim.
 public actor ZeroKnowledgeSecureEnclaveVault {
     public init() {}
 
-    public func encryptString(_ text: String, keyTag: String) -> Data {
-        let raw = Data(text.utf8)
-        // Deterministic mock of Secure Enclave AES-GCM wrapping for testability
-        return raw.base64EncodedData()
+    public func encryptString(_ text: String, keyTag: String) throws -> Data {
+        let key = try VaultCryptography.key(
+            tag: keyTag,
+            create: true,
+            service: VaultCryptography.helperKeychainService
+        )
+        let box = try AES.GCM.seal(Data(text.utf8), using: key)
+        guard let combined = box.combined else {
+            throw NSError(domain: "R0lling.Vault", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Αποτυχία κρυπτογράφησης AES-GCM."
+            ])
+        }
+        return combined
     }
 
     public func decryptData(_ data: Data, keyTag: String) -> String? {
-        guard let base64Decoded = Data(base64Encoded: data) else { return nil }
-        return String(data: base64Decoded, encoding: .utf8)
+        guard let key = try? VaultCryptography.key(
+            tag: keyTag,
+            create: false,
+            service: VaultCryptography.helperKeychainService
+        ),
+              let box = try? AES.GCM.SealedBox(combined: data),
+              let plaintext = try? AES.GCM.open(box, using: key) else { return nil }
+        return String(data: plaintext, encoding: .utf8)
     }
 }
 
@@ -434,12 +451,12 @@ public actor ZeroKnowledgeSecureEnclaveVault {
 public actor AutomatedADRGenerator {
     public init() {}
 
-    public func generateADR(number: Int, title: String, context: String, decision: String, consequences: [String]) -> String {
+    public func generateADR(number: Int, title: String, context: String, decision: String, consequences: [String], createdAt: Date = Date()) -> String {
         return """
         # ADR-\(String(format: "%03d", number)): \(title)
 
         ## Status
-        Accepted (2026-10-08)
+        Accepted (\(JournalEntry.makeDateKey(for: createdAt, timeZone: TimeZone(secondsFromGMT: 0)!)))
 
         ## Context
         \(context)
@@ -687,16 +704,14 @@ public actor VocalProsodyStressMirror {
 
 /// [WEAR-08] Emergency Zero-Touch Privacy Cloak
 public actor EmergencyPrivacyCloak {
-    private var isCloakActive: Bool = false
-
     public init() {}
 
     public func engagePrivacyCloak() -> Bool {
-        isCloakActive = true
-        return true // Zeroizes volatile RAM & locks vaults
+        // No app-wide vault lock or volatile-memory clearing hook is integrated.
+        return false
     }
 
     public func isEngaged() -> Bool {
-        return isCloakActive
+        return false
     }
 }

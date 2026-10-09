@@ -1,28 +1,76 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import CoreTransferable
 
 #if canImport(PhotosUI)
 import PhotosUI
 #endif
 
+/// File-backed, size-limited import used by photo-to-vision paths. Photos providers may hand
+/// over RAW or very large originals, so the byte bound is checked before reading them into RAM.
+struct ImportedVisionPhoto: Transferable {
+    let url: URL
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(importedContentType: .image) { received in
+            let sourceURL = received.file
+            let values = try sourceURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+            guard values.isRegularFile == true,
+                  let fileSize = values.fileSize,
+                  fileSize > 0,
+                  fileSize <= ImageMetadataSanitizer.maximumVisionInputBytes else {
+                throw failure("Η εικόνα είναι κενή, μη κανονικό αρχείο ή υπερβαίνει το όριο των 40 MB.")
+            }
+
+            let suffix = sourceURL.pathExtension.isEmpty ? "image" : sourceURL.pathExtension
+            let destinationURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("R0lling-VisionImport-\(UUID().uuidString).\(suffix)")
+            do {
+                try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+            } catch {
+                try? FileManager.default.removeItem(at: destinationURL)
+                throw error
+            }
+            return ImportedVisionPhoto(url: destinationURL)
+        }
+    }
+
+    func loadVisionData() throws -> Data {
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard values.isRegularFile == true,
+              let fileSize = values.fileSize,
+              fileSize > 0,
+              fileSize <= ImageMetadataSanitizer.maximumVisionInputBytes else {
+            throw Self.failure("Η εικόνα είναι κενή ή υπερβαίνει το όριο των 40 MB.")
+        }
+        let sourceData = try Data(contentsOf: url, options: .mappedIfSafe)
+        return try ImageMetadataSanitizer.encodeForVision(sourceData)
+    }
+
+    private static func failure(_ message: String) -> NSError {
+        NSError(domain: "R0lling.VisionImport", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+}
+
 /// Κουμπί εισαγωγής media από Photos (PHPicker via PhotosUI) + Files για ήχο/άλλα.
-/// A03: πραγματική ανάγνωση Data — χωρίς fake success αν αποτύχει το load.
+/// A03: file-backed import for large assets; failed loads never report success.
 public struct PhotosMediaPickerButton: View {
     public var isDisabled: Bool
-    public var onImport: (Data, String, MediaType) async -> Void
+    @Binding public var isFileImporterPresented: Bool
+    public var onImport: (URL, String, MediaType) async -> Void
     public var onError: (String) -> Void
 
 #if canImport(PhotosUI)
     @State private var photoSelection: [PhotosPickerItem] = []
 #endif
-    @State private var deikseFileImporter: Bool = false
-
     public init(
         isDisabled: Bool = false,
-        onImport: @escaping (Data, String, MediaType) async -> Void,
+        isFileImporterPresented: Binding<Bool>,
+        onImport: @escaping (URL, String, MediaType) async -> Void,
         onError: @escaping (String) -> Void
     ) {
         self.isDisabled = isDisabled
+        self._isFileImporterPresented = isFileImporterPresented
         self.onImport = onImport
         self.onError = onError
     }
@@ -45,6 +93,7 @@ public struct PhotosMediaPickerButton: View {
                         Circle()
                             .stroke(R0llingTheme.borderSubtle, lineWidth: 1)
                     )
+                    .r0llingBevelCapsule()
             }
             .disabled(isDisabled)
             .onChange(of: photoSelection) { _, neoSelection in
@@ -54,7 +103,7 @@ public struct PhotosMediaPickerButton: View {
 #endif
             Button(action: {
                 R0llingTheme.triggerHapticFeedback()
-                deikseFileImporter = true
+                isFileImporterPresented = true
             }) {
                 Image(systemName: "folder.badge.plus")
                     .font(.system(size: 15, weight: .bold))
@@ -66,12 +115,13 @@ public struct PhotosMediaPickerButton: View {
                         Circle()
                             .stroke(R0llingTheme.borderSubtle, lineWidth: 1)
                     )
+                    .r0llingBevelCapsule()
             }
             .disabled(isDisabled)
             .accessibilityLabel("Εισαγωγή αρχείου media")
         }
         .fileImporter(
-            isPresented: $deikseFileImporter,
+            isPresented: $isFileImporterPresented,
             allowedContentTypes: [.image, .movie, .video, .audio, .mpeg4Movie, .mpeg4Audio],
             allowsMultipleSelection: true
         ) { apotelesma in
@@ -86,13 +136,14 @@ public struct PhotosMediaPickerButton: View {
 
         for item in items {
             do {
-                guard let data = try await item.loadTransferable(type: Data.self), !data.isEmpty else {
-                    onError("Αποτυχία φόρτωσης από Photos (κενά δεδομένα).")
+                let mediaType = try epilysiMediaType(apo: item)
+                guard let importedFile = try await item.loadTransferable(type: ImportedPhotosFile.self) else {
+                    onError("Αποτυχία φόρτωσης αρχείου από Photos.")
                     continue
                 }
-                let mediaType = try epilysiMediaType(apo: item)
-                let filename = syntheshOnomatos(apo: item, mediaType: mediaType)
-                await onImport(data, filename, mediaType)
+                defer { try? FileManager.default.removeItem(at: importedFile.url) }
+                let filename = syntheshOnomatos(apo: importedFile.url, mediaType: mediaType)
+                await onImport(importedFile.url, filename, mediaType)
             } catch {
                 onError("Photos import: \(error.localizedDescription)")
             }
@@ -108,8 +159,34 @@ public struct PhotosMediaPickerButton: View {
         throw MediaApothikeusiError.agnostosTypos(onomaArxeiou: item.itemIdentifier ?? "photos_item")
     }
 
-    private func syntheshOnomatos(apo item: PhotosPickerItem, mediaType: MediaType) -> String {
-        "\(UUID().uuidString).\(proepiloghmeniEpektasi(mediaType))"
+    private func syntheshOnomatos(apo fileURL: URL, mediaType: MediaType) -> String {
+        let pathExtension = fileURL.pathExtension.lowercased()
+        let extensionToUse = pathExtension.isEmpty ? proepiloghmeniEpektasi(mediaType) : pathExtension
+        return "\(UUID().uuidString).\(extensionToUse)"
+    }
+
+    private struct ImportedPhotosFile: Transferable {
+        let url: URL
+
+        static var transferRepresentation: some TransferRepresentation {
+            FileRepresentation(importedContentType: .image) { received in
+                try copyReceivedFile(received.file)
+            }
+            FileRepresentation(importedContentType: .movie) { received in
+                try copyReceivedFile(received.file)
+            }
+            FileRepresentation(importedContentType: .video) { received in
+                try copyReceivedFile(received.file)
+            }
+        }
+
+        private static func copyReceivedFile(_ sourceURL: URL) throws -> ImportedPhotosFile {
+            let fileExtension = sourceURL.pathExtension.isEmpty ? "media" : sourceURL.pathExtension
+            let destinationURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("R0lling-PhotosImport-\(UUID().uuidString).\(fileExtension)")
+            try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+            return ImportedPhotosFile(url: destinationURL)
+        }
     }
 #endif
 
@@ -124,16 +201,11 @@ public struct PhotosMediaPickerButton: View {
                     if accessed { url.stopAccessingSecurityScopedResource() }
                 }
                 do {
-                    let data = try Data(contentsOf: url)
-                    guard !data.isEmpty else {
-                        onError("Κενό αρχείο: \(url.lastPathComponent)")
-                        continue
-                    }
                     let mediaType = try JournalMediaImporter.mediaType(
                         giaOnomaArxeiou: url.lastPathComponent,
                         utTypeIdentifier: UTType(filenameExtension: url.pathExtension)?.identifier
                     )
-                    await onImport(data, url.lastPathComponent, mediaType)
+                    await onImport(url, url.lastPathComponent, mediaType)
                 } catch {
                     onError("Ανάγνωση \(url.lastPathComponent): \(error.localizedDescription)")
                 }

@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
-"""
-Deep Static Codebase Auditor for R0lling
-Verifies:
-1. Syntax integrity (balanced braces, parens, brackets)
-2. Declared structs/classes/enums/actors vs usages
-3. Import integrity
-4. Theme token compliance (zero orange/amber/red in non-error views)
-5. Swift 6 Concurrency isolation (actors, Sendable conformance)
+"""Heuristic source scan, not a Swift parser/type checker.
+Counts declarations and checks selected text/delimiters/theme tokens.
+Does not validate imports, runtime behavior or Swift 6 concurrency.
 """
 
 import os
@@ -55,8 +50,16 @@ def audit():
                         break
                 
                 char = line[i]
-                if char == '"' and (i == 0 or line[i-1] != '\\'):
-                    in_string = not in_string
+                if char == '"':
+                    # A quote is escaped only when preceded by an odd-length
+                    # run of backslashes (e.g. Swift's "\\" separator).
+                    backslash_count = 0
+                    backslash_index = i - 1
+                    while backslash_index >= 0 and line[backslash_index] == "\\":
+                        backslash_count += 1
+                        backslash_index -= 1
+                    if backslash_count % 2 == 0:
+                        in_string = not in_string
                 elif not in_string and not in_multiline_comment:
                     if char in "{[(":
                         stack.append((char, l_idx, char))

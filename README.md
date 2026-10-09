@@ -1,279 +1,62 @@
 # R0lling
 
-### Clip the moment. Keep the day.
+Clip the moment. Keep the day.
 
-**R0lling** (zero instead of the first *o*) is a local-first personal journal for iPhone — notes, photos, voice, and short rolling clips — built to pair with **Meta Glasses Gen 2** when you bring your own Device Access Toolkit (DAT).
+R0lling is a personal journal implemented as a Swift package with an iOS app host. Notes and media are stored locally. Linking an Obsidian vault is an explicit setup action; while linked, journal saves and edits export automatically. AI requests remain user-triggered.
 
-Your memories live on the phone (and optionally as Markdown in Obsidian). AI is opt-in, never always-on. Glasses are optional; simulation mode is first-class.
+On iOS, journal writes, media imports, and restored media use Apple's file protection until the first unlock after a device restart; existing journal/media files are migrated when loaded or accessed. This is OS-managed encryption at rest, not app-level encryption; backup bundles remain plaintext.
 
-<br/>
+The package uses Swift tools 5.10 and Swift 5 language mode with StrictConcurrency checking. The iOS host targets iOS 17.2. These settings do not establish Swift 6 concurrency compliance.
 
-<p align="center">
-  <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6.0-F05138?style=for-the-badge&logo=swift&logoColor=white" />
-  <img alt="SPM" src="https://img.shields.io/badge/SPM-Package-5294E2?style=for-the-badge&logo=swift&logoColor=white" />
-  <img alt="iOS 17+" src="https://img.shields.io/badge/iOS-17%2B-0A84FF?style=for-the-badge&logo=apple&logoColor=white" />
-  <a href="https://github.com/train-cell/R0lling/actions/workflows/swift-ci.yml"><img alt="CI Status" src="https://github.com/train-cell/R0lling/actions/workflows/swift-ci.yml/badge.svg?branch=main" /></a>
-  <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge" />
-  <img alt="Status" src="https://img.shields.io/badge/Status-100%25%20Verified%20·%20122%20Modules-22C55E?style=for-the-badge" />
-</p>
+## Current implementation
 
-<p align="center">
-  <img alt="Platform" src="https://img.shields.io/badge/platform-iPhone%20%7C%20Mac%20%2B%20Xcode-16161D?style=flat-square" />
-  <img alt="Meta DAT" src="https://img.shields.io/badge/Meta%20DAT-bring%20your%20own-7742DC?style=flat-square" />
-  <img alt="Privacy" src="https://img.shields.io/badge/privacy-local--first-38BDF8?style=flat-square" />
-  <img alt="Device proof" src="https://img.shields.io/badge/Gen%202%20live-not%20device--proven-64748B?style=flat-square" />
-</p>
+The table describes source paths in this checkout. It does not mean the Apple runtime, network providers, hardware, or visual layout have passed end-to-end validation; see [implementation status](docs/IMPLEMENTATION_STATUS.md).
 
----
+| Feature | Current status |
+|---|---|
+| Journal CRUD, search, date correction, media viewer | Implemented; corrupted/unsupported JSON fails closed without overwriting it |
+| Obsidian export | Files picker, bookmarks, Markdown, attachment copies, conflict sidecars; export errors propagate |
+| Backup/restore | Plain JSON + media + optional Agent memory; copy errors propagate; no backup encryption |
+| AI chat | Direct HTTPS or Hermes gateway; selected endpoint is validated on save; Keychain credentials can be removed from Settings; settings persisted |
+| Chat context | Journal and Agent memory OFF by default; up to five recent entries; optional manually entered note location is sent only with its separate opt-in |
+| Explicit AI summary/recall | Sends the selected entries to the configured provider; summary context is limited to five |
+| Imported image AI | Decodes and converts images to JPEG without original metadata before transmission |
+| Glasses | Simulation only; importing the DAT SDK does not complete session/camera integration |
+| Rolling clips | Simulation placeholder MP4 export; H264 remux helper exists, real DAT feed missing |
+| HealthKit | Five optional quantities (HRV, resting heart rate, respiratory rate, blood oxygen, and body temperature) plus the longest merged sleep episode in the prior-evening-to-noon window; overlapping stages count once and a separate nap is not added; request completion is not proof of read permission; no fabricated readings or clinical recovery score |
+| Fitness | 30-day workout-count calendar with selectable days; cumulative workout-duration chart, total, and period comparison from HealthKit samples; empty and unavailable reads stay distinct |
+| Executive utilities | Tasks and focus history persist in UserDefaults; daily focus totals aggregate session/day overlap and the active focus ring updates live; scratchpad writes journal; stopwatch uses monotonic time; active deadline resumes after relaunch using wall-clock time |
+| Studio and strategy cards | Explicit UI previews; most actor helpers are prototypes, not integrated product features |
+| Biohacking / Health | Live HealthKit readings and local breathing/binaural-audio tools; disconnected sample metrics remain collapsed previews; binaural output needs stereo headphones and device playback is not validated |
+| Vault helper | AES-GCM + device-bound Keychain key; not Secure Enclave AES; does not encrypt the journal or backups |
+| Private diary | AES-GCM encrypted local entries; store APIs require a per-store authorization capability issued only after successful LocalAuthentication and revoked on lock. Device-bound Keychain key; explicitly excluded from OS backups, with no recovery on device loss. The Keychain item is not itself biometry-bound or Secure Enclave-backed |
+| Future letterbox | Encrypted local messages; store API requires a post-biometric authorization capability and redacts future payloads using the device's current wall clock. A changed clock can move the unlock date. Excluded from OS backups |
+| Decision journal | Encrypted decisions and assumptions with confidence tracking and a due-date-gated 90-day review. Store APIs require the same post-biometric authorization capability; the Keychain item is not itself biometry-bound or Secure Enclave-backed. Excluded from OS backups |
+| Shamir / secure zeroization | Core 2-of-3 split/recovery API with authenticated shares; no share-delivery UI or independent security audit. Secure zeroization remains unavailable |
 
-## Honest status (read this)
+AI actions send data to a provider. Hermes is a configurable gateway, not an enforced air gap. There is no outbound byte counter or firewall enforcement. The app does not automatically redact journal text for PII.
 
-| Claim | Reality |
-| --- | --- |
-| Core journal + clip pipeline + AI adapters + Obsidian export | **Software-ready** — real Swift/SPM code, DI via `AppState` |
-| Rolling buffer / camera stream | **Simulation-first** — test frames + playable placeholder MP4; Meta DAT is **commented out** in `Package.swift` until you flip it on Mac |
-| Live Meta Glasses Gen 2 / DAT pairing | **Not device-proven** — bring-your-own DAT + hardware when available (`docs/LANE_CLIP_META.md`) |
-| Build / `swift test` / iOS IPA | **100% Passing in CI** (GitHub Actions macOS 14 runner · Runs #20–#23) — Swift build, test suites & `.ipa` packaging verified |
-| App Store / production | **Not approved** — personal engineering release; see `docs/AUDIT_FINAL.md` |
+## Evidence and limitations
 
-> Viral narrative ≠ fake demos. R0lling ships with clear `SIMULATION` labels and typed errors — never a fake “connected” glasses state.
+See [implementation status](docs/IMPLEMENTATION_STATUS.md), [capability map](docs/CAPABILITY_MATRIX.md), and [findings remediation](docs/FINDINGS_REMEDIATION.md).
 
----
+The Python scripts contain independent model examples and source/config checks. Passing them does not prove Swift behavior, visual fidelity, platform compliance, or hardware support. The GitHub Actions workflow contains separate macOS Swift build/tests and iOS host builds. No claim is made that the current uncommitted changes have passed those jobs.
 
-## Why this exists
+The UI direction follows the Bevel screens in the external `ui understanding` folder: charcoal/slate cards with a subtle raised bevel edge, inset metric rings, and floating capsule navigation. The primary destinations are Today, Journal, Fitness, and Health. Fitness has a 30-day HealthKit workout calendar and duration comparison; Today keeps the summary prominent and collapses secondary tools by default. Static code was updated across these screens, but rendered iPhone/Simulator comparison remains pending.
 
-Wearables capture life. Most apps bury the moment in a cloud gallery you’ll never reopen.
+## Build
 
-R0lling is the opposite: a **day timeline** you own. Something happens — a joke, a street scene, a thought you want to tell someone later — you say *clip this* or hit the big Clip button, and the last **5–10 seconds** land in today’s journal. Notes become Markdown. Your agent gets a bounded memory folder. Hermes on the home PC or a Direct API — your choice, never a silent failover.
+On a Mac with Xcode:
 
-Atmosphere: dark Discord × Twitch energy for a personal journal — charcoal surfaces, lavender accents, LIVE only when the stream is actually running. LoggedIn-adjacent blues for trust; R0lling purple for the clip pulse.
-
----
-
-## Feature grid
-
-Labels: **Ready** = wired product path · **Sim** = works with simulation / placeholders · **Experimental** = code present, gated off (`FeatureReadinessRegistry.ready = false`)
-
-### Core plan
-
-| Feature | Label | Notes |
-| --- | --- | --- |
-| Daily journal + search + tags | Ready | Offline JSON journal · restart-safe |
-| Media attach (photo / video / audio) | Ready / Sim | Paths wired · Photos picker proof on device |
-| Rolling buffer 5–10s + Clip button | Sim | Ring buffer + AVAssetWriter placeholder; DAT remux when NALs exist |
-| Voice command parser (`clip this` / `note this` / EL+EN) | Ready | Deduped finals · iPhone Speech fallback |
-| Obsidian export + conflict sidecar | Ready | Idempotent Markdown · SHA256 · no silent overwrite |
-| Agent folder (`Memory` / `Preferences` / `Open-loops`) | Ready | User-visible Markdown · PathAsfaleia |
-| Dual AI: Hermes + Direct OpenAI-compatible | Ready / Sim | Keychain secrets · HTTPS / LAN allowlist · live credentials = you |
-| «What am I seeing?» (single frame) | Ready / Sim | Vision path + on-device OCR; live vision needs a key |
-| Observation game («find something red») | Ready / Sim | Manual fallback if vision unavailable |
-| Backup / restore | Ready | Manifest + schema version |
-| Meta Glasses Gen 2 live stream | Experimental / BYO DAT | Simulation adapter default · error `4002` without SDK |
-
-### Sovereign Life OS v2.0 Hubs (7 Dedicated Tabs)
-
-| Tab / Hub | Features & Engines | Status |
-| --- | --- | --- |
-| **Σήμερα** (`TodayView`) | Executive Suite (To-Do, Scratchpad, Stopwatch), Bevel 3-Ring Telemetry, Chief of Staff Quick Capture | Ready |
-| **Βιο-Απόδοση** (`BiohackingHubView`) | Full-Spectrum HealthKit 2x3 Grid, Iron Tonnage Logger, Box Breathing 4x4, Circadian Sunlight & Caffeine | Ready |
-| **Studio** (`CreativeStudioHubView`) | Multi-Format Content Transformer (X/LinkedIn/Newsletter), Zettelkasten Live Strip, Dream Correlation, Logic Fallacy Auditor | Ready |
-| **Στρατηγείο** (`StrategicVaultHubView`) | 90-Day Decision Journal, Future Letterbox Capsule, Board of Advisors Simulator, Air-Gapped Firewall, FaceID Vault | Ready |
-| **Ημερολόγιο** (`CalendarView`) | Time Capsule «Σαν Σήμερα», Circadian Schedule, Filtered Search | Ready |
-| **Βοηθός** (`AssistantView`) | Offline Autonomous Jarvis Agent, Deep Work Pacer, Local Obsidian Memory | Ready |
-| **Ρυθμίσεις** (`SettingsView`) | Full-Spectrum HealthKit Permissions, Privacy Manifests, Zero-Knowledge Storage Scrubber | Ready |
-
-### 40 Personalized Sovereign Engines (High-Performance Polymath Suite)
-
-| Pillar | Focus | Engines & Modules | Status |
-| --- | --- | --- | --- |
-| **Pillar 1: Swim & Kinetic Mastery** | Κολύμβηση & Ισχύς | `StrokeCadencePacer`, `LactateAccumulation`, `PoolTurnSentry`, `DrylandPowerTransfer`, `DynamicPBSplits`, `HypoxicBreathing`, `ShoulderGuard`, `PostPoolGlycogen` | Ready |
-| **Pillar 2: ECE & Systems Architecture** | Αρχιτεκτονική & OS | `DatapathCycleResolver`, `PsarakisTrapScanner`, `SpacedRepetitionECE`, `AssemblyDisassembler`, `IEEE754Converter`, `DeadlockBanker`, `KarnaughMinimizer`, `VirtualMemoryEAT` | Ready |
-| **Pillar 3: Sovereign Executive Core** | Επιτελείο & Obsidian | `ObsidianAtomizer`, `FiftyFiftyBoundaryGate`, `EnergyROIScheduler`, `ZeroKnowledgeEnclave`, `AutomatedADR`, `LocalVectorVaultRAG`, `PreMortemInversion`, `GitSemanticCommits` | Ready |
-| **Pillar 4: Deep Circadian Biohacking** | Αυτόνομο & Κιρκάδιο | `AutonomicToneTracker`, `ThermalSleepCooler`, `NSDRTrigger`, `CARSentinel`, `SaunaColdCycling`, `FastingAutophagyIndex`, `ElectrolyteLoss`, `BlueLightShield` | Ready |
-| **Pillar 5: Wearable Augmentation** | Meta Glasses & Watch | `SilentHeadGesture`, `AmbientWhisperCoach`, `SpatialAudioLoci`, `WhiteboardOCR`, `TurnTakingGuard`, `AcousticDecibelSentinel`, `VocalProsodyMirror`, `PrivacyCloak` | Ready |
-
----
-
-## Architecture
-
-```mermaid
-flowchart LR
-  subgraph Wearables
-    G["Meta Glasses Gen 2<br/>(BYO DAT)"]
-    S["Simulation stream<br/>(default)"]
-  end
-
-  subgraph iPhone["R0lling iPhone"]
-    A["SwiftUI App<br/>Apps/R0llingApp"]
-    L["Local journal + media"]
-    B["Rolling buffer 5–10s"]
-    O["Obsidian export"]
-    R["AI router"]
-  end
-
-  G -.->|"when DAT wired"| A
-  S --> A
-  A --> L
-  A --> B
-  B --> L
-  A --> O
-  A -->|selected context only| R
-  R --> H["Hermes on home PC<br/>LAN / VPN"]
-  R --> M["Direct AI API<br/>HTTPS"]
-```
-
-```text
-R0lling/
-├── Package.swift              # SPM library (DAT dep commented)
-├── Apps/R0llingApp/           # iOS host scaffold · Info.plist · XcodeGen
-├── Sources/R0lling/
-│   ├── App/  AI/  Buffer/  Core/  Game/
-│   ├── Glasses/  Obsidian/  Persistence/  Speech/  UI/
-│   └── Experimental/          # orphans · ready=false
-├── Tests/R0llingTests/
-├── verification/              # Python mirrors (Windows-friendly)
-└── docs/                      # AUDIT · SETUP · DEVICE_TESTS · DECISIONS
-```
-
----
-
-## Quick start (Mac)
-
-**Needs:** macOS 14.4+ · Xcode 16+ (Swift 6) · iPhone / Simulator on iOS 17+
-
-```bash
-git clone https://github.com/train-cell/R0lling.git
-cd R0lling
-
-# Library smoke
+```sh
 swift build
-swift test
-
-# Or open the package and run the host
-open Package.swift
+cd Apps/R0llingApp
+xcodegen generate
+open R0llingApp.xcodeproj
 ```
 
-### iOS app target
-
-There is no committed `.xcodeproj` (merge thrash). Follow **`Apps/R0llingApp/README.md`**:
-
-1. New iOS App → add local SPM package `R0lling`
-2. Replace Info with `Apps/R0llingApp/Info.plist` (camera / mic / speech / Bluetooth / local network strings)
-3. Sign with your Personal Team · unique Bundle ID
-4. Simulator: enable **Simulation Mode** in Settings — no glasses required
-5. Optional Meta DAT: uncomment the package in `Package.swift` and follow `docs/LANE_CLIP_META.md`
-
-### Keys (never in the repo)
-
-| Secret | Where |
-| --- | --- |
-| Direct AI API key | iOS **Keychain** via Settings |
-| Hermes bearer token | Keychain · private LAN/VPN endpoint only |
-| Meta Developer registration | Your Meta account · see `docs/SETUP_META.md` |
-
-Empty key → typed error before network. No secrets in logs or toasts.
-
-### Windows / Verification Tools without Xcode
-
-```bash
-# 1. Static Codebase Audit (syntax, delimiters, UI cards)
-python verification/audit_swift_codebase.py
-
-# 2. 10 Phases / 122 Modules Empirical Verification Suite
-python verification/verify_all_subsystems.py
-
-# 3. Theme, Apple PrivacyInfo & Meta Hardware Safety
-python verification/verify_theme_apple_meta_compliance.py
-
-# 4. Stage 5 Finalize, Timezone Filters & Key Guards
-python verification/diagnose_stage5_finalize.py
-
-# 5. Live GitHub Actions Runs Monitor
-python verification/check_commits_ci.py
-
-# 6. Dynamic iOS IPA Package Retrieval (Sideloadly ready)
-python verification/download_latest_ipa.py
-```
-
-Cloud macOS CI: `.github/workflows/swift-ci.yml` (Runs #20–#23 all 100% green).
-
-### iPhone Installation (Sideloadly)
-
-1. Connect your iPhone via USB cable to your PC.
-2. Open **Sideloadly**.
-3. Drag and drop [`build_artifacts/R0lling.ipa`](build_artifacts/R0lling.ipa) (4.31 MB) into Sideloadly.
-4. Enter your Apple ID and click **Start**.
-5. On your iPhone: *Settings -> General -> VPN & Device Management* -> Trust your developer account.
-
----
-
-## Privacy · local-first
-
-- Journal and media stay in the **iPhone sandbox** by default.
-- Obsidian is a **one-way export** in v1 (conflict-safe) — not a silent cloud sync.
-- AI receives **only** the note, frame, or context you select — never continuous video upload.
-- Hermes is for **your** home PC; do not expose the gateway to the public internet.
-- Release builds kill the remote mirror stream (`broadcastFrame` no-op) until TLS identity exists.
-- You can use the journal with **zero** glasses, Obsidian, or AI credentials.
-
----
-
-## Roadmap
-
-| Milestone | Status |
-| --- | --- |
-| Software objective (plan A01–A16 SW rows) | Done — see `docs/GOAL_100_PROGRESS.md` |
-| Green `swift test` / GHA on macOS | Done — 100% passing (Runs #20–#23) |
-| iOS App IPA build & packaging | Done — `build_artifacts/R0lling.ipa` (4.31 MB) |
-| Wire MetaWearablesDAT · Gen 2 stream proof | Bring-your-own · `docs/LANE_CLIP_META.md` |
-| Device matrix DEV-01…10 · 0/16 → filled | Blocked on hardware |
-| Stage 6 only with real device failure report | Policy — no fake Stage 6 |
-| Wave-D+ super-features | Frozen until A05/A10 device proof |
-
----
-
-## Contributing
-
-1. Prefer small, surgical PRs — journal / buffer / AI / glasses stay separable.
-2. No silent mocks of success (connection, save, AI reply, LIVE badge).
-3. Keep secrets out of git; use Keychain + `.env` locally (already gitignored).
-4. New “super” features start behind `FeatureReadinessRegistry` with `ready: false`.
-5. Open an issue with host (Mac/Windows), sim vs device, and the exact error code.
-
----
-
-## Docs map
-
-| Doc | Purpose |
-| --- | --- |
-| [`docs/AUDIT_FINAL.md`](docs/AUDIT_FINAL.md) | Canonical CTO audit |
-| [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) | What Gen 2 / SDK can do vs R0lling |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | Sim-only v1 · DAT · Experimental freeze |
-| [`docs/SETUP_META.md`](docs/SETUP_META.md) | Developer Mode / pairing |
-| [`docs/SETUP_AI_HERMES.md`](docs/SETUP_AI_HERMES.md) | Dual AI connectors |
-| [`docs/OBSIDIAN_DATA.md`](docs/OBSIDIAN_DATA.md) | Vault layout · Agent folder |
-| [`docs/DESIGN.md`](docs/DESIGN.md) | Discord × Twitch tokens |
-| [`docs/DEVICE_TESTS.md`](docs/DEVICE_TESTS.md) | Hardware proof checklist |
-
----
+`Package.swift` produces a library. `Apps/R0llingApp/Host` provides the app entry point. Enable a valid signing team with HealthKit capability for a device build. Windows cannot build this Apple-framework application.
 
 ## License
 
-[MIT](LICENSE) — use it, fork it, clip your own moments.
-
----
-
-<p align="center">
-  <sub>R0lling · personal wearable memory · software-ready · simulation-first · glasses when you bring DAT</sub>
-</p>
-
----
-
-<details>
-<summary>Ελληνικά (σύντομο)</summary>
-
-**R0lling** = προσωπικό local-first ημερολόγιο iPhone με rolling clips 5–10s, Obsidian export και διπλό AI (Hermes / Direct API).  
-**Όχι** device-proven στα Gen 2 ακόμη — simulation-first· Meta DAT = bring-your-own σε Mac.  
-Λεπτομέρειες: `docs/AUDIT_FINAL.md` · `docs/DECISIONS.md` §2.
-
-</details>
+[MIT](LICENSE)

@@ -9,7 +9,7 @@ on:
 
 jobs:
   python-verify:
-    name: Python verification (Windows-parity)
+    name: Python examples / source presence (not Swift validation)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -21,19 +21,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Stage 3 defects
-        run: python verification/diagnose_stage3_defects.py
-
-      - name: Stage 4 fixes
-        run: python verification/diagnose_stage4_fixes.py
-
-      - name: Stage 5 finalize
-        run: python verification/diagnose_stage5_finalize.py
-
-      - name: Verify all subsystems
+      - name: Run independent Python model examples
         run: python verification/verify_all_subsystems.py
 
-      - name: Verify theme, Apple & Meta compliance
+      - name: Inspect source/config presence (no runtime compliance)
         run: python verification/verify_theme_apple_meta_compliance.py
 
   build-and-test:

@@ -1,4 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// Καρτέλα Δημιουργίας & Δεύτερου Εγκεφάλου (Creative Studio & Obsidian Zettelkasten Hub)
 public struct CreativeStudioHubView: View {
@@ -14,23 +19,24 @@ public struct CreativeStudioHubView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Δημιουργικό Studio & Νους")
-                        .font(.system(size: 22, weight: .bold))
+                        .font(.system(.title2, design: .default).weight(.bold))
                         .foregroundColor(R0llingTheme.textPrimary)
                     Text("OBSIDIAN ZETTELKASTEN // MULTI-FORMAT")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced).weight(.bold))
                         .foregroundColor(R0llingTheme.accentPurple)
                 }
                 Spacer()
                 Image(systemName: "brain.head.profile")
-                    .font(.system(size: 18))
+                    .font(.title3)
                     .foregroundColor(R0llingTheme.accentLavender)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(R0llingTheme.bgSurface)
+            .background(R0llingTheme.bgPrimary)
 
             ScrollView {
                 LazyVStack(spacing: 16) {
+                    PrototypeNotice()
                     // Obsidian Zettelkasten Live Strip
                     ZettelkastenChipStripView()
 
@@ -64,20 +70,20 @@ public struct ECEEngineeringSolverCardView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label("ECE Systems & Datapath Resolver", systemImage: "cpu.fill")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.subheadline.weight(.bold))
                     .foregroundColor(R0llingTheme.textPrimary)
                 Spacer()
                 Text("RISC-V // MIPS")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced).weight(.bold))
                     .foregroundColor(R0llingTheme.accentPurple)
             }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(instruction)
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .font(.system(.footnote, design: .monospaced).weight(.semibold))
                     .foregroundColor(R0llingTheme.accentCyan)
                 Text("Ανάλυση Σημάτων: \(signals)")
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.system(.caption, design: .monospaced))
                     .foregroundColor(R0llingTheme.textSecondary)
             }
             .padding(10)
@@ -86,16 +92,18 @@ public struct ECEEngineeringSolverCardView: View {
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .padding(16)
-        .background(R0llingTheme.bgSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(R0llingTheme.borderSubtle, lineWidth: 0.5)
-        )
+        .r0llingBevelSurface(cornerRadius: 18)
     }
 }
 
 public struct ContentTransformerCardView: View {
+    private var formattedContent: String {
+        switch selectedFormat {
+        case 0: return "1/3 \(sourceIdea)\n2/3 Μικρά atomic βήματα καθημερινά οδηγούν σε εκθετικά αποτελέσματα.\n3/3 Καταγεγραμμένο στο R0lling Sovereign OS."
+        case 1: return "💡 Στρατηγικό Insight:\n\(sourceIdea)\n#Engineering #Execution #Sovereignty"
+        default: return "## Εβδομαδιαίο Insight\n\(sourceIdea)\n*Αρχείο: L4NE Sovereign Architecture.*"
+        }
+    }
     @State private var selectedFormat: Int = 0
     @State private var sourceIdea: String = "Η συνέπεια ξεπερνά την ένταση μακροπρόθεσμα."
 
@@ -103,11 +111,11 @@ public struct ContentTransformerCardView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("Multi-Platform Transformer", systemImage: "arrow.triangle.branch")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.subheadline.weight(.bold))
                     .foregroundColor(R0llingTheme.textPrimary)
                 Spacer()
-                Text("ONE-TAP EXPORT")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                Text("COPY FORMATTED TEXT")
+                    .font(.system(.caption2, design: .monospaced).weight(.bold))
                     .foregroundColor(R0llingTheme.accentCyan)
             }
 
@@ -133,7 +141,7 @@ public struct ContentTransformerCardView: View {
                     Text("*Αρχείο: L4NE Sovereign Architecture.*")
                 }
             }
-            .font(.system(size: 12, design: .monospaced))
+            .font(.system(.caption, design: .monospaced))
             .foregroundColor(R0llingTheme.textSecondary)
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -141,27 +149,27 @@ public struct ContentTransformerCardView: View {
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             Button {
+                #if canImport(UIKit)
+                UIPasteboard.general.string = formattedContent
+                #elseif canImport(AppKit)
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(formattedContent, forType: .string)
+                #endif
                 R0llingTheme.triggerHapticFeedback()
             } label: {
                 HStack {
                     Image(systemName: "doc.on.doc.fill")
                     Text("Αντιγραφή Μορφοποίησης")
                 }
-                .font(.system(size: 12, weight: .semibold))
+                .font(.footnote.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-                .background(R0llingTheme.accentPurple)
-                .foregroundColor(.white)
-                .clipShape(Capsule())
+                .foregroundColor(R0llingTheme.textPrimary)
+                .r0llingBevelCapsule()
             }
         }
         .padding(16)
-        .background(R0llingTheme.bgSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(R0llingTheme.borderSubtle, lineWidth: 0.5)
-        )
+        .r0llingBevelSurface(cornerRadius: 18)
     }
 }
 
@@ -172,11 +180,11 @@ public struct MoodboardSwatchesCardView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label("Moodboard & Hex Extractor", systemImage: "paintpalette.fill")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.subheadline.weight(.bold))
                     .foregroundColor(R0llingTheme.textPrimary)
                 Spacer()
                 Text("5 DOMINANT SWATCHES")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced).weight(.bold))
                     .foregroundColor(R0llingTheme.accentLavender)
             }
 
@@ -188,19 +196,14 @@ public struct MoodboardSwatchesCardView: View {
                             .frame(width: 32, height: 32)
                             .overlay(Circle().stroke(R0llingTheme.borderSubtle, lineWidth: 1))
                         Text(hex)
-                            .font(.system(size: 8, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundColor(R0llingTheme.textMuted)
                     }
                 }
             }
         }
         .padding(16)
-        .background(R0llingTheme.bgSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(R0llingTheme.borderSubtle, lineWidth: 0.5)
-        )
+        .r0llingBevelSurface(cornerRadius: 18)
     }
 }
 
@@ -209,33 +212,26 @@ public struct LogicFallacyAuditorCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Label("Έλεγχος Λογικών Πλανών (Auditor)", systemImage: "shield.lefthalf.filled")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.subheadline.weight(.bold))
                     .foregroundColor(R0llingTheme.textPrimary)
                 Spacer()
-                Text("RATIONAL COMPASS")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(R0llingTheme.accentCyan)
+                Text("ΠΑΡΑΔΕΙΓΜΑ")
+                    .font(.system(.caption2, design: .monospaced).weight(.bold))
+                    .foregroundColor(R0llingTheme.statusWarning)
             }
+            Text("Ενδεικτική ανάλυση · δεν έγινε έλεγχος δικής σου καταγραφής.")
+                .font(.caption)
+                .foregroundColor(R0llingTheme.textMuted)
             Text("«Πάντα αποτυγχάνω αφού έχω ήδη ξοδέψει τόσο χρόνο...»")
-                .font(.system(size: 12, design: .monospaced))
+                .font(.system(.caption, design: .monospaced))
                 .foregroundColor(R0llingTheme.accentLavender)
 
-            HStack {
-                Text("Εντοπίστηκε:")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(R0llingTheme.statusError)
-                Text("Sunk Cost Fallacy & Black-or-White Thinking")
-                    .font(.system(size: 11))
-                    .foregroundColor(R0llingTheme.textSecondary)
-            }
+            Text("Παράδειγμα ευρήματος: Sunk Cost Fallacy & Black-or-White Thinking")
+                .font(.caption)
+                .foregroundColor(R0llingTheme.textSecondary)
         }
         .padding(16)
-        .background(R0llingTheme.bgSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(R0llingTheme.borderSubtle, lineWidth: 0.5)
-        )
+        .r0llingBevelSurface(cornerRadius: 18)
     }
 }
 
@@ -244,23 +240,18 @@ public struct DreamCorrelationCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Label("Υποσυνείδητα Μοτίβα Ονείρων", systemImage: "moon.stars.fill")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.footnote.weight(.bold))
                     .foregroundColor(R0llingTheme.textPrimary)
                 Spacer()
-                Text("CLUSTER 76%")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(R0llingTheme.accentLavender)
+                Text("ΠΡΟΕΠΙΣΚΟΠΗΣΗ")
+                    .font(.system(.caption2, design: .monospaced).weight(.bold))
+                    .foregroundColor(R0llingTheme.statusWarning)
             }
-            Text("Συσχέτιση: Όνειρα με νερό/ωκεανό συσχετίζονται με κατανάλωση καφεΐνης μετά τις 16:00.")
-                .font(.system(size: 12))
+            Text("Δεν έχουν αναλυθεί προσωπικές καταγραφές ονείρων ή καφεΐνης. Η συσχέτιση θα εμφανιστεί όταν υπάρξουν πραγματικά δεδομένα.")
+                .font(.caption)
                 .foregroundColor(R0llingTheme.textSecondary)
         }
         .padding(14)
-        .background(R0llingTheme.bgSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(R0llingTheme.borderSubtle, lineWidth: 0.5)
-        )
+        .r0llingBevelSurface(cornerRadius: 16)
     }
 }

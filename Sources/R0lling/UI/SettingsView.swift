@@ -4,16 +4,28 @@ import UniformTypeIdentifiers
 /// Οθόνη ρυθμίσεων (Settings View)
 public struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
-    @State private var bufferDurationSelection: Double = 10.0
+    @AppStorage("r0lling.buffer.targetSeconds") private var bufferDurationSelection: Double = 10.0
     @State private var simulationMode: Bool = true
     @State private var selectedAIProvider: AIProviderType = .directAPI
     @State private var directEndpointURL: String = "https://api.openai.com/v1"
     @State private var directModelName: String = "gpt-4o-mini"
+    @State private var directAPIKeychainKey = "r0lling.direct_api_key"
     @State private var directAPIKey: String = ""
     @State private var hermesEndpointURL: String = "https://127.0.0.1:8080/v1"
+    @State private var hermesTokenKeychainKey = "r0lling.hermes_token"
     @State private var hermesToken: String = ""
+    @State private var hasDirectAPIKey: Bool = false
+    @State private var hasHermesToken: Bool = false
+    @State private var credentialRemovalKey: String?
+    @State private var credentialRemovalLabel = ""
+    @State private var showCredentialRemovalConfirmation = false
+    @State private var includeJournal: Bool = false
+    @State private var includeMemory: Bool = false
+    @State private var includeLocation: Bool = false
+    @State private var contextLimit: Int = 5
     @State private var deixeiEpilogiVault: Bool = false
     @State private var deixeiEpilogiBackup: Bool = false
+    @State private var emfaniseEksagogiBackup: Bool = false
 
     public var body: some View {
         NavigationView {
@@ -37,22 +49,20 @@ public struct SettingsView: View {
                             .foregroundColor(R0llingTheme.accentPurple)
                     }
 
-                    Toggle("Simulation Mode (Δοκιμή χωρίς γυαλιά)", isOn: $simulationMode)
-                        .onChange(of: simulationMode) { _, val in
-                            Task {
-                                await appState.glassesAdapter.toggleSimulationMode(enabled: val)
-                                // R3-003: Αν το SDK λείπει, το adapter επιβάλλει simulation.
-                                let actual = await appState.glassesAdapter.isSimulationMode
-                                if val == false && actual == true {
-                                    simulationMode = true
-                                    appState.showToast("Real DAT mode μη διαθέσιμο χωρίς MetaWearablesDAT SDK.")
+                    if MetaDATStreamBridge.einaiLiveYlopoiimeno {
+                        Toggle("Simulation Mode (Δοκιμή χωρίς γυαλιά)", isOn: $simulationMode)
+                            .onChange(of: simulationMode) { _, val in
+                                Task {
+                                    await appState.glassesAdapter.toggleSimulationMode(enabled: val)
+                                    simulationMode = await appState.glassesAdapter.isSimulationMode
                                 }
                             }
-                        }
-
-                    if !MetaGlassesAdapter.einaiDatSDKDiathesimo {
-                        Text("DAT SDK: μη συνδεδεμένο — μόνο Simulation.")
-                            .font(.system(size: 12))
+                    } else {
+                        Label("SIMULATION ONLY", systemImage: "eyeglasses")
+                            .font(.system(.caption, design: .monospaced).weight(.bold))
+                            .foregroundColor(R0llingTheme.statusWarning)
+                        Text("Το live Meta DAT bridge δεν είναι υλοποιημένο σε αυτό το build.")
+                            .font(.caption)
                             .foregroundColor(R0llingTheme.textSecondary)
                     }
                 }
@@ -64,6 +74,18 @@ public struct SettingsView: View {
                         Text("10 Δευτερόλεπτα").tag(10.0)
                     }
                     .pickerStyle(SegmentedPickerStyle())
+                    .disabled(appState.isStreaming)
+                    .onChange(of: bufferDurationSelection) { _, selectedSeconds in
+                        Task {
+                            await appState.glassesAdapter.setBufferTargetSeconds(selectedSeconds)
+                        }
+                    }
+
+                    Text(appState.isStreaming
+                         ? "Η επιλογή εφαρμόζεται αφού σταματήσει η τρέχουσα ροή."
+                         : "Η διάρκεια εφαρμόζεται στην επόμενη ροή γυαλιών.")
+                        .font(.caption)
+                        .foregroundColor(R0llingTheme.textSecondary)
 
                     HStack {
                         Text("Τρέχων Buffer:")
@@ -80,35 +102,64 @@ public struct SettingsView: View {
                         Text("Hermes (Home PC)").tag(AIProviderType.hermes)
                     }
                     .pickerStyle(SegmentedPickerStyle())
-                    .onChange(of: selectedAIProvider) { _, val in
-                        appState.activeProvider = val
-                    }
+
 
                     if selectedAIProvider == .directAPI {
                         TextField("Base URL", text: $directEndpointURL)
                         TextField("Model Name", text: $directModelName)
                         SecureField("API Key", text: $directAPIKey)
+                        if hasDirectAPIKey {
+                            Button("Αφαίρεση αποθηκευμένου API key", role: .destructive) {
+                                requestCredentialRemoval(
+                                    key: directAPIKeychainKey,
+                                    label: "Direct AI API key"
+                                )
+                            }
+                        }
                     } else {
                         TextField("Hermes Gateway URL (Home PC)", text: $hermesEndpointURL)
                         SecureField("Hermes Bearer Token", text: $hermesToken)
+                        if hasHermesToken {
+                            Button("Αφαίρεση αποθηκευμένου Hermes token", role: .destructive) {
+                                requestCredentialRemoval(
+                                    key: hermesTokenKeychainKey,
+                                    label: "Hermes token"
+                                )
+                            }
+                        }
                     }
+
+                    Toggle("Ημερολόγιο στο chat AI", isOn: $includeJournal)
+                    Toggle("Agent memory στο chat AI", isOn: $includeMemory)
+                    Toggle("Τοποθεσία σημειώσεων στο context", isOn: $includeLocation)
+                    Stepper("Έως \(contextLimit) καταγραφές", value: $contextLimit, in: 0...5)
+                    Text("Κάθε ερώτηση αποστέλλεται στον επιλεγμένο πάροχο. Το ημερολόγιο και η Agent memory προστίθενται στο chat μόνο όταν ενεργοποιηθούν εδώ. Η τοποθεσία περιλαμβάνεται μόνο για σημειώσεις στις οποίες έχεις προσθέσει όνομα τοποθεσίας. Οι ενέργειες σύνοψης και ανάκλησης αποστέλλουν τις αντίστοιχες καταγραφές.")
+                        .font(.caption)
 
                     Button("Αποθήκευση Ρυθμίσεων AI") {
                         let newSettings = AISettings(
                             activeProvider: selectedAIProvider,
                             directAPIBaseURL: directEndpointURL,
                             directAPIModel: directModelName,
-                            hermesBaseURL: hermesEndpointURL
+                            directAPIKeyKeychainKey: directAPIKeychainKey,
+                            hermesBaseURL: hermesEndpointURL,
+                            hermesTokenKeychainKey: hermesTokenKeychainKey,
+                            includeJournalInChat: includeJournal,
+                            includeAgentMemoryInChat: includeMemory,
+                            includeLocationInContext: includeLocation,
+                            maxContextEntries: contextLimit
                         )
                         Task {
                             do {
-                                try await appState.aiRouter.validateDirectURL(directEndpointURL)
-                                try await appState.aiRouter.validateHermesURL(hermesEndpointURL)
+                                try await appState.aiRouter.validateEndpointForSaving(
+                                    provider: selectedAIProvider,
+                                    directBaseURL: directEndpointURL,
+                                    hermesBaseURL: hermesEndpointURL
+                                )
                             } catch {
                                 appState.showToast("Μη έγκυρο AI URL: \(error.localizedDescription)")
                                 return
                             }
-                            await appState.aiRouter.updateSettings(newSettings)
                             do {
                                 if !directAPIKey.isEmpty {
                                     try await appState.aiRouter.storeSecret(
@@ -122,9 +173,19 @@ public struct SettingsView: View {
                                         forKey: newSettings.hermesTokenKeychainKey
                                     )
                                 }
-                                appState.showToast("Οι ρυθμίσεις AI αποθηκεύτηκαν (Keychain).")
+                                await appState.aiRouter.updateSettings(newSettings)
+                                appState.activeProvider = newSettings.activeProvider
+                                directAPIKey = ""
+                                hermesToken = ""
+                                hasDirectAPIKey = await appState.aiRouter.hasSecret(
+                                    forKey: newSettings.directAPIKeyKeychainKey
+                                )
+                                hasHermesToken = await appState.aiRouter.hasSecret(
+                                    forKey: newSettings.hermesTokenKeychainKey
+                                )
+                                appState.showToast("Οι ρυθμίσεις AI αποθηκεύτηκαν.")
                             } catch {
-                                appState.showToast("Ρυθμίσεις OK· Keychain σφάλμα: \(error.localizedDescription)")
+                                appState.showToast("Αποτυχία αποθήκευσης credentials: \(error.localizedDescription)")
                             }
                         }
                     }
@@ -178,7 +239,9 @@ public struct SettingsView: View {
 
                 // Section 5: Backup & Restore (A15)
                 Section(header: Text("Αντίγραφα Ασφαλείας (Backup)")) {
-                    Button("Δημιουργία Πλήρους Backup Bundle") {
+                    Text("Το bundle περιέχει μη κρυπτογραφημένο JSON, media και Agent memory. Φύλαξέ το σε προστατευμένη τοποθεσία.")
+                        .font(.caption)
+                    Button("Εξαγωγή backup σε Files…") {
                         Task {
                             await appState.dimiourgia_backup_bundle()
                         }
@@ -202,12 +265,67 @@ public struct SettingsView: View {
                     HStack {
                         Text("Αρχιτεκτονική:")
                         Spacer()
-                        Text("Local-First Swift 6 / iOS 17.2+")
+                        Text("Swift 5 mode / iOS 17.2+")
                             .foregroundColor(R0llingTheme.textSecondary)
                     }
                 }
             }
+            .r0llingFormSurface()
             .navigationTitle("Ρυθμίσεις")
+            .confirmationDialog(
+                "Να αφαιρεθεί το αποθηκευμένο \(credentialRemovalLabel);",
+                isPresented: $showCredentialRemovalConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Αφαίρεση credential", role: .destructive) {
+                    guard let key = credentialRemovalKey else { return }
+                    Task {
+                        do {
+                            try await appState.aiRouter.deleteSecret(forKey: key)
+                            if key == directAPIKeychainKey {
+                                hasDirectAPIKey = false
+                            } else if key == hermesTokenKeychainKey {
+                                hasHermesToken = false
+                            }
+                            appState.showToast("Το αποθηκευμένο credential αφαιρέθηκε.")
+                        } catch {
+                            appState.showToast("Αποτυχία αφαίρεσης credential: \(error.localizedDescription)")
+                        }
+                    }
+                }
+                Button("Άκυρο", role: .cancel) {}
+            }
+            #if canImport(UIKit)
+            .onChange(of: appState.pendingBackupExportURL) { _, backupURL in
+                emfaniseEksagogiBackup = backupURL != nil
+            }
+            .sheet(isPresented: $emfaniseEksagogiBackup) {
+                if let backupURL = appState.pendingBackupExportURL {
+                    BackupBundleExportPicker(bundleURL: backupURL) { didExport in
+                        appState.finishBackupExport(didExport: didExport)
+                        emfaniseEksagogiBackup = false
+                    }
+                    .ignoresSafeArea()
+                }
+            }
+            #endif
+            .task {
+                let settings = await appState.aiRouter.currentSettings()
+                selectedAIProvider = settings.activeProvider
+                directEndpointURL = settings.directAPIBaseURL
+                directModelName = settings.directAPIModel
+                directAPIKeychainKey = settings.directAPIKeyKeychainKey
+                hermesEndpointURL = settings.hermesBaseURL
+                hermesTokenKeychainKey = settings.hermesTokenKeychainKey
+                includeJournal = settings.includeJournalInChat
+                includeMemory = settings.includeAgentMemoryInChat
+                includeLocation = settings.includeLocationInContext
+                contextLimit = max(0, min(5, settings.maxContextEntries))
+                simulationMode = await appState.glassesAdapter.isSimulationMode
+                await appState.glassesAdapter.setBufferTargetSeconds(bufferDurationSelection)
+                hasDirectAPIKey = await appState.aiRouter.hasSecret(forKey: settings.directAPIKeyKeychainKey)
+                hasHermesToken = await appState.aiRouter.hasSecret(forKey: settings.hermesTokenKeychainKey)
+            }
             .fileImporter(
                 isPresented: $deixeiEpilogiVault,
                 allowedContentTypes: [.folder],
@@ -225,7 +343,7 @@ public struct SettingsView: View {
             }
             .fileImporter(
                 isPresented: $deixeiEpilogiBackup,
-                allowedContentTypes: [.folder],
+                allowedContentTypes: [.folder, .r0llingBackupBundle],
                 allowsMultipleSelection: false
             ) { result in
                 switch result {
@@ -239,5 +357,11 @@ public struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private func requestCredentialRemoval(key: String, label: String) {
+        credentialRemovalKey = key
+        credentialRemovalLabel = label
+        showCredentialRemovalConfirmation = true
     }
 }

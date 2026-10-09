@@ -1,9 +1,11 @@
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
 # R0lling — Security Audit (Lane: Security) · RESIDUALS CLOSED
 
 **Ημερομηνία:** 6 Οκτωβρίου 2026 (security residual pass → 100%)  
 **Workspace:** `.`  
 **Skills:** `security_reviewer` · `security-guardian`  
-**Canonical CTO:** `docs/AUDIT_FINAL.md` supersedes ιστορικά OPEN findings αυτού του αρχείου.  
+**Historical pointer:** `docs/AUDIT_FINAL.md` is an archived 2026-10-06 snapshot, not the current authority. Use `docs/IMPLEMENTATION_STATUS.md`, `docs/CAPABILITY_MATRIX.md`, and `docs/FINDINGS_REMEDIATION.md` for current status.
 **Proof:** `python verification/diagnose_stage5_finalize.py` → **ALL PASSED** (SEC suite expanded)
 
 ---

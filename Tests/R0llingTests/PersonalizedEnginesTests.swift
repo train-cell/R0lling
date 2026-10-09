@@ -1,4 +1,5 @@
 import XCTest
+import Security
 @testable import R0lling
 
 final class PersonalizedEnginesTests: XCTestCase {
@@ -156,17 +157,26 @@ final class PersonalizedEnginesTests: XCTestCase {
         XCTAssertFalse(blocked)
     }
 
-    func testSOV04ZeroKnowledgeSecureEnclaveVault() async {
+    func testSOV04ZeroKnowledgeSecureEnclaveVault() async throws {
         let vault = ZeroKnowledgeSecureEnclaveVault()
         let raw = "Confidential Sovereign Secret"
-        let encrypted = await vault.encryptString(raw, keyTag: "TAG")
-        let decrypted = await vault.decryptData(encrypted, keyTag: "TAG")
+        let keyTag = "helper-test-\(UUID().uuidString)"
+        defer {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: "com.r0lling.local-aes-helper",
+                kSecAttrAccount as String: keyTag
+            ]
+            SecItemDelete(query as CFDictionary)
+        }
+        let encrypted = try await vault.encryptString(raw, keyTag: keyTag)
+        let decrypted = await vault.decryptData(encrypted, keyTag: keyTag)
         XCTAssertEqual(decrypted, raw)
     }
 
     func testSOV05AutomatedADRGenerator() async {
         let adr = AutomatedADRGenerator()
-        let text = await adr.generateADR(number: 42, title: "Swift 6 Concurrency Migration", context: "Data races prevention", decision: "Use isolated actors", consequences: ["Safety guaranteed"])
+        let text = await adr.generateADR(number: 42, title: "Swift 6 Concurrency Migration", context: "Data races prevention", decision: "Use isolated actors", consequences: ["Safety guaranteed"], createdAt: ISO8601DateFormatter().date(from: "2026-10-08T00:00:00Z")!)
         XCTAssertTrue(text.contains("ADR-042: Swift 6 Concurrency Migration"))
         XCTAssertTrue(text.contains("Accepted (2026-10-08)"))
     }
@@ -301,11 +311,11 @@ final class PersonalizedEnginesTests: XCTestCase {
         XCTAssertTrue(cue.contains("διαφραγματική ανάσα"))
     }
 
-    func testWEAR08EmergencyPrivacyCloak() async {
+    func testWEAR08EmergencyPrivacyCloakReportsUnavailable() async {
         let cloak = EmergencyPrivacyCloak()
         let engaged = await cloak.engagePrivacyCloak()
-        XCTAssertTrue(engaged)
+        XCTAssertFalse(engaged, "The privacy cloak is not integrated with vaults or app memory")
         let active = await cloak.isEngaged()
-        XCTAssertTrue(active)
+        XCTAssertFalse(active)
     }
 }

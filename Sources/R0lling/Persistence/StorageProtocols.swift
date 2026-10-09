@@ -2,6 +2,8 @@ import Foundation
 
 public protocol JournalStorageProtocol: Sendable {
     func saveEntry(_ entry: JournalEntry) async throws
+    /// Insert only entries whose IDs are absent, with one storage commit. Returns the IDs inserted.
+    func insertEntriesIfAbsentAtomically(_ entries: [JournalEntry]) async throws -> Set<UUID>
     func deleteEntry(id: UUID) async throws
     func getEntry(id: UUID) async throws -> JournalEntry?
     func getEntriesForDate(_ date: Date) async throws -> [JournalEntry]
@@ -12,6 +14,8 @@ public protocol JournalStorageProtocol: Sendable {
 
 public protocol MediaStorageProtocol: Sendable {
     func saveMediaFile(data: Data, originalFilename: String, mediaType: MediaType) async throws -> MediaAttachment
+    /// Copies large imported assets from disk without first materializing the whole file in memory.
+    func saveMediaFile(from sourceURL: URL, originalFilename: String, mediaType: MediaType) async throws -> MediaAttachment
     /// SEC-002: throws αν το relativePath επιχειρεί path traversal εκτός Media root.
     func getMediaFileURL(relativePath: String) throws -> URL
     func deleteMediaFile(relativePath: String) async throws

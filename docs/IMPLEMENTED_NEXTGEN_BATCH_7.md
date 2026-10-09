@@ -1,3 +1,5 @@
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
 # ⚡ R0lling Next-Gen Super-Features (Batch 7)
 **Manifest & Architectural Reference for Features 3, 4, 8, 11, 12, 13, 16**
 *Status: **SCAFFOLD / PARTIAL WIRE** — όχι device-proven · Python math mirrors ≠ Swift/hardware/CLIP/Whisper proof*  

@@ -22,6 +22,39 @@ final class ApplePlatformComplianceTests: XCTestCase {
         XCTAssertThrowsError(try HermesEndpointAsfaleia.epikyroseHermesBaseURL("http://public-server.com/api"))
     }
 
+    func testHermesCleartextTailscaleCGNATBoundaries() throws {
+        let lowerBoundary = try HermesEndpointAsfaleia.epikyroseHermesBaseURL(
+            "http://100.64.0.0:8080/v1"
+        )
+        XCTAssertEqual(lowerBoundary.host, "100.64.0.0")
+
+        let upperBoundary = try HermesEndpointAsfaleia.epikyroseHermesBaseURL(
+            "http://100.127.255.255:8080/v1"
+        )
+        XCTAssertEqual(upperBoundary.host, "100.127.255.255")
+
+        XCTAssertThrowsError(
+            try HermesEndpointAsfaleia.epikyroseHermesBaseURL("http://100.63.255.255:8080/v1")
+        )
+        XCTAssertThrowsError(
+            try HermesEndpointAsfaleia.epikyroseHermesBaseURL("http://100.128.0.0:8080/v1")
+        )
+    }
+
+    func testChatCompletionsURLPreservesBaseQueryAndRejectsFragment() throws {
+        let base = try HermesEndpointAsfaleia.epikyroseDirectBaseURL(
+            "https://proxy.example/v1?tenant=blue&region=eu"
+        )
+        let endpoint = try HermesEndpointAsfaleia.chatCompletionsURL(fromBaseURL: base)
+
+        XCTAssertEqual(endpoint.path, "/v1/chat/completions")
+        XCTAssertEqual(URLComponents(url: endpoint, resolvingAgainstBaseURL: false)?.query, "tenant=blue&region=eu")
+        XCTAssertNil(endpoint.fragment)
+
+        let fragmentURL = try XCTUnwrap(URL(string: "https://proxy.example/v1#client-only"))
+        XCTAssertThrowsError(try HermesEndpointAsfaleia.chatCompletionsURL(fromBaseURL: fragmentURL))
+    }
+
     func testApplePermissionErrorCodesRegistered() {
         XCTAssertEqual(AppErrorTaxonomy.permissionCameraDenied, 8001)
         XCTAssertEqual(AppErrorTaxonomy.permissionMicrophoneDenied, 8002)

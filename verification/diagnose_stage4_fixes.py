@@ -64,9 +64,9 @@ def test_r3_002() -> None:
         "synthesizeMP4Container absent",
     )
     check(
-        "AVAssetWriter path",
-        "AVAssetWriter" in exporter and "moov" in exporter,
-        "PlayableClipExporter uses AVAssetWriter + moov guard",
+        "AVAssetWriter + AVFoundation playability",
+        "AVAssetWriter" in exporter and "load(.isPlayable)" in exporter,
+        "PlayableClipExporter validates the generated asset with AVFoundation",
     )
     check(
         "isPlayable field",
@@ -75,9 +75,9 @@ def test_r3_002() -> None:
     )
     tests = read("Tests/R0llingTests/RollingBufferTests.swift")
     check(
-        "moov XCTest",
-        'Data("moov".utf8)' in tests or "moov" in tests,
-        "RollingBufferTests asserts moov presence",
+        "AVFoundation playability XCTest",
+        "load(.isPlayable)" in tests and "XCTAssertTrue(isPlayable)" in tests,
+        "RollingBufferTests asks AVFoundation whether the export is playable",
     )
 
 
@@ -197,28 +197,19 @@ def test_iso8601_roundtrip_python() -> None:
     )
 
 
-def test_moov_required_contract() -> None:
-    print("[R3-002-py] moov-required contract (anti-regression)...")
-    # Το παλιό fake container δεν πρέπει να θεωρείται playable.
-    fake = (
-        bytes([0x00, 0x00, 0x00, 0x20])
-        + b"ftypisom"
-        + b"\x00" * 20
-        + (4).to_bytes(4, "big")
-        + b"mdat"
-        + b"\x00" * 16
-    )
-    check(
-        "fake not playable",
-        b"moov" not in fake,
-        "legacy ftyp+mdat without moov rejected by contract",
-    )
-    # Το exporter source απαιτεί moov μετά το write.
+def test_playability_contract() -> None:
+    print("[R3-002-py] AVFoundation playability contract (source assertions only)...")
     exporter = read("Sources/R0lling/Buffer/PlayableClipExporter.swift")
+    tests = read("Tests/R0llingTests/RollingBufferTests.swift")
     check(
-        "post-write moov assert",
-        'range(of: Data("moov".utf8))' in exporter or 'Data("moov"' in exporter,
-        "exporter fails closed without moov",
+        "AVFoundation decides playability",
+        "load(.isPlayable)" in exporter,
+        "source asks AVFoundation instead of relying on a byte marker",
+    )
+    check(
+        "XCTest checks AVFoundation playability",
+        "load(.isPlayable)" in tests and "XCTAssertTrue(isPlayable)" in tests,
+        "Apple test source validates the exported asset through AVFoundation",
     )
 
 
@@ -233,7 +224,7 @@ def main() -> int:
     test_r3_005()
     test_r3_006()
     test_iso8601_roundtrip_python()
-    test_moov_required_contract()
+    test_playability_contract()
     print("=" * 70)
     if errors:
         print(f"FAILED: {len(errors)} check(s)")

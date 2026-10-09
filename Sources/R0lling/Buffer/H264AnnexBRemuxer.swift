@@ -23,6 +23,7 @@ public enum H264AnnexBRemuxer {
         samples: [BufferedSample],
         destinationURL: URL
     ) async throws {
+        try Task.checkCancellation()
         let videoSamples = samples.filter { !$0.isAudio }
         guard videoSamples.count >= elaxistaVideoSamples else {
             throw NSError(
@@ -123,6 +124,13 @@ public enum H264AnnexBRemuxer {
             try FileManager.default.removeItem(at: destinationURL)
         }
 
+        var outputVerified = false
+        defer {
+            if !outputVerified {
+                try? FileManager.default.removeItem(at: destinationURL)
+            }
+        }
+
         var formatDesc: CMFormatDescription?
         let createStatus = ftiakseFormatDescription(sps: sps, pps: pps, out: &formatDesc)
 
@@ -136,6 +144,9 @@ public enum H264AnnexBRemuxer {
         }
 
         let writer = try AVAssetWriter(outputURL: destinationURL, fileType: .mp4)
+        defer {
+            if writer.status != .completed { writer.cancelWriting() }
+        }
         let videoInput = AVAssetWriterInput(
             mediaType: .video,
             outputSettings: nil,
@@ -160,12 +171,28 @@ public enum H264AnnexBRemuxer {
             )
         }
 
-        let baseTime = videoSamples.first!.timestampSeconds
+        guard let firstVideoSample = videoSamples.first else {
+            throw NSError(
+                domain: errorDomain,
+                code: kodikosElleipsisSPSPPS,
+                userInfo: [NSLocalizedDescriptionKey: "Δεν υπάρχουν video samples για remux."]
+            )
+        }
+        let baseTime = firstVideoSample.timestampSeconds
         writer.startSession(atSourceTime: .zero)
         let timescale: CMTimeScale = 600
 
         for sample in videoSamples {
+            let readinessDeadline = ProcessInfo.processInfo.systemUptime + 10
             while !videoInput.isReadyForMoreMediaData {
+                try Task.checkCancellation()
+                guard writer.status == .writing,
+                      ProcessInfo.processInfo.systemUptime < readinessDeadline else {
+                    writer.cancelWriting()
+                    throw writer.error ?? NSError(domain: "R0lling.Buffer", code: 3090, userInfo: [
+                        NSLocalizedDescriptionKey: "Το video writer απέτυχε ή υπερέβη το όριο αναμονής."
+                    ])
+                }
                 try await Task.sleep(nanoseconds: 2_000_000)
             }
 
@@ -209,6 +236,7 @@ public enum H264AnnexBRemuxer {
 
         videoInput.markAsFinished()
         await writer.finishWriting()
+        try Task.checkCancellation()
 
         guard writer.status == .completed else {
             throw writer.error ?? NSError(
@@ -218,14 +246,15 @@ public enum H264AnnexBRemuxer {
             )
         }
 
-        let data = try Data(contentsOf: destinationURL)
-        guard data.range(of: Data("moov".utf8)) != nil else {
+        let asset = AVURLAsset(url: destinationURL)
+        guard try await asset.load(.isPlayable) else {
             throw NSError(
                 domain: errorDomain,
                 code: kodikosWriterApotyxia,
-                userInfo: [NSLocalizedDescriptionKey: "Remux MP4 χωρίς moov — μη playable."]
+                userInfo: [NSLocalizedDescriptionKey: "Το AVFoundation δεν αναγνωρίζει το remux ως playable MP4."]
             )
         }
+        outputVerified = true
     }
 
     private static func ftiakseFormatDescription(

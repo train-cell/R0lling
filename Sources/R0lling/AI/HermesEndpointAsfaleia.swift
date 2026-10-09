@@ -62,15 +62,28 @@ public enum HermesEndpointAsfaleia {
         return url
     }
 
-    /// Συνθέτει `/chat/completions` από validated base URL (ασφαλές concat — όχι RFC3986 relative replace).
+    /// Appends the API path while preserving URL query items and rejecting fragments.
     public static func chatCompletionsURL(
         fromBaseURL base: URL,
         errorDomain: String = AIErrorTaxonomy.hermesDomain,
         errorCode: Int = AIErrorTaxonomy.hermesInvalidURL
     ) throws -> URL {
-        var absolute = base.absoluteString
-        while absolute.hasSuffix("/") { absolute.removeLast() }
-        guard let endpoint = URL(string: absolute + "/chat/completions") else {
+        guard var components = URLComponents(url: base, resolvingAgainstBaseURL: false),
+              components.fragment == nil else {
+            throw AIErrorTaxonomy.makeError(
+                domain: errorDomain,
+                code: errorCode,
+                message: "Αδυναμία σύνθεσης chat/completions URL."
+            )
+        }
+
+        let basePath = components.percentEncodedPath
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        components.percentEncodedPath = basePath.isEmpty
+            ? "/chat/completions"
+            : "/\(basePath)/chat/completions"
+
+        guard let endpoint = components.url else {
             throw AIErrorTaxonomy.makeError(
                 domain: errorDomain,
                 code: errorCode,

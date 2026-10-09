@@ -8,6 +8,7 @@ public struct EntryEditorSheet: View {
 
     @State private var contentText: String
     @State private var tagsText: String
+    @State private var locationNameText: String
     @State private var editedTimestamp: Date
     @State private var timeZoneIdentifier: String
 
@@ -21,6 +22,7 @@ public struct EntryEditorSheet: View {
         self.onCancel = onCancel
         _contentText = State(initialValue: entry.content)
         _tagsText = State(initialValue: entry.tags.joined(separator: ", "))
+        _locationNameText = State(initialValue: entry.locationName ?? "")
         _editedTimestamp = State(initialValue: entry.timestamp)
         _timeZoneIdentifier = State(initialValue: entry.timeZoneIdentifier)
     }
@@ -35,6 +37,13 @@ public struct EntryEditorSheet: View {
 
                 Section("Tags (χωρισμένα με κόμμα)") {
                     TextField("π.χ. ταξίδι, εργασία", text: $tagsText)
+                }
+
+                Section("Τοποθεσία (προαιρετικά)") {
+                    TextField("π.χ. Αθήνα", text: $locationNameText)
+                    Text("Το όνομα τοποθεσίας προστίθεται χειροκίνητα. Αποστέλλεται σε AI μόνο αν ενεργοποιήσεις την αντίστοιχη ρύθμιση.")
+                        .font(.caption)
+                        .foregroundColor(R0llingTheme.textSecondary)
                 }
 
                 Section("Ημερομηνία & ζώνη (A02)") {
@@ -56,6 +65,7 @@ public struct EntryEditorSheet: View {
                         .foregroundColor(R0llingTheme.textMuted)
                 }
             }
+            .r0llingFormSurface()
             .navigationTitle("Επεξεργασία")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -73,6 +83,8 @@ public struct EntryEditorSheet: View {
                         var updated = entry
                         updated.content = contentText
                         updated.tags = tags
+                        let locationName = locationNameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        updated.locationName = locationName.isEmpty ? nil : locationName
                         updated.timestamp = editedTimestamp
                         let tz = timeZoneIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
                         updated.timeZoneIdentifier = tz.isEmpty ? TimeZone.current.identifier : tz

@@ -1,8 +1,12 @@
-# ⚡ R0lling — Master Pivot & UI Hyperanalysis: The Sovereign 1-User OS
+> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+
+# ⚡ R0lling — Historical Product and UI Proposal
 > **Έργο:** `R0lling` (iOS 17.2+ / Swift 6 / 1-User Sovereign Life Companion)  
-> **Σχεδιαστική Γλώσσα:** Bevel Telemetry × Discord Cyber-Slate × Twitch Neon (`ui understanding` Methodology)  
+> **Σχεδιαστική Γλώσσα (παλιό draft):** Bevel Telemetry × Discord Cyber-Slate × Twitch Neon (`ui understanding` Methodology)
 > **Αρχιτεκτονική Πυρήνα:** 100% On-Device / Local-First / Zero-Cloud Dependencies / Obsidian Vault & LAN Hermes AI  
 > **Ημερομηνία Έκδοσης:** 8 Οκτωβρίου 2026 — Έκδοση: v2.0 Hyper-Spec  
+
+> **Μη δεσμευτικό ιστορικό spec.** Περιέχει προτάσεις και παλιές χρωματικές τιμές που δεν περιγράφουν το τρέχον app. Για σημερινό UI source of truth δες `DESIGN.md`; για υλοποίηση και περιορισμούς δες `IMPLEMENTATION_STATUS.md`.
 
 ---
 
@@ -10,7 +14,7 @@
 
 Το **R0lling** μετασχηματίζεται ριζικά σε ένα **ιδιωτικό κυρίαρχο λειτουργικό σύστημα ζωής και γνωστικής υπεραπόδοσης (Sovereign Life & Cognitive OS)**. Απομακρύνεται οριστικά από τους περιορισμούς streaming υλικού τρίτων κατασκευαστών (Meta camera streaming locks) και αναπτύσσεται ως το απόλυτο, αυτόνομο native iPhone app που εκμεταλλεύεται στο μέγιστο τους αισθητήρες της συσκευής (κάμερα, μικρόφωνο, CoreMotion, CoreLocation, HealthKit, Neural Engine).
 
-### Το Σχεδιαστικό Σύστημα Bevel × Discord (`ui understanding` Compliance)
+### Το παλιό draft σχεδιασμού Bevel × Discord
 1. **Παλέτα Χρωμάτων (Design Tokens):**
    * **Primary Background:** `#16161D` (Deep Discord Slate Canvas)
    * **Card Surface:** `#22232D` (Elevated Card Background)
@@ -885,7 +889,9 @@ struct MetricRow: View {
 
 ---
 
-### [21] Zero-Knowledge Private Diary (FaceID Lock)
+### [21] Proposed Zero-Knowledge Private Diary (FaceID Lock)
+
+> **Historical analysis; check current implementation status before relying on it.** The app now requires a per-store authorization capability for vault operations, minted after LocalAuthentication and revoked on lock. The Keychain key itself remains device-bound and is not biometry-bound or Secure Enclave-backed; see `IMPLEMENTATION_STATUS.md`.
 
 #### Υπερανάλυση UI
 Κρυπτογραφημένη κάρτα σκέψεων με έντονο blur filter (`.blur(radius: 16)`), σκοτεινό πέπλο και εικονίδιο ασπίδας (`lock.shield.fill`). Tap οπουδήποτε στην κάρτα εκτελεί άμεσο βιομετρικό έλεγχο FaceID και αποκαλύπτει το κείμενο με smooth spring fade.
@@ -990,7 +996,9 @@ public actor HermesEndpointAsfaleia {
 
 ---
 
-### [25] Future Letterbox (Μηνύματα στο Μέλλον)
+### [25] Proposed Future Letterbox (Μηνύματα στο Μέλλον)
+
+> **Design proposal.** The current product surface is implemented in `EncryptedDiaryStore` and `StrategicVaultHubView`; its reveal date uses the device wall clock and is not trusted time.
 
 #### Υπερανάλυση UI
 Κάρτα «Σφραγισμένο Γράμμα» με ψηφιακή βουλοκέρινη σφραγίδα (`lock.seal.fill`) και αντίστροφη μέτρηση ημερών (`⏳ ΞΕΚΛΕΙΔΩΜΑ ΣΕ 48 ΗΜΕΡΕΣ`). Όταν παρέλθει η ημερομηνία, σπάει η σφραγίδα με haptic vibration και αποκαλύπτεται το ηχητικό μήνυμα.
@@ -1089,8 +1097,10 @@ public actor LocalWhisperOfflineService {
 
 ### [37] Ambient Soundscape & Binaural Focus Synthesizer
 
+> **Κατάσταση υλοποίησης (2026-10-09):** Το app υλοποιεί στερεοφωνικό ημιτονοειδή ήχο με AVAudioEngine, τέσσερα beat presets και start/stop controls. Το παρακάτω radial dial, pink/brown noise, ripple animation και ο υπόλοιπος κώδικας είναι σχεδιαστική πρόταση, όχι υλοποιημένα στοιχεία. Η έξοδος ήχου δεν έχει επικυρωθεί σε Apple device.
+
 #### Υπερανάλυση UI
-Ενσωματωμένο sound lab card. Διαθέτει διαδραστικό radial dial για επιλογή συχνότητας binaural beats (π.χ. `40Hz Gamma` για hyper-focus, `10Hz Alpha` για flow state) σε συνδυασμό με procedural Pink/Brown noise. Visual ripple rings εκπέμπονται από το κέντρο του interface συγχρονισμένα με τον ρυθμό της συχνότητας.
+Προτεινόμενο sound lab card με radial dial για επιλογή συχνότητας binaural beats και προαιρετικό procedural Pink/Brown noise. Τα presets και οι ονομασίες περιγράφουν το concept του σχεδιασμού· δεν αποτελούν ισχυρισμούς ότι το app παράγει ήχο ή ότι η συχνότητα επιφέρει συγκεκριμένο αποτέλεσμα.
 
 #### Design Anatomy & Art Direction
 * **Στυλ / Πρόθεση:** Ψυχο-ακουστικό καταφύγιο εστίασης.
@@ -1406,5 +1416,5 @@ public struct FallacyAuditResult: Codable, Sendable {
 
 ## 🏁 Επισκόπηση Υλοποίησης & Επόμενα Βήματα
 
-1. **Απόλυτη Συμμόρφωση:** Το αρχείο αποτελεί το ενιαίο, δεσμευτικό blueprint για το R0lling, συνδυάζοντας την αυστηρότητα του Bevel με την κυριαρχία του Discord slate περιβάλλοντος.
-2. **Επόμενη Φάση:** Άμεση υλοποίηση των νέων UI components και σύνδεσή τους με τους αντίστοιχους Swift 6 Actors.
+1. Το αρχείο είναι ιστορική πρόταση, όχι δεσμευτικό blueprint ούτε απόδειξη υλοποίησης.
+2. Χρησιμοποίησε το `DESIGN.md` και τα τρέχοντα source files για τις σημερινές αποφάσεις UI.

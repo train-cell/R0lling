@@ -12,6 +12,7 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
     private var streamTask: Task<Void, Never>?
     private weak var bufferService: (any RollingBufferServiceProtocol)?
     private weak var sensorFeedSink: (any GlassesSensorFeedSink)?
+    private var bufferTargetSeconds: Double
     private var policy: GlassesReconnectPolicy = .proepilogiR0lling
     /// Θυμάται αν έτρεχε streaming πριν το background pause (για auto-resume).
     private var itanStreamingPrinPause: Bool = false
@@ -22,14 +23,32 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
         MetaDATStreamBridge.einaiSDKDiathesimo
     }
 
-    public init(bufferService: (any RollingBufferServiceProtocol)? = nil) {
+    public init(
+        bufferService: (any RollingBufferServiceProtocol)? = nil,
+        initialBufferTargetSeconds: Double = 10.0
+    ) {
         self.bufferService = bufferService
+        self.bufferTargetSeconds = Self.normalizedBufferTarget(initialBufferTargetSeconds)
         // Χωρίς SDK: simulation υποχρεωτικό. Με SDK: default simulation για ασφαλή local dev.
         self.simulationEnabled = true
     }
 
+    private static func normalizedBufferTarget(_ seconds: Double) -> Double {
+        guard seconds.isFinite else { return 10.0 }
+        return seconds < 7.5 ? 5.0 : 10.0
+    }
+
     public func setBufferService(_ service: any RollingBufferServiceProtocol) {
         self.bufferService = service
+    }
+
+    /// The selected rolling window is applied on the next stream start.
+    public var configuredBufferTargetSeconds: Double {
+        bufferTargetSeconds
+    }
+
+    public func setBufferTargetSeconds(_ seconds: Double) {
+        bufferTargetSeconds = Self.normalizedBufferTarget(seconds)
     }
 
     public var connectionState: GlassesConnectionState {
@@ -67,7 +86,8 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
     }
 
     public func toggleSimulationMode(enabled: Bool) {
-        if !enabled && !Self.einaiDatSDKDiathesimo {
+        guard state == .disconnected else { return }
+        if !enabled && !MetaDATStreamBridge.einaiLiveYlopoiimeno {
             // R3-003: Απαγορεύεται «real» mode χωρίς SDK — κρατάμε simulation.
             self.simulationEnabled = true
             print("[MetaGlassesAdapter] Real DAT mode μη διαθέσιμο χωρίς MetaWearablesDAT — παραμένει Simulation.")
@@ -134,8 +154,14 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
 
         if !simulationEnabled {
             #if canImport(MetaWearablesDAT)
-            // DAT live session ήδη ανοιχτό από connect· εδώ start camera stream.
-            _ = try await MetaDATStreamBridge.anoixeLiveSession()
+            guard MetaDATStreamBridge.einaiLiveYlopoiimeno else {
+                throw NSError(
+                    domain: MetaDATStreamBridge.errorDomain,
+                    code: MetaDATStreamBridge.kodikosSessionApotyxia,
+                    userInfo: [NSLocalizedDescriptionKey: "Το live DAT stream hook δεν είναι υλοποιημένο."]
+                )
+            }
+            // connectDevice already owns the live session. Do not open a second session here.
             #else
             throw NSError(
                 domain: "R0lling.Glasses",
@@ -147,7 +173,7 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
 
         state = .streaming(fps: 30.0, isBuffering: true)
         itanStreamingPrinPause = true
-        try await bufferService?.startBuffering(targetSeconds: 10.0)
+        try await bufferService?.startBuffering(targetSeconds: bufferTargetSeconds)
 
         if simulationEnabled {
             startSimulationIngestionLoop()
@@ -232,8 +258,9 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
                 return generateSyntheticJPEG()
             }
             #if canImport(MetaWearablesDAT)
-            // Wire: DAT high-res photo capture
-            return generateSyntheticJPEG()
+            throw NSError(domain: MetaDATStreamBridge.errorDomain, code: 4011, userInfo: [
+                NSLocalizedDescriptionKey: "Η πραγματική λήψη φωτογραφίας DAT δεν έχει υλοποιηθεί."
+            ])
             #else
             throw NSError(
                 domain: "R0lling.Glasses",

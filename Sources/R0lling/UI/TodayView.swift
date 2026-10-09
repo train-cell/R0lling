@@ -3,9 +3,17 @@ import SwiftUI
 /// Κύρια οθόνη ημερήσιας ροής (Today View) με Strava Activity Feed & Bevel 3-Ring Telemetry
 public struct TodayView: View {
     @EnvironmentObject private var appState: AppState
+    @Binding private var quickAction: TodayQuickAction?
     @State private var composerText: String = ""
     @State private var selectedTags: String = ""
     @State private var entryProsEpeksergasia: JournalEntry?
+    @State private var isFileImporterPresented = false
+    @State private var isTodayDetailsExpanded = false
+    @FocusState private var composerIsFocused: Bool
+
+    public init(quickAction: Binding<TodayQuickAction?> = .constant(nil)) {
+        self._quickAction = quickAction
+    }
 
     public var body: some View {
         ZStack(alignment: .bottom) {
@@ -17,6 +25,7 @@ public struct TodayView: View {
                         if appState.isStreaming {
                             LiveViewfinderCard(
                                 isStreaming: appState.isStreaming,
+                                isSimulation: appState.isSimulationMode,
                                 bufferDuration: appState.bufferDuration,
                                 onClipTap: {
                                     Task {
@@ -27,53 +36,37 @@ public struct TodayView: View {
                         }
 
                         // Sovereign Life OS — Bevel 3-Ring Concentric Telemetry
-                        BevelConcentricTelemetryCard(score: appState.cognitiveTelemetry)
+                        BevelConcentricTelemetryCard(
+                            score: appState.cognitiveTelemetry,
+                            activeFocusDeadline: appState.deepWorkEndsAt,
+                            completedFocusSecondsToday: appState.completedFocusSecondsToday,
+                            entryCount: appState.todayEntries.count
+                        )
 
-                        // Chief of Staff (Jarvis Engine)
-                        ChiefOfStaffCardView()
-
-                        // Private Daily Podcast Player
-                        DailyPodcastPlayerCard()
-
-                        // Biohacking & Performance Quick Hub
-                        VStack(spacing: 12) {
-                            HStack {
-                                Text("BIOHACKING & PERFORMANCE")
-                                    .font(.system(size: 11, weight: .heavy, design: .monospaced))
-                                    .foregroundColor(R0llingTheme.accentCyan)
-                                    .tracking(1.2)
-                                Spacer()
+                        HealthKitTelemetryCardView(
+                            snapshot: appState.liveHealthSnapshot,
+                            didCompleteAuthorizationRequest: appState.didCompleteHealthKitAccessRequest,
+                            onRequestAuth: {
+                                Task { await appState.requestHealthKitAccess() }
                             }
-                            DeepWorkSentinelCard()
-                            BinauralSynthesizerCardView()
-                            HealthKitTelemetryCardView(
-                                snapshot: appState.liveHealthSnapshot,
-                                isAuthorized: appState.isHealthKitAuthorized,
-                                onRequestAuth: {
-                                    Task {
-                                        await appState.requestHealthKitAccess()
-                                    }
-                                }
-                            )
-                            GymVolumeLoggerCardView()
-                        }
+                        )
 
-                        // Executive Productivity & Tools Suite
-                        VStack(spacing: 12) {
-                            HStack {
-                                Text("EXECUTIVE SUITE & UTILITIES")
-                                    .font(.system(size: 11, weight: .heavy, design: .monospaced))
-                                    .foregroundColor(R0llingTheme.accentLavender)
-                                    .tracking(1.2)
-                                Spacer()
+                        DisclosureGroup(isExpanded: $isTodayDetailsExpanded) {
+                            VStack(spacing: 12) {
+                                DeepWorkSentinelCard()
+                                SovereignToDoListView()
+                                SovereignScratchpadView()
+                                SovereignStopwatchTimerView()
                             }
-                            SovereignToDoListView()
-                            SovereignScratchpadView()
-                            SovereignStopwatchTimerView()
+                            .padding(.top, 12)
+                        } label: {
+                            Label("Εργαλεία", systemImage: "slider.horizontal.3")
+                                .font(.headline.weight(.semibold))
+                                .foregroundColor(R0llingTheme.textPrimary)
                         }
-
-                        // Obsidian Live Zettelkasten Linker
-                        ZettelkastenChipStripView()
+                        .tint(R0llingTheme.accentLavender)
+                        .padding(14)
+                        .r0llingBevelSurface(cornerRadius: 18)
 
                         if !appState.timeCapsuleMemories.isEmpty {
                             timeCapsuleBanner
@@ -84,14 +77,13 @@ public struct TodayView: View {
                         } else {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
-                                    Text("ACTIVITY TIMELINE")
-                                        .font(.system(size: 11, weight: .heavy, design: .monospaced))
-                                        .foregroundColor(R0llingTheme.textMuted)
-                                        .tracking(1.2)
+                                    Text("Καταγραφές")
+                                        .font(.headline.weight(.semibold))
+                                        .foregroundColor(R0llingTheme.textPrimary)
                                     Spacer()
-                                    Text("\(appState.todayEntries.count) ENTRIES")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(R0llingTheme.accentPurple)
+                                    Text("\(appState.todayEntries.count) καταγραφές")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundColor(R0llingTheme.textSecondary)
                                 }
                                 .padding(.horizontal, 4)
 
@@ -128,6 +120,7 @@ public struct TodayView: View {
                 FloatingClipBar(
                     bufferDuration: appState.bufferDuration,
                     isStreaming: appState.isStreaming,
+                    isSimulation: appState.isSimulationMode,
                     onClipTapped: {
                         Task {
                             await appState.triggerClip(seconds: 10.0)
@@ -150,78 +143,76 @@ public struct TodayView: View {
                 onCancel: { entryProsEpeksergasia = nil }
             )
         }
+        .task(id: quickAction) {
+            guard let quickAction else { return }
+            switch quickAction {
+            case .newNote:
+                composerIsFocused = true
+            case .importFile:
+                isFileImporterPresented = true
+            }
+            self.quickAction = nil
+        }
     }
 
     private var headerView: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 8) {
-                    Text("R0lling")
-                        .font(.system(size: 24, weight: .black, design: .rounded))
-                        .foregroundColor(R0llingTheme.textPrimary)
-
-                    Text("POV LAB")
-                        .font(.system(size: 9, weight: .black, design: .monospaced))
-                        .foregroundColor(R0llingTheme.accentPurple)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(R0llingTheme.accentPurple.opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                }
-
-                Text(Date().formattedGreekHeader().uppercased())
-                    .font(.system(size: 11, weight: .bold))
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("R0lling")
+                    .font(.subheadline.weight(.semibold))
                     .foregroundColor(R0llingTheme.textSecondary)
-                    .tracking(0.6)
-            }
-
-            Spacer()
-
-            Button(action: {
-                Task {
-                    if appState.glassesState.isLive {
-                        await appState.toggleLiveStream()
-                    } else {
-                        await appState.toggleGlassesConnection()
-                        if !appState.isStreaming {
+                Spacer()
+                Button(action: {
+                    Task {
+                        if appState.glassesState.isLive {
                             await appState.toggleLiveStream()
+                        } else {
+                            await appState.toggleGlassesConnection()
+                            if !appState.isStreaming {
+                                await appState.toggleLiveStream()
+                            }
                         }
                     }
+                }) {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(appState.isStreaming ? R0llingTheme.statusSuccess : R0llingTheme.textMuted)
+                            .frame(width: 8, height: 8)
+                        Image(systemName: "eyeglasses")
+                            .font(.body.weight(.semibold))
+                        Text(appState.isStreaming ? (appState.isSimulationMode ? "Δοκιμαστική ροή" : "Ζωντανή ροή") : appState.glassesState.statusDescription)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2.weight(.bold))
+                    }
+                    .foregroundColor(R0llingTheme.textPrimary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .r0llingBevelCapsule()
                 }
-            }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "eyeglasses")
-                        .font(.system(size: 13, weight: .bold))
-                    Text(appState.isStreaming ? "REC LIVE" : appState.glassesState.statusDescription.uppercased())
-                        .font(.system(size: 11, weight: .black, design: .rounded))
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    appState.isStreaming ? R0llingTheme.primaryButtonGradient : LinearGradient(
-                        colors: [R0llingTheme.bgElevated, R0llingTheme.bgElevated],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(appState.isStreaming ? R0llingTheme.accentPurple : R0llingTheme.borderSubtle, lineWidth: 1)
-                )
-                .shadow(color: appState.isStreaming ? R0llingTheme.accentPurple.opacity(0.35) : Color.clear, radius: 8, x: 0, y: 2)
+                .buttonStyle(.plain)
+                .accessibilityLabel(appState.isStreaming ? "Ζωντανή ροή γυαλιών" : "Κατάσταση σύνδεσης γυαλιών")
+            }
+            HStack(spacing: 8) {
+                Text("Σήμερα, \(compactGreekDate)")
+                    .font(.largeTitle.weight(.bold))
+                    .foregroundColor(R0llingTheme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .accessibilityAddTraits(.isHeader)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .background(R0llingTheme.bgSurface)
-        .overlay(
-            Rectangle()
-                .frame(height: 1)
-                .foregroundColor(R0llingTheme.borderSubtle),
-            alignment: .bottom
-        )
+        .background(R0llingTheme.bgPrimary)
+    }
+
+    private var compactGreekDate: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "el_GR")
+        formatter.setLocalizedDateFormatFromTemplate("dMMMM")
+        return formatter.string(from: Date())
     }
 
     private var timeCapsuleBanner: some View {
@@ -231,20 +222,19 @@ public struct TodayView: View {
                     .foregroundColor(R0llingTheme.bevelCyan)
                     .font(.system(size: 13, weight: .bold))
                 Text("ΣΑΝ ΣΗΜΕΡΑ — TIME CAPSULE")
-                    .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                    .font(.caption.weight(.heavy).monospaced())
                     .foregroundColor(R0llingTheme.bevelCyan)
                     .tracking(1.0)
                 Spacer()
             }
             ForEach(appState.timeCapsuleMemories) { mem in
                 Text("⏳ \(mem.displayText): «\(mem.entry.content)»")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.subheadline.weight(.medium))
                     .foregroundColor(R0llingTheme.textPrimary)
             }
         }
         .padding(14)
-        .background(R0llingTheme.bgElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .r0llingBevelSurface(cornerRadius: 14)
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(R0llingTheme.bevelCyan.opacity(0.3), lineWidth: 1)
@@ -264,12 +254,12 @@ public struct TodayView: View {
             .padding(.top, 30)
 
             Text("ΚΑΜΙΑ ΚΑΤΑΓΡΑΦΗ ΣΗΜΕΡΑ")
-                .font(.system(size: 15, weight: .heavy, design: .monospaced))
+                .font(.headline.weight(.heavy).monospaced())
                 .foregroundColor(R0llingTheme.textPrimary)
                 .tracking(1.2)
 
             Text("Ξεκίνα τη ροή από τα Meta Glasses, σημείωσε μια σκέψη, ή επισύναψε φωτογραφία/βίντεο από Photos.")
-                .font(.system(size: 13, weight: .regular))
+                .font(.body)
                 .foregroundColor(R0llingTheme.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
@@ -278,95 +268,97 @@ public struct TodayView: View {
     }
 
     private var composerBar: some View {
-        HStack(spacing: 10) {
-            Button(action: {
-                R0llingTheme.triggerHapticFeedback()
-                appState.toggleSpeechDictation()
-            }) {
-                Image(systemName: appState.isListeningSpeech ? "waveform" : "mic.fill")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundColor(appState.isListeningSpeech ? .white : R0llingTheme.accentPurple)
-                    .frame(width: 44, height: 44)
-                    .background(appState.isListeningSpeech ? R0llingTheme.accentPurple : R0llingTheme.bgElevated)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(appState.isListeningSpeech ? R0llingTheme.accentLavender : R0llingTheme.borderSubtle, lineWidth: 1)
-                    )
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                dictationButton
+                mediaPickerButton
+                composerTextField.frame(minWidth: 150, maxWidth: .infinity)
+                sendNoteButton
             }
-
-            PhotosMediaPickerButton(
-                onImport: { data, filename, mediaType in
-                    let note = composerText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    await appState.attachMediaData(
-                        data: data,
-                        originalFilename: filename,
-                        mediaType: mediaType,
-                        noteText: note.isEmpty ? nil : note
-                    )
-                    if !note.isEmpty {
-                        composerText = ""
-                    }
-                },
-                onError: { minima in
-                    appState.showToast(minima)
+            VStack(spacing: 8) {
+                composerTextField
+                HStack(spacing: 8) {
+                    dictationButton
+                    mediaPickerButton
+                    Spacer(minLength: 0)
+                    sendNoteButton
                 }
-            )
-
-            TextField("Σημείωση δραστηριότητας...", text: $composerText)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(R0llingTheme.textPrimary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .background(R0llingTheme.bgElevated)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(R0llingTheme.borderSubtle, lineWidth: 1)
-                )
-                .onSubmit {
-                    let text = composerText
-                    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-                    composerText = ""
-                    Task {
-                        await appState.addNote(text: text)
-                    }
-                }
-
-            Button(action: {
-                let text = composerText
-                composerText = ""
-                Task {
-                    await appState.addNote(text: text)
-                }
-            }) {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 15, weight: .black))
-                    .foregroundColor(.white)
-                    .frame(width: 44, height: 44)
-                    .background(
-                        composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            ? LinearGradient(colors: [R0llingTheme.bgElevated, R0llingTheme.bgElevated], startPoint: .top, endPoint: .bottom)
-                            : R0llingTheme.primaryButtonGradient
-                    )
-                    .clipShape(Circle())
-                    .shadow(
-                        color: composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            ? Color.clear
-                            : R0llingTheme.accentPurple.opacity(0.4),
-                        radius: 6, x: 0, y: 2
-                    )
             }
-            .disabled(composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(R0llingTheme.bgSurface)
-        .overlay(
-            Rectangle()
-                .frame(height: 1)
-                .foregroundColor(R0llingTheme.borderSubtle),
-            alignment: .top
+        .padding(10)
+        .r0llingBevelSurface(cornerRadius: 22)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    private var dictationButton: some View {
+        Button(action: {
+            R0llingTheme.triggerHapticFeedback()
+            appState.toggleSpeechDictation()
+        }) {
+            Image(systemName: appState.isListeningSpeech ? "waveform" : "mic.fill")
+                .font(.system(.body, weight: .bold))
+                .foregroundColor(appState.isListeningSpeech ? .white : R0llingTheme.accentPurple)
+                .frame(width: 44, height: 44)
+                .background(appState.isListeningSpeech ? R0llingTheme.accentPurple : R0llingTheme.bgElevated)
+                .r0llingBevelCapsule()
+        }
+        .accessibilityLabel(appState.isListeningSpeech ? "Διακοπή υπαγόρευσης" : "Έναρξη υπαγόρευσης")
+        .accessibilityHint(appState.isListeningSpeech ? "Σταματά την υπαγόρευση σημείωσης" : "Υπαγορεύστε μια σημείωση δραστηριότητας")
+    }
+
+    private var mediaPickerButton: some View {
+        PhotosMediaPickerButton(
+            isFileImporterPresented: $isFileImporterPresented,
+            onImport: { fileURL, filename, mediaType in
+                let note = composerText.trimmingCharacters(in: .whitespacesAndNewlines)
+                await appState.attachMediaFile(
+                    from: fileURL,
+                    originalFilename: filename,
+                    mediaType: mediaType,
+                    noteText: note.isEmpty ? nil : note
+                )
+                if !note.isEmpty { composerText = "" }
+            },
+            onError: { minima in appState.showToast(minima) }
         )
+    }
+
+    private var composerTextField: some View {
+        TextField("Σημείωση δραστηριότητας...", text: $composerText)
+            .font(.body.weight(.medium))
+            .foregroundColor(R0llingTheme.textPrimary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .r0llingBevelInsetSurface(cornerRadius: 16)
+            .focused($composerIsFocused)
+            .onSubmit(submitComposerNote)
+    }
+
+    private var sendNoteButton: some View {
+        Button(action: submitComposerNote) {
+            Image(systemName: "arrow.up")
+                .font(.system(.body, weight: .black))
+                .foregroundColor(.white)
+                .frame(width: 44, height: 44)
+                .background(
+                    composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ? LinearGradient(colors: [R0llingTheme.bgElevated, R0llingTheme.bgElevated], startPoint: .top, endPoint: .bottom)
+                        : R0llingTheme.primaryButtonGradient
+                )
+                .r0llingBevelCapsule()
+        }
+        .disabled(composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .accessibilityLabel("Αποθήκευση σημείωσης")
+        .accessibilityHint(composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Γράψτε μια σημείωση για να ενεργοποιηθεί"
+            : "Αποθηκεύει τη σημείωση δραστηριότητας")
+    }
+
+    private func submitComposerNote() {
+        let text = composerText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        composerText = ""
+        Task { await appState.addNote(text: text) }
     }
 }

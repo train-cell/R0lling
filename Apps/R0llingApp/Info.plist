@@ -20,6 +20,26 @@
 	<string>1.0.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.personal.r0lling.backup-bundle</string>
+			<key>UTTypeDescription</key>
+			<string>R0lling Backup Bundle</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>com.apple.package</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>r0backup</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchScreen</key>
@@ -39,29 +59,27 @@
 	</array>
 	<!-- A16 privacy usage strings (host app target) -->
 	<key>NSCameraUsageDescription</key>
-	<string>Το R0lling χρησιμοποιεί την κάμερα για λήψη φωτογραφιών, παιχνίδια παρατήρησης και σύνδεση με τα γυαλιά.</string>
+	<string>Η λήψη από την κάμερα δεν είναι διαθέσιμη σε αυτή την έκδοση του R0lling.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Το R0lling χρησιμοποιεί το μικρόφωνο για φωνητικές σημειώσεις («note this») και συγχρονισμό ήχου στα clips.</string>
+	<string>Το R0lling χρησιμοποιεί το μικρόφωνο για φωνητικές σημειώσεις. Δεν καταγράφει ήχο για clips.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Το R0lling μετατρέπει τη φωνή σας σε κείμενο για αυτόματη καταγραφή στο ημερολόγιο.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Το R0lling επισυνάπτει φωτογραφίες και βίντεο από τη βιβλιοθήκη στο ημερολόγιο.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Το R0lling μπορεί να αποθηκεύσει εξαγόμενα clips στη βιβλιοθήκη φωτογραφιών κατόπιν αιτήματος.</string>
+	<string>Η αποθήκευση στη βιβλιοθήκη Φωτογραφιών δεν είναι διαθέσιμη σε αυτή την έκδοση.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Το R0lling συνδέεται ασύρματα με τα Meta Glasses Gen 2 μέσω Bluetooth.</string>
+	<string>Η σύνδεση Bluetooth με γυαλιά δεν είναι διαθέσιμη σε αυτή την έκδοση του R0lling.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Το R0lling συνδέεται ασύρματα με τα Meta Glasses Gen 2 μέσω Bluetooth.</string>
+	<string>Η σύνδεση Bluetooth με γυαλιά δεν είναι διαθέσιμη σε αυτή την έκδοση του R0lling.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Το R0lling συνδέεται με τον τοπικό βοηθό Hermes στο οικιακό σας δίκτυο (Home PC).</string>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_r0lling-hermes._tcp</string>
-	</array>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Χρησιμοποιείται για ξεκλείδωμα της ιδιωτικής προεπισκόπησης με βιομετρική ταυτοποίηση.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Το R0lling διαβάζει μετρήσεις HRV, καρδιακών παλμών ηρεμίας, ύπνου και βημάτων για τον υπολογισμό των δεικτών Cognitive Readiness και Bevel Telemetry.</string>
+	<string>Το R0lling εμφανίζει προαιρετικές μετρήσεις HRV, καρδιακών παλμών ηρεμίας, αναπνευστικού ρυθμού, οξυγόνου αίματος, θερμοκρασίας σώματος, ύπνου και καταγεγραμμένων προπονήσεων από το Apple Health.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Το R0lling μπορεί να καταγράφει προπονήσεις και ενέργεια στο Apple Health κατόπιν επιλογής σας.</string>
+	<string>Η εγγραφή δεδομένων στο Apple Health δεν είναι διαθέσιμη σε αυτή την έκδοση.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
