@@ -205,6 +205,7 @@ public struct R0llingFormSurfaceModifier: ViewModifier {
     }
 }
 
+@MainActor
 extension View {
     public func r0llingCard() -> some View {
         self.modifier(R0llingCardModifier())

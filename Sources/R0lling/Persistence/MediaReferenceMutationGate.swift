@@ -4,6 +4,7 @@ import Foundation
 /// The lock is intentionally held across suspension points so restore and deletion
 /// cannot interleave a reference snapshot with a file removal.
 public actor MediaReferenceMutationGate {
+    public init() {}
     private var isOccupied = false
     private struct Waiter {
         let id: UUID

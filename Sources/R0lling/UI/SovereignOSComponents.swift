@@ -298,6 +298,7 @@ public struct BevelConcentricTelemetryCard: View {
             .accessibilityHidden(true)
     }
 
+    @ViewBuilder
     private func metricRings(for displayedScore: CognitiveTelemetryScore) -> some View {
         let compact = dynamicTypeSize.isAccessibilitySize || (cardWidth > 0 && cardWidth < 340)
         let strain = String(format: "%.1f", displayedScore.cognitiveStrain)
@@ -306,7 +307,7 @@ public struct BevelConcentricTelemetryCard: View {
         let readinessDetail = displayedScore.readinessPercent == nil ? "no input data" : "entries + focus"
         let readinessProgress = Double(displayedScore.readinessPercent ?? 0) / 100
 
-        Group {
+        return Group {
             if compact {
                 VStack(spacing: 8) {
                     compactMetric(title: "Cognitive strain", value: strain, detail: "heuristic / 21", progress: displayedScore.cognitiveStrain / 21, color: R0llingTheme.accentAmber)

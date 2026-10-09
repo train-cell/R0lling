@@ -344,8 +344,10 @@ public struct SovereignStopwatchTimerView: View {
             startedAtUptime = ProcessInfo.processInfo.systemUptime
             isRunning = true
             timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
-                if let start = startedAtUptime {
-                    elapsedTime = accumulatedTime + ProcessInfo.processInfo.systemUptime - start
+                Task { @MainActor in
+                    if let start = startedAtUptime {
+                        elapsedTime = accumulatedTime + ProcessInfo.processInfo.systemUptime - start
+                    }
                 }
             }
         }

@@ -62,7 +62,7 @@ public enum AppErrorTaxonomy {
                 code: diskWriteFailed,
                 message: error.localizedDescription
             )
-        case .kenoDedomena, .agnostosTypos, .arxeioDenVrethike:
+        case .kenoDedomena, .agnostosTypos, .arxeioDenVrethike, .unsafeRelativePath:
             return makeError(
                 domain: mediaDomain,
                 code: diskWriteFailed,
