@@ -1,7 +1,9 @@
 import Foundation
 
 /// Κεντρικό μητρώο ετοιμότητας wave-B/C super-features.
-/// `ready == false` → κρυφό από UI · όχι product surface στο AppState · αρχεία παραμένουν για άλλες lanes.
+/// `ready` controls whether the source-wired product path may be exposed; it is not a build,
+/// runtime, device, or release-verification certificate. `ready == false` permits only an
+/// explicit diagnostic/status surface until the missing implementation and its acceptance gates pass.
 public enum FeatureReadinessRegistry {
 
     /// Σημαία ετοιμότητας ενός super-feature.
@@ -17,7 +19,7 @@ public enum FeatureReadinessRegistry {
         }
     }
 
-    // MARK: - READY (πραγματικό software pipeline + UI/hooks)
+    // MARK: - Source-wired product paths (Apple runtime/device validation is tracked separately)
 
     public static let earcon = Flag(
         id: "earcon",
@@ -52,7 +54,7 @@ public enum FeatureReadinessRegistry {
     public static let emotionTags = Flag(
         id: "emotionTags",
         ready: true,
-        reason: "Keyword emotion tags στο addNote (όχι prosody/F0)"
+        reason: "Transcript keyword cues στο addNote· ρητά text-based, όχι acoustic emotion/prosody"
     )
     public static let scavengerStreak = Flag(
         id: "scavengerStreak",
@@ -77,7 +79,7 @@ public enum FeatureReadinessRegistry {
     public static let nutritionHeuristic = Flag(
         id: "nutritionHeuristic",
         ready: true,
-        reason: "OCR food tokens → heuristic meal note (όχι HealthKit)"
+        reason: "OCR food tokens → reviewable, user-confirmed heuristic meal estimate (όχι HealthKit)"
     )
     public static let dataviewFrontmatter = Flag(
         id: "dataviewFrontmatter",
@@ -110,12 +112,12 @@ public enum FeatureReadinessRegistry {
     public static let watermark = Flag(
         id: "watermark",
         ready: false,
-        reason: "Experimental/ orphan schema · όχι export path · DECISIONS §5"
+        reason: "AVFoundation/Core Animation export and MediaViewer path implemented; Apple build and rendered-frame verification pending"
     )
     public static let fileWatcher = Flag(
         id: "fileWatcher",
         ready: false,
-        reason: "Experimental/ orphan · όχι bridge instantiate · DECISIONS §5"
+        reason: "Monitors directory-entry changes by path and identity; reconciliation failures stop the watcher. File-content detection/import/sync and Apple Files-scope/runtime validation remain unavailable"
     )
     public static let proximity = Flag(
         id: "proximity",

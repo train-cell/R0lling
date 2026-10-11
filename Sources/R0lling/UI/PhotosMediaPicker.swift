@@ -181,10 +181,24 @@ public struct PhotosMediaPickerButton: View {
         }
 
         private static func copyReceivedFile(_ sourceURL: URL) throws -> ImportedPhotosFile {
+            let temporaryDirectory = FileManager.default.temporaryDirectory
+            let availableBytes = (try? temporaryDirectory.resourceValues(
+                forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+            ).volumeAvailableCapacityForImportantUsage) ?? 0
+            try MediaImportPreflight.validatePhotosStagingSource(
+                at: sourceURL,
+                availableBytes: availableBytes
+            )
+
             let fileExtension = sourceURL.pathExtension.isEmpty ? "media" : sourceURL.pathExtension
-            let destinationURL = FileManager.default.temporaryDirectory
+            let destinationURL = temporaryDirectory
                 .appendingPathComponent("R0lling-PhotosImport-\(UUID().uuidString).\(fileExtension)")
-            try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+            do {
+                try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+            } catch {
+                try? FileManager.default.removeItem(at: destinationURL)
+                throw error
+            }
             return ImportedPhotosFile(url: destinationURL)
         }
     }

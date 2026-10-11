@@ -17,15 +17,15 @@ let package = Package(
         )
     ],
     dependencies: [
-        // Meta Wearables DAT — ΔΕΝ vendor σε Windows.
-        // Mac flip: docs/LANE_CLIP_META.md βήμα 1 (uncomment + product dependency).
-        // .package(url: "https://github.com/facebook/meta-wearables-dat-ios.git", from: "1.0.0")
+        // Meta Wearables DAT remains intentionally unlinked until the live bridge is implemented.
+        // Current products are MWDATCore + MWDATCamera; see docs/LANE_CLIP_META.md.
     ],
     targets: [
         .target(
             name: "R0lling",
             dependencies: [
-                // Mac: .product(name: "MetaWearablesDAT", package: "meta-wearables-dat-ios")
+                // Add MWDATCore + MWDATCamera only with the compatible Xcode/Swift toolchain
+                // and after implementing and reviewing MetaDATStreamBridge.
             ],
             path: "Sources/R0lling",
             exclude: ["Experimental/README.md"],

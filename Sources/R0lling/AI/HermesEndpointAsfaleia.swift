@@ -24,6 +24,14 @@ public enum HermesEndpointAsfaleia {
             )
         }
 
+        guard !containsDisallowedBaseURLComponents(url) else {
+            throw AIErrorTaxonomy.makeError(
+                domain: AIErrorTaxonomy.hermesDomain,
+                code: AIErrorTaxonomy.hermesInvalidURL,
+                message: "Το URL βάσης Hermes δεν επιτρέπεται να περιέχει credentials ή query parameters. Χρησιμοποίησε το πεδίο token του Keychain."
+            )
+        }
+
         switch scheme {
         case "https":
             return url
@@ -51,25 +59,29 @@ public enum HermesEndpointAsfaleia {
         guard !trimmed.isEmpty, trimmed.count <= maxURLLength,
               let url = URL(string: trimmed),
               let scheme = url.scheme?.lowercased(),
-              scheme == "https"
+              scheme == "https",
+              !containsDisallowedBaseURLComponents(url)
         else {
             throw AIErrorTaxonomy.makeError(
                 domain: AIErrorTaxonomy.directDomain,
                 code: AIErrorTaxonomy.directInsecureEndpoint,
-                message: "Το Direct AI Base URL πρέπει να είναι HTTPS."
+                message: "Το Direct AI Base URL πρέπει να είναι HTTPS και χωρίς credentials ή query parameters."
             )
         }
         return url
     }
 
-    /// Appends the API path while preserving URL query items and rejecting fragments.
+    /// Appends the API path only to a credential-free base URL without query or fragment.
     public static func chatCompletionsURL(
         fromBaseURL base: URL,
         errorDomain: String = AIErrorTaxonomy.hermesDomain,
         errorCode: Int = AIErrorTaxonomy.hermesInvalidURL
     ) throws -> URL {
         guard var components = URLComponents(url: base, resolvingAgainstBaseURL: false),
-              components.fragment == nil else {
+              components.fragment == nil,
+              components.user == nil,
+              components.password == nil,
+              components.percentEncodedQuery == nil else {
             throw AIErrorTaxonomy.makeError(
                 domain: errorDomain,
                 code: errorCode,
@@ -91,6 +103,16 @@ public enum HermesEndpointAsfaleia {
             )
         }
         return endpoint
+    }
+
+    /// Detects endpoint components that could smuggle secrets outside Keychain storage.
+    public static func containsDisallowedBaseURLComponents(_ url: URL) -> Bool {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return true
+        }
+        return components.user != nil
+            || components.password != nil
+            || components.percentEncodedQuery != nil
     }
 
     /// Host allowlist για cleartext HTTP (LAN / VPN threat model).
@@ -118,11 +140,19 @@ public enum HermesEndpointAsfaleia {
     // MARK: - Private helpers
 
     private static func parseIPv4(_ host: String) -> [UInt8]? {
-        let parts = host.split(separator: ".")
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
         guard parts.count == 4 else { return nil }
         var octets: [UInt8] = []
         for part in parts {
-            guard let value = UInt8(part) else { return nil }
+            // Only accept canonical dotted-decimal IPv4. Several resolvers treat
+            // leading-zero octets as octal (for example 010.0.0.1 -> 8.0.0.1),
+            // while the allowlist math below would read that same text as 10.0.0.1.
+            // Reject ambiguous forms so the checked address is the one URLSession uses.
+            guard !part.isEmpty,
+                  part.utf8.allSatisfy({ (48...57).contains($0) }),
+                  part == "0" || part.first != "0",
+                  let value = UInt8(part)
+            else { return nil }
             octets.append(value)
         }
         return octets

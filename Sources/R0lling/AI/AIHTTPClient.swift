@@ -8,6 +8,19 @@ struct AIHTTPResponseTooLarge: Error, Equatable {
     let maximumBytes: Int
 }
 
+/// The outbound JSON payload is rejected before URLSession can buffer or send it.
+public struct AIRequestBodyTooLarge: Error, Equatable, LocalizedError, Sendable {
+    public let maximumBytes: Int
+
+    public init(maximumBytes: Int) {
+        self.maximumBytes = maximumBytes
+    }
+
+    public var errorDescription: String? {
+        "Το αίτημα προς το AI είναι πολύ μεγάλο για ασφαλή αποστολή. Μείωσε το κείμενο ή τα καρέ εικόνας και δοκίμασε ξανά."
+    }
+}
+
 /// Redirects are rejected so an authenticated POST body cannot be replayed to
 /// an origin that was never accepted by the provider endpoint validator.
 struct AIHTTPRedirectRejected: Error, Equatable {}
@@ -177,6 +190,7 @@ private final class DataTaskCancellation: @unchecked Sendable {
 public enum AIHTTPClient {
     public static let defaultTimeoutSeconds: TimeInterval = 30.0
     public static let hermesTimeoutSeconds: TimeInterval = 20.0
+    public static let defaultMaximumRequestBytes: Int = 10 * 1024 * 1024
     public static let maxRetryCount: Int = 2
     public static let retryBaseDelaySeconds: TimeInterval = 0.4
 
@@ -187,6 +201,7 @@ public enum AIHTTPClient {
         public let url: URL
         public let bearerToken: String
         public let body: Data
+        public let maximumRequestBytes: Int
         public let timeout: TimeInterval
         public let errorDomain: String
         public let httpRejectedCode: Int
@@ -202,6 +217,7 @@ public enum AIHTTPClient {
             bearerToken: String,
             body: Data,
             timeout: TimeInterval,
+            maximumRequestBytes: Int = AIHTTPClient.defaultMaximumRequestBytes,
             errorDomain: String,
             httpRejectedCode: Int,
             responseTooLargeCode: Int,
@@ -214,6 +230,7 @@ public enum AIHTTPClient {
             self.url = url
             self.bearerToken = bearerToken
             self.body = body
+            self.maximumRequestBytes = max(1, maximumRequestBytes)
             self.timeout = timeout
             self.errorDomain = errorDomain
             self.httpRejectedCode = httpRejectedCode
@@ -228,6 +245,10 @@ public enum AIHTTPClient {
 
     /// Εκτελεί POST με Bearer auth, retries σε transient failures, σεβασμό cancelation.
     public static func postJSON(_ config: RequestConfig) async throws -> Data {
+        guard config.body.count <= config.maximumRequestBytes else {
+            throw AIRequestBodyTooLarge(maximumBytes: config.maximumRequestBytes)
+        }
+
         var lastError: Error?
 
         for attempt in 0...maxRetryCount {

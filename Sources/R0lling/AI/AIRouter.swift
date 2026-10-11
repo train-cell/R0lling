@@ -3,48 +3,115 @@ import ImageIO
 
 /// Κεντρικός δρομολογητής AI (AIRouter) που διαχειρίζεται τα ερωτήματα και τη μνήμη.
 public actor AIRouter {
+    private static let settingsDefaultsKey = "r0lling.ai.settings"
     private var settings: AISettings
     private var directConnector: DirectAPIConnector?
     private var hermesConnector: HermesConnector?
+    private var connectorOverrideForTesting: (any AIConnectorProtocol)?
 
     public init(settings: AISettings) {
         self.settings = settings
-        updateConnectors()
+        let connectors = Self.makeConnectors(for: settings)
+        self.directConnector = connectors.direct
+        self.hermesConnector = connectors.hermes
+    }
+
+    init(settings: AISettings, connectorOverrideForTesting: any AIConnectorProtocol) {
+        self.settings = settings
+        self.connectorOverrideForTesting = connectorOverrideForTesting
+        let connectors = Self.makeConnectors(for: settings)
+        self.directConnector = connectors.direct
+        self.hermesConnector = connectors.hermes
     }
 
     /// Loads persisted non-secret settings; credentials remain in Keychain.
     public static func loadSettings() -> AISettings {
-        guard let data = UserDefaults.standard.data(forKey: "r0lling.ai.settings"),
+        let defaults = UserDefaults.standard
+        guard let data = defaults.data(forKey: settingsDefaultsKey),
               let value = try? JSONDecoder().decode(AISettings.self, from: data) else { return AISettings() }
-        return value
+        guard let safeValue = settingsSafeForPersistence(value) else {
+            defaults.removeObject(forKey: settingsDefaultsKey)
+            return AISettings()
+        }
+        if safeValue != value, let sanitizedData = try? JSONEncoder().encode(safeValue) {
+            defaults.set(sanitizedData, forKey: settingsDefaultsKey)
+        }
+        return safeValue
     }
 
     public func currentSettings() -> AISettings { settings }
 
     public func updateSettings(_ newSettings: AISettings) {
-        if let data = try? JSONEncoder().encode(newSettings) {
-            UserDefaults.standard.set(data, forKey: "r0lling.ai.settings")
+        let defaults = UserDefaults.standard
+        if let safeSettings = Self.settingsSafeForPersistence(newSettings),
+           let data = try? JSONEncoder().encode(safeSettings) {
+            defaults.set(data, forKey: Self.settingsDefaultsKey)
+        } else {
+            // Purge legacy or newly supplied URL credentials instead of retaining them in defaults.
+            defaults.removeObject(forKey: Self.settingsDefaultsKey)
         }
         self.settings = newSettings
         updateConnectors()
     }
 
+    private static func settingsSafeForPersistence(_ settings: AISettings) -> AISettings? {
+        var safe = settings
+        let defaultSettings = AISettings()
+        let activeURL = settings.activeProvider == .directAPI
+            ? settings.directAPIBaseURL
+            : settings.hermesBaseURL
+        guard isValidEndpointForPersistence(provider: settings.activeProvider, raw: activeURL) else {
+            return nil
+        }
+
+        if !isValidEndpointForPersistence(provider: .directAPI, raw: settings.directAPIBaseURL) {
+            safe.directAPIBaseURL = defaultSettings.directAPIBaseURL
+        }
+        if !isValidEndpointForPersistence(provider: .hermes, raw: settings.hermesBaseURL) {
+            safe.hermesBaseURL = defaultSettings.hermesBaseURL
+        }
+        return safe
+    }
+
+    private static func isValidEndpointForPersistence(provider: AIProviderType, raw: String) -> Bool {
+        switch provider {
+        case .directAPI:
+            return (try? HermesEndpointAsfaleia.epikyroseDirectBaseURL(raw)) != nil
+        case .hermes:
+            return (try? HermesEndpointAsfaleia.epikyroseHermesBaseURL(raw)) != nil
+        }
+    }
+
     private func updateConnectors() {
+        let connectors = Self.makeConnectors(for: settings)
+        directConnector = connectors.direct
+        hermesConnector = connectors.hermes
+    }
+
+    private static func makeConnectors(for settings: AISettings) -> (
+        direct: DirectAPIConnector,
+        hermes: HermesConnector
+    ) {
         let directKey = retrieveSecret(forKey: settings.directAPIKeyKeychainKey) ?? ""
-        self.directConnector = DirectAPIConnector(
+        let direct = DirectAPIConnector(
             baseURLString: settings.directAPIBaseURL,
             modelName: settings.directAPIModel,
             apiKey: directKey
         )
 
         let hermesToken = retrieveSecret(forKey: settings.hermesTokenKeychainKey) ?? ""
-        self.hermesConnector = HermesConnector(
+        let hermes = HermesConnector(
             baseURLString: settings.hermesBaseURL,
             authToken: hermesToken
         )
+        return (direct, hermes)
     }
 
     private func activeConnector() throws -> any AIConnectorProtocol {
+        if let connectorOverrideForTesting {
+            return connectorOverrideForTesting
+        }
+
         switch settings.activeProvider {
         case .directAPI:
             guard let connector = directConnector else {
@@ -94,7 +161,7 @@ public actor AIRouter {
     }
 
     /// Πολυ-καδρική σύνθεση (A11) — connector δέχεται `imageBase64Frames`.
-    /// `FeatureReadinessRegistry.multiFrameVision.ready == false` μέχρι AppState να τραβάει πραγματικά buffer keyframes.
+    /// `FeatureReadinessRegistry.multiFrameVision.ready == false` όσο δεν υπάρχει live DAT H264-to-image capture feed.
     public func askWhatAmISeeingMultiFrames(frames: [Data], customQuestion: String?) async throws -> String {
         try Task.checkCancellation()
         guard !frames.isEmpty else {
@@ -106,7 +173,17 @@ public actor AIRouter {
         }
         let connector = try activeConnector()
         let limited = Array(frames.prefix(OpenAIChatRequestBuilder.maxVisionFrames))
-        let b64Frames = try limited.map { try Self.jpegForAI($0).base64EncodedString() }
+        var aggregateImageBytes = 0
+        var b64Frames: [String] = []
+        b64Frames.reserveCapacity(limited.count)
+        for frame in limited {
+            let jpeg = try Self.jpegForAI(frame)
+            aggregateImageBytes = try OpenAIChatRequestBuilder.addingVisionFrameBytes(
+                jpeg.count,
+                to: aggregateImageBytes
+            )
+            b64Frames.append(jpeg.base64EncodedString())
+        }
         let prompt = (customQuestion ?? "Περιέγραψε τι συμβαίνει σε αυτή τη χρονική σειρά καρέ από τα Meta Glasses μου.")
             + " (Ανάλυση \(limited.count) διαδοχικών στιγμιοτύπων)."
         let payload = AIRequestPayload(
@@ -149,16 +226,47 @@ public actor AIRouter {
             )
         }
 
-        let connector = try activeConnector()
+        let sourceSummary = Self.localRecallSourceSummary(relevantEntries)
         let promptText = "Ο χρήστης ρωτάει: «\(query)». Με βάση τις παρακάτω καταχωρήσεις, απάντησε συγκεκριμένα και ανάφερε τις ακριβείς ημερομηνίες ή πρόσωπα."
-        let payload = AIRequestPayload(prompt: promptText, contextEntries: contextForAI(Array(relevantEntries.prefix(5))))
-        let result = try await connector.generateReply(payload: payload)
+        do {
+            let connector = try activeConnector()
+            let payload = AIRequestPayload(prompt: promptText, contextEntries: contextForAI(Array(relevantEntries.prefix(5))))
+            let result = try await connector.generateReply(payload: payload)
+            try Task.checkCancellation()
+            return (
+                reply: "\(result.reply)\n\nΠηγές journal:\n\(sourceSummary)",
+                matchingEntries: relevantEntries
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
+        } catch {
+            // Some URLSession/Foundation implementations surface task cancellation as
+            // a transport error. Do not turn a cancelled recall into a successful fallback.
+            try Task.checkCancellation()
 
-        return (reply: result.reply, matchingEntries: relevantEntries)
+            // Recall remains useful when credentials, network, or the selected provider
+            // is unavailable: the deterministic local matches and their stable IDs are
+            // still returned instead of turning a memory search into a dead end.
+            return (
+                reply: "Το AI δεν ήταν διαθέσιμο, αλλά βρήκα τοπικά σχετικές καταχωρήσεις για «\(query)».\n\nΠηγές journal:\n\(sourceSummary)",
+                matchingEntries: relevantEntries
+            )
+        }
+    }
+
+    internal static func localRecallSourceSummary(_ entries: [JournalEntry]) -> String {
+        entries.prefix(5).map { entry in
+            let title = entry.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let label = (title?.isEmpty == false ? title! : String(entry.content.prefix(80)))
+                .replacingOccurrences(of: "\n", with: " ")
+            return "• \(entry.dateKey) · \(label) · id:\(entry.id.uuidString)"
+        }.joined(separator: "\n")
     }
 
     /// R3-004: Keychain (όχι plaintext UserDefaults). Fallback μόνο με ρητό env flag σε tests.
-    private func retrieveSecret(forKey key: String) -> String? {
+    private static func retrieveSecret(forKey key: String) -> String? {
         return KeychainSecretStore.retrieve(forKey: key)
     }
 
@@ -173,7 +281,7 @@ public actor AIRouter {
     }
 
     public func hasSecret(forKey key: String) -> Bool {
-        guard let value = retrieveSecret(forKey: key) else { return false }
+        guard let value = Self.retrieveSecret(forKey: key) else { return false }
         return !value.isEmpty
     }
 

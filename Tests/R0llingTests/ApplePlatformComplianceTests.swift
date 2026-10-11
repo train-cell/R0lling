@@ -41,18 +41,47 @@ final class ApplePlatformComplianceTests: XCTestCase {
         )
     }
 
-    func testChatCompletionsURLPreservesBaseQueryAndRejectsFragment() throws {
-        let base = try HermesEndpointAsfaleia.epikyroseDirectBaseURL(
-            "https://proxy.example/v1?tenant=blue&region=eu"
-        )
-        let endpoint = try HermesEndpointAsfaleia.chatCompletionsURL(fromBaseURL: base)
+    func testHermesCleartextRejectsAmbiguousNumericHosts() {
+        // Legacy resolvers may interpret 010.0.0.1 as octal 8.0.0.1, even
+        // though a decimal allowlist parser would classify it as private 10.0.0.1.
+        for host in [
+            "010.0.0.1",
+            "0172.16.0.1",
+            "192.168.001.001",
+            "2130706433",
+            "127.1",
+            "0x7f000001"
+        ] {
+            XCTAssertFalse(
+                HermesEndpointAsfaleia.isAllowlistedCleartextHost(host),
+                "Ambiguous numeric hostname must not pass the HTTP allowlist: \(host)"
+            )
+            XCTAssertThrowsError(
+                try HermesEndpointAsfaleia.epikyroseHermesBaseURL("http://\(host):8080")
+            )
+        }
+    }
 
+    func testProviderBaseURLsRejectCredentialsAndQueryParameters() throws {
+        for raw in [
+            "https://user:secret@proxy.example/v1",
+            "https://proxy.example/v1?api_key=secret",
+            "https://proxy.example/v1?tenant=blue"
+        ] {
+            XCTAssertThrowsError(try HermesEndpointAsfaleia.epikyroseDirectBaseURL(raw), raw)
+            XCTAssertThrowsError(try HermesEndpointAsfaleia.epikyroseHermesBaseURL(raw), raw)
+        }
+
+        let base = try HermesEndpointAsfaleia.epikyroseDirectBaseURL("https://proxy.example/v1")
+        let endpoint = try HermesEndpointAsfaleia.chatCompletionsURL(fromBaseURL: base)
         XCTAssertEqual(endpoint.path, "/v1/chat/completions")
-        XCTAssertEqual(URLComponents(url: endpoint, resolvingAgainstBaseURL: false)?.query, "tenant=blue&region=eu")
+        XCTAssertNil(endpoint.query)
         XCTAssertNil(endpoint.fragment)
 
         let fragmentURL = try XCTUnwrap(URL(string: "https://proxy.example/v1#client-only"))
         XCTAssertThrowsError(try HermesEndpointAsfaleia.chatCompletionsURL(fromBaseURL: fragmentURL))
+        let queryURL = try XCTUnwrap(URL(string: "https://proxy.example/v1?token=secret"))
+        XCTAssertThrowsError(try HermesEndpointAsfaleia.chatCompletionsURL(fromBaseURL: queryURL))
     }
 
     func testApplePermissionErrorCodesRegistered() {

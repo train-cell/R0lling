@@ -323,8 +323,11 @@ def test_sec_surgical_patches() -> None:
     )
     check(
         "Podcast completion at end",
-        "didFinish" in podcast and "pendingCompletion" in podcast,
-        "CQ-P2-020 completion after speech",
+        "didFinish" in podcast
+        and "completionRegistry.register(completion, for: utterance)" in podcast
+        and "completionRegistry.take(for: utterance)?()" in podcast
+        and "completionRegistry.discardAll()" in podcast,
+        "CQ-P2-020 completion is scoped to the finishing utterance and discarded on stop",
     )
 
     # SEC-004 / SEC-007 — Hermes HTTPS + allowlist

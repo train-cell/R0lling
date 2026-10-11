@@ -19,6 +19,18 @@ final class ObsidianBridgeTests: XCTestCase {
         }
     }
 
+    func testCanvasColorsMatchJSONCanvasPresetAndHexDefinitions() throws {
+        let entry = JournalEntry(content: "A journal entry")
+        let json = ObsidianCanvasGenerator().generateCanvasJSON(entries: [entry], title: "Weekly review")
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        let nodes = try XCTUnwrap(object["nodes"] as? [[String: Any]])
+        let center = try XCTUnwrap(nodes.first(where: { $0["id"] as? String == "center-node" }))
+        let entryNode = try XCTUnwrap(nodes.first(where: { $0["id"] as? String != "center-node" }))
+
+        XCTAssertEqual(center["color"] as? String, "6")
+        XCTAssertEqual(entryNode["color"] as? String, "#7D8597")
+    }
+
     func testExportEntryCreatesMarkdown() async throws {
         let entry = JournalEntry(
             title: "Ημερολόγιο Δοκιμών",
@@ -50,6 +62,71 @@ final class ObsidianBridgeTests: XCTestCase {
         XCTAssertEqual(url1.path, url2.path)
         let occurrences = content2.components(separatedBy: "r0lling:id:\(entry.id.uuidString)").count - 1
         XCTAssertEqual(occurrences, 2) // Opening and closing tag
+    }
+
+    func testMovingEntryDateRemovesOnlyItsOldManagedBlock() async throws {
+        let oldEntry = makeEntryOnDay(10, content: "Καταχώρηση που μεταφέρεται.")
+        let sameDayEntry = makeEntryOnDay(10, content: "Άλλη καταχώρηση της ίδιας ημέρας.")
+        let oldResult = try await bridge.exportEntry(oldEntry, mediaStorage: mediaStorage)
+        _ = try await bridge.exportEntry(sameDayEntry, mediaStorage: mediaStorage)
+        var movedEntry = oldEntry
+        movedEntry.timestamp = oldEntry.timestamp.addingTimeInterval(24 * 60 * 60)
+        movedEntry.content = "Ενημερωμένη καταχώρηση στη νέα ημέρα."
+
+        let result = try await bridge.moveEntry(
+            from: oldEntry,
+            to: movedEntry,
+            mediaStorage: mediaStorage
+        )
+
+        XCTAssertFalse(result.hadConflict)
+        XCTAssertEqual(result.noteURL.lastPathComponent, "\(movedEntry.dateKey).md")
+        let oldNote = try String(contentsOf: oldResult.noteURL, encoding: .utf8)
+        XCTAssertFalse(oldNote.contains("r0lling:id:\(oldEntry.id.uuidString)"))
+        XCTAssertTrue(oldNote.contains("r0lling:id:\(sameDayEntry.id.uuidString)"))
+        XCTAssertTrue(oldNote.contains("Άλλη καταχώρηση της ίδιας ημέρας."))
+
+        let newNote = try String(contentsOf: result.noteURL, encoding: .utf8)
+        XCTAssertTrue(newNote.contains("Ενημερωμένη καταχώρηση στη νέα ημέρα."))
+        XCTAssertEqual(newNote.components(separatedBy: "r0lling:id:\(oldEntry.id.uuidString)").count - 1, 2)
+    }
+
+    func testMovingEntryPreservesExternallyChangedOldNoteAndReportsConflict() async throws {
+        let oldEntry = makeEntryOnDay(10, content: "Αρχική καταχώρηση πριν τη μεταφορά.")
+        let oldResult = try await bridge.exportEntry(oldEntry, mediaStorage: mediaStorage)
+        let externallyEdited = try String(contentsOf: oldResult.noteURL, encoding: .utf8)
+            + "\n\n## Χειροκίνητη προσθήκη\nΝα διατηρηθεί.\n"
+        try externallyEdited.write(to: oldResult.noteURL, atomically: true, encoding: .utf8)
+
+        var movedEntry = oldEntry
+        movedEntry.timestamp = oldEntry.timestamp.addingTimeInterval(24 * 60 * 60)
+        movedEntry.content = "Ενημερωμένη καταχώρηση στη νέα ημέρα."
+
+        let result = try await bridge.moveEntry(
+            from: oldEntry,
+            to: movedEntry,
+            mediaStorage: mediaStorage
+        )
+
+        XCTAssertTrue(result.hadConflict)
+        let sidecarPath = try XCTUnwrap(result.conflictSidecarRelativePath)
+        XCTAssertEqual(try String(contentsOf: oldResult.noteURL, encoding: .utf8), externallyEdited)
+        XCTAssertTrue(externallyEdited.contains("r0lling:id:\(oldEntry.id.uuidString)"))
+        XCTAssertTrue(externallyEdited.contains("Να διατηρηθεί."))
+
+        let newNote = try String(contentsOf: result.noteURL, encoding: .utf8)
+        XCTAssertTrue(newNote.contains("Ενημερωμένη καταχώρηση στη νέα ημέρα."))
+        let sidecarURL = tempDirectory.appendingPathComponent(sidecarPath)
+        let sidecar = try String(contentsOf: sidecarURL, encoding: .utf8)
+        XCTAssertTrue(sidecar.contains(movedEntry.dateKey))
+        XCTAssertTrue(sidecar.contains("παλιά σημείωση άλλαξε"))
+    }
+
+    private func makeEntryOnDay(_ day: Int, content: String) -> JournalEntry {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let timestamp = calendar.date(from: DateComponents(year: 2026, month: 1, day: day, hour: 12))!
+        return JournalEntry(timestamp: timestamp, timeZoneIdentifier: "UTC", content: content)
     }
 
     /// R3-005: Εξωτερική τροποποίηση → πρωτότυπο παραμένει + sidecar conflict.
@@ -122,6 +199,10 @@ final class ObsidianBridgeTests: XCTestCase {
         let entry = JournalEntry(content: "Do not overwrite external note")
         let noteURL = try noteURL(for: entry)
         let original = Data("# User-authored note\nKeep this content.\n".utf8)
+        try FileManager.default.createDirectory(
+            at: noteURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
         try original.write(to: noteURL)
 
         let hashStore = tempDirectory.appendingPathComponent("R0llingMeta/export-hashes.json")
@@ -227,7 +308,7 @@ final class ObsidianBridgeTests: XCTestCase {
             _ = try await bridge.exportEntry(entry, mediaStorage: mediaStorage)
             XCTFail("A directory must never be exported as an attachment file")
         } catch {
-            XCTAssertEqual((error as NSError).code, 6010)
+            XCTAssertEqual((error as NSError).code, 6011)
         }
         XCTAssertFalse(FileManager.default.fileExists(atPath: expectedNoteURL.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: tempDirectory
@@ -410,7 +491,7 @@ final class ObsidianBridgeTests: XCTestCase {
             )
             XCTFail("A directory at the generated-file destination must be preserved")
         } catch let error as NSError {
-            XCTAssertEqual(error.code, 6006)
+            XCTAssertEqual(error.code, 6012)
         }
         XCTAssertTrue(FileManager.default.fileExists(atPath: sentinel.path))
     }
@@ -425,6 +506,122 @@ final class ObsidianBridgeTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: memURL.path))
         let body = try String(contentsOf: memURL, encoding: .utf8)
         XCTAssertTrue(body.contains("test path asfaleia"))
+    }
+
+    func testAgentMemoryRecoversInterruptedMultiFileSaveBeforeReading() async throws {
+        let vault = tempDirectory.appendingPathComponent("InterruptedAgentSave", isDirectory: true)
+        try FileManager.default.createDirectory(at: vault, withIntermediateDirectories: true)
+        let previous = AgentMemory(
+            memoryNotes: "old memory",
+            userPreferences: "old preferences",
+            openLoops: "old loops"
+        )
+        let next = AgentMemory(
+            memoryNotes: "new memory",
+            userPreferences: "new preferences",
+            openLoops: "new loops"
+        )
+        let agent = AgentFolderManager(vaultURL: vault)
+        try await agent.saveAgentMemory(previous)
+
+        for interruptionCount in [1, 2] {
+            await agent.simulateMemorySaveInterruptionForTesting(afterCommitCount: interruptionCount)
+            do {
+                try await agent.saveAgentMemory(next)
+                XCTFail("Expected a simulated interruption after commit \(interruptionCount)")
+            } catch let error as NSError {
+                XCTAssertEqual(error.domain, "R0lling.Agent")
+                XCTAssertEqual(error.code, 6112)
+            }
+
+            let restartedManager = AgentFolderManager(vaultURL: vault)
+            let recovered = try await restartedManager.loadAgentMemory()
+            XCTAssertEqual(recovered.memoryNotes, previous.memoryNotes)
+            XCTAssertEqual(recovered.userPreferences, previous.userPreferences)
+            XCTAssertEqual(recovered.openLoops, previous.openLoops)
+            XCTAssertFalse(FileManager.default.fileExists(
+                atPath: vault.appendingPathComponent("Agent/.memory-transaction.json").path
+            ))
+        }
+    }
+
+    func testAgentMemoryFinalizesInterruptedSaveWhenAllFilesWereCommitted() async throws {
+        let vault = tempDirectory.appendingPathComponent("CommittedAgentSave", isDirectory: true)
+        try FileManager.default.createDirectory(at: vault, withIntermediateDirectories: true)
+        let agent = AgentFolderManager(vaultURL: vault)
+        let next = AgentMemory(
+            memoryNotes: "committed memory",
+            userPreferences: "committed preferences",
+            openLoops: "committed loops"
+        )
+        await agent.simulateMemorySaveInterruptionForTesting(afterCommitCount: 3)
+        do {
+            try await agent.saveAgentMemory(next)
+            XCTFail("Expected a simulated interruption after the final commit")
+        } catch let error as NSError {
+            XCTAssertEqual(error.code, 6112)
+        }
+
+        let restartedManager = AgentFolderManager(vaultURL: vault)
+        let recovered = try await restartedManager.loadAgentMemory()
+        XCTAssertEqual(recovered.memoryNotes, next.memoryNotes)
+        XCTAssertEqual(recovered.userPreferences, next.userPreferences)
+        XCTAssertEqual(recovered.openLoops, next.openLoops)
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: vault.appendingPathComponent("Agent/.memory-transaction.json").path
+        ))
+    }
+
+    func testAgentMemoryInterruptedFirstSaveRemovesPartialFiles() async throws {
+        let vault = tempDirectory.appendingPathComponent("InterruptedFirstAgentSave", isDirectory: true)
+        try FileManager.default.createDirectory(at: vault, withIntermediateDirectories: true)
+        let agent = AgentFolderManager(vaultURL: vault)
+        await agent.simulateMemorySaveInterruptionForTesting(afterCommitCount: 1)
+        do {
+            try await agent.saveAgentMemory(AgentMemory(
+                memoryNotes: "new memory",
+                userPreferences: "new preferences",
+                openLoops: "new loops"
+            ))
+            XCTFail("Expected a simulated interruption during the first save")
+        } catch let error as NSError {
+            XCTAssertEqual(error.code, 6112)
+        }
+
+        let recovered = try await AgentFolderManager(vaultURL: vault).loadAgentMemory()
+        XCTAssertEqual(recovered.memoryNotes, "# Σημειώσεις Μνήμης Βοηθού\n\n")
+        XCTAssertEqual(recovered.userPreferences, "# Προτιμήσεις Χρήστη\n\n")
+        XCTAssertEqual(recovered.openLoops, "# Εκκρεμότητες & Ανοιχτά Θέματα\n\n")
+        for name in ["Memory.md", "Preferences.md", "Open-loops.md"] {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: vault.appendingPathComponent("Agent/\(name)").path))
+        }
+    }
+
+    func testAgentMemoryRecoveryPreservesExternalEditInsteadOfOverwritingIt() async throws {
+        let vault = tempDirectory.appendingPathComponent("ConflictingAgentRecovery", isDirectory: true)
+        try FileManager.default.createDirectory(at: vault, withIntermediateDirectories: true)
+        let agent = AgentFolderManager(vaultURL: vault)
+        let previous = AgentMemory(memoryNotes: "old memory", userPreferences: "old preferences", openLoops: "old loops")
+        let next = AgentMemory(memoryNotes: "new memory", userPreferences: "new preferences", openLoops: "new loops")
+        try await agent.saveAgentMemory(previous)
+        await agent.simulateMemorySaveInterruptionForTesting(afterCommitCount: 1)
+        do {
+            try await agent.saveAgentMemory(next)
+            XCTFail("Expected a simulated interruption")
+        } catch let error as NSError {
+            XCTAssertEqual(error.code, 6112)
+        }
+
+        let memoryFile = vault.appendingPathComponent("Agent/Memory.md")
+        try Data("external edit".utf8).write(to: memoryFile)
+        let restartedManager = AgentFolderManager(vaultURL: vault)
+        do {
+            _ = try await restartedManager.loadAgentMemory()
+            XCTFail("Recovery must fail closed when a managed file changed after interruption")
+        } catch let error as NSError {
+            XCTAssertEqual(error.code, 6105)
+        }
+        XCTAssertEqual(try String(contentsOf: memoryFile, encoding: .utf8), "external edit")
     }
 
     func testAgentMemoryRejectsVaultDirectoryReplacement() async throws {
@@ -512,6 +709,32 @@ final class ObsidianBridgeTests: XCTestCase {
             FileManager.default.attributesOfItem(atPath: memoryFile.path)[.size] as? NSNumber
         ).intValue
         XCTAssertEqual(remainingSize, oversizedContents.count)
+    }
+
+    func testAgentMemoryRejectsGrowthDuringBackupWithoutReplacingExternalEdit() async throws {
+        let agentDirectory = tempDirectory.appendingPathComponent("Agent", isDirectory: true)
+        try FileManager.default.createDirectory(at: agentDirectory, withIntermediateDirectories: true)
+        let maximumBytes = 4 * 1024 * 1024
+        let originalBytes = Data(repeating: 0x61, count: maximumBytes - 1)
+        let appendedBytes = Data([0x62, 0x63])
+        let memoryFile = agentDirectory.appendingPathComponent("Memory.md")
+        try originalBytes.write(to: memoryFile)
+
+        let agent = AgentFolderManager(vaultURL: tempDirectory)
+        await agent.simulateMemoryBackupGrowthForTesting(fileName: "Memory.md", appending: appendedBytes)
+
+        do {
+            try await agent.saveAgentMemory(AgentMemory(memoryNotes: "replacement"))
+            XCTFail("A managed file that grows beyond 4 MiB during backup must fail closed")
+        } catch let error as NSError {
+            XCTAssertEqual(error.domain, "R0lling.Agent")
+            XCTAssertEqual(error.code, 6110)
+        }
+
+        var expectedContents = originalBytes
+        expectedContents.append(appendedBytes)
+        XCTAssertEqual(try Data(contentsOf: memoryFile), expectedContents)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: agentDirectory.path), ["Memory.md"])
     }
 
     func testAgentMemoryRejectsOversizedMarkdownBeforeCreatingFiles() async throws {

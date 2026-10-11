@@ -122,7 +122,6 @@ public struct R0llingBevelSurfaceModifier: ViewModifier {
                 )
             }
             .shadow(color: Color.black.opacity(0.28), radius: 8, x: 0, y: 4)
-            .shadow(color: Color.white.opacity(0.025), radius: 1, x: 0, y: -1)
     }
 }
 
@@ -170,7 +169,6 @@ public struct R0llingBevelCapsuleModifier: ViewModifier {
                 )
             }
             .shadow(color: Color.black.opacity(0.24), radius: 6, x: 0, y: 3)
-            .shadow(color: Color.white.opacity(0.03), radius: 1, x: 0, y: -1)
     }
 }
 

@@ -4,22 +4,54 @@ import SwiftUI
 /// Every cell and total is derived from HealthKit workouts; no sample data is shown.
 public struct FitnessView: View {
     @EnvironmentObject private var appState: AppState
+    private let onOpenQuickActions: (() -> Void)?
 
-    public init() {}
+    public init(onOpenQuickActions: (() -> Void)? = nil) {
+        self.onOpenQuickActions = onOpenQuickActions
+    }
 
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Fitness")
-                        .font(.largeTitle.weight(.bold))
-                        .foregroundColor(R0llingTheme.textPrimary)
-                    Text("Τελευταίες 30 ημέρες")
-                        .font(.subheadline)
-                        .foregroundColor(R0llingTheme.textSecondary)
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Fitness")
+                            .font(.largeTitle.weight(.bold))
+                            .foregroundColor(R0llingTheme.textPrimary)
+                        Text("Τελευταίες 30 ημέρες")
+                            .font(.subheadline)
+                            .foregroundColor(R0llingTheme.textSecondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isHeader)
+
+                    Spacer(minLength: 4)
+
+                    if let onOpenQuickActions {
+                        Button(action: onOpenQuickActions) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 21, weight: .medium))
+                                .foregroundColor(R0llingTheme.textPrimary)
+                                .frame(width: 54, height: 54)
+                                .background {
+                                    Circle().fill(
+                                        LinearGradient(
+                                            colors: [R0llingTheme.bgElevated, R0llingTheme.bgSurface],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                }
+                                .overlay {
+                                    Circle().stroke(R0llingTheme.borderSubtle, lineWidth: 1)
+                                }
+                                .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 3)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Περισσότερες λειτουργίες")
+                        .accessibilityHint("Ανοίγει το μενού γρήγορων ενεργειών.")
+                    }
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isHeader)
 
                 FitnessActivityCalendarCard(snapshot: appState.fitnessActivitySnapshot)
 
@@ -74,49 +106,75 @@ public struct FitnessView: View {
 
 private struct FitnessActivityCalendarCard: View {
     let snapshot: FitnessActivitySnapshot
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    private let weekdays = ["Δ", "Τ", "Τ", "Π", "Π", "Σ", "Κ"]
-    @State private var selectedDate: Date? = Calendar.current.startOfDay(for: .now)
+    private let weekdays = FitnessActivityWeekdayLabels.greekMondayFirst
+    private let dayTargetSize: CGFloat = 44
+    @State private var selectedDate: Date? = FitnessActivityCalendar.athensCalendar.startOfDay(for: .now)
+
+    private var monthGridWidth: CGFloat { dayTargetSize * 7 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if horizontalSizeClass == .regular,
-               !dynamicTypeSize.isAccessibilitySize,
-               monthBuckets.count > 1 {
+            ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 14) {
                     ForEach(monthBuckets) { month in
                         monthGrid(month)
                     }
                 }
-            } else {
-                VStack(alignment: .leading, spacing: 14) {
-                    ForEach(monthBuckets) { month in
-                        monthGrid(month)
+                .fixedSize(horizontal: true, vertical: false)
+
+                ScrollView(.horizontal, showsIndicators: true) {
+                    HStack(alignment: .top, spacing: 14) {
+                        ForEach(monthBuckets) { month in
+                            monthGrid(month)
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             if let selectedDay {
-                HStack(spacing: 8) {
-                    Image(systemName: "calendar")
-                        .foregroundColor(R0llingTheme.accentCyan)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(selectedDay.date.formatted(date: .complete, time: .omitted))
-                            .font(.caption.weight(.semibold))
-                            .foregroundColor(R0llingTheme.textPrimary)
-                        Text(selectedDay.workoutCount == 0
-                             ? "Δεν υπάρχουν προπονήσεις σε αυτή την ημέρα."
-                             : "\(selectedDay.workoutCount) προπονήσεις · \(FitnessActivitySummaryCard.durationText(selectedDay.durationSeconds))")
-                            .font(.caption2)
-                            .foregroundColor(R0llingTheme.textSecondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "calendar")
+                            .foregroundColor(R0llingTheme.accentCyan)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(FitnessActivityCalendar.formatted(selectedDay.date, template: "EEEE, d MMMM yyyy"))
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(R0llingTheme.textPrimary)
+                            Text(selectedDay.workoutCount == 0
+                                 ? "Δεν υπάρχουν προπονήσεις σε αυτή την ημέρα."
+                                 : "\(selectedDay.workoutCount) προπονήσεις · \(FitnessActivitySummaryCard.durationText(selectedDay.durationSeconds))")
+                                .font(.caption2)
+                                .foregroundColor(R0llingTheme.textSecondary)
+                        }
+                        Spacer(minLength: 0)
                     }
-                    Spacer(minLength: 0)
+                    .accessibilityElement(children: .combine)
+
+                    ForEach(selectedDay.workouts) { workout in
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(R0llingTheme.accentCyan)
+                                .frame(width: 8, height: 8)
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(workout.activityName)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(R0llingTheme.textPrimary)
+                                Text("\(FitnessActivityCalendar.formatted(workout.startedAt, template: "HH:mm")) · \(FitnessActivitySummaryCard.durationText(workout.durationSeconds))")
+                                    .font(.caption)
+                                    .foregroundColor(R0llingTheme.textSecondary)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .frame(minHeight: 44, alignment: .leading)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("\(workout.activityName), ώρα \(FitnessActivityCalendar.formatted(workout.startedAt, template: "HH:mm")), διάρκεια \(FitnessActivitySummaryCard.durationText(workout.durationSeconds))")
+                    }
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .r0llingBevelInsetSurface(cornerRadius: 12)
-                .accessibilityElement(children: .combine)
             }
 
             HStack(spacing: 10) {
@@ -149,12 +207,12 @@ private struct FitnessActivityCalendarCard: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 2) {
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(dayTargetSize), spacing: 0), count: 7), spacing: 0) {
                 ForEach(weekdays.indices, id: \.self) { index in
                     Text(weekdays[index])
                         .font(.system(size: 9, weight: .medium))
                         .foregroundColor(R0llingTheme.textMuted)
-                        .frame(maxWidth: .infinity, minHeight: 24)
+                        .frame(width: dayTargetSize, height: dayTargetSize)
                         .accessibilityHidden(true)
                 }
 
@@ -163,14 +221,13 @@ private struct FitnessActivityCalendarCard: View {
                         dayButton(day)
                     } else {
                         Color.clear
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
+                            .frame(width: dayTargetSize, height: dayTargetSize)
                             .accessibilityHidden(true)
                     }
                 }
             }
         }
-        .frame(minWidth: 150, maxWidth: .infinity, alignment: .leading)
+        .frame(width: monthGridWidth, alignment: .leading)
         .accessibilityElement(children: .contain)
     }
 
@@ -190,7 +247,7 @@ private struct FitnessActivityCalendarCard: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 44)
+                .frame(width: dayTargetSize, height: dayTargetSize)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -208,10 +265,7 @@ private struct FitnessActivityCalendarCard: View {
     }
 
     private func monthTitle(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "el_GR")
-        formatter.setLocalizedDateFormatFromTemplate("MMM yyyy")
-        return formatter.string(from: date)
+        FitnessActivityCalendar.formatted(date, template: "MMM yyyy")
     }
 
     private func activityColor(for count: Int) -> Color {
@@ -234,7 +288,7 @@ private struct FitnessActivityCalendarCard: View {
     }
 
     private func accessibilityLabel(for day: FitnessActivityDay) -> String {
-        let date = day.date.formatted(date: .complete, time: .omitted)
+        let date = FitnessActivityCalendar.formatted(day.date, template: "EEEE, d MMMM yyyy")
         guard day.workoutCount > 0 else { return "\(date): καμία καταγεγραμμένη προπόνηση" }
         return "\(date): \(day.workoutCount) προπονήσεις, \(FitnessActivitySummaryCard.durationText(day.durationSeconds))"
     }
@@ -290,6 +344,11 @@ private struct FitnessActivitySummaryCard: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(chartAccessibilityLabel)
 
+            HStack(spacing: 16) {
+                trendLegend(color: R0llingTheme.accentAmber, title: "Τρέχον διάστημα")
+                trendLegend(color: R0llingTheme.textMuted, title: "Προηγούμενο διάστημα")
+            }
+
             HStack {
                 Text("\(snapshot.totalWorkoutCount) καταγεγραμμένες προπονήσεις")
                 Spacer()
@@ -309,10 +368,7 @@ private struct FitnessActivitySummaryCard: View {
 
     private var dateRangeText: String {
         guard let first = snapshot.currentDays.first?.date else { return "Τελευταίες 30 ημέρες" }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "el_GR")
-        formatter.setLocalizedDateFormatFromTemplate("d MMM")
-        return "\(formatter.string(from: first)) – \(formatter.string(from: snapshot.referenceDate))"
+        return "\(FitnessActivityCalendar.formatted(first, template: "d MMM")) – \(FitnessActivityCalendar.formatted(snapshot.referenceDate, template: "d MMM"))"
     }
 
     private var comparisonText: String {
@@ -331,6 +387,16 @@ private struct FitnessActivitySummaryCard: View {
 
     private var chartAccessibilityLabel: String {
         "Σωρευτική διάρκεια προπονήσεων 30 ημερών: \(Self.durationText(snapshot.totalDurationSeconds)). Προηγούμενο διάστημα: \(Self.durationText(snapshot.previousDurationSeconds))."
+    }
+
+    private func trendLegend(color: Color, title: String) -> some View {
+        HStack(spacing: 6) {
+            Capsule().fill(color).frame(width: 16, height: 3)
+            Text(title)
+                .font(.caption2)
+                .foregroundColor(R0llingTheme.textSecondary)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -425,10 +491,7 @@ private struct FitnessActivityTrendChart: View {
 
     private func axisDate(_ date: Date?) -> String {
         guard let date else { return "" }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "el_GR")
-        formatter.setLocalizedDateFormatFromTemplate("d MMM")
-        return formatter.string(from: date)
+        FitnessActivityCalendar.formatted(date, template: "d MMM")
     }
 
     private func point(

@@ -1,22 +1,58 @@
 import Foundation
 
 /// A HealthKit workout reduced to the values used by the activity view.
-public struct FitnessWorkoutSample: Sendable, Equatable {
+public struct FitnessWorkoutSample: Identifiable, Sendable, Equatable {
+    public let id: UUID
     public let startedAt: Date
     public let durationSeconds: TimeInterval
+    public let activityName: String
 
-    public init(startedAt: Date, durationSeconds: TimeInterval) {
+    public init(
+        id: UUID = UUID(),
+        startedAt: Date,
+        durationSeconds: TimeInterval,
+        activityName: String = "Προπόνηση"
+    ) {
+        self.id = id
         self.startedAt = startedAt
         self.durationSeconds = durationSeconds
+        self.activityName = activityName
     }
 }
 
 public struct FitnessActivityDay: Identifiable, Sendable, Equatable {
     public let date: Date
-    public let workoutCount: Int
-    public let durationSeconds: TimeInterval
+    public let workouts: [FitnessWorkoutSample]
+
+    public var workoutCount: Int { workouts.count }
+    public var durationSeconds: TimeInterval { workouts.reduce(0) { $0 + $1.durationSeconds } }
 
     public var id: Date { date }
+}
+
+public enum FitnessActivityCalendar {
+    public static let athensTimeZoneIdentifier = "Europe/Athens"
+
+    public static var athensCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "el_GR")
+        calendar.timeZone = TimeZone(identifier: athensTimeZoneIdentifier) ?? .current
+        return calendar
+    }
+
+    public static func formatted(_ date: Date, template: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "el_GR")
+        formatter.calendar = athensCalendar
+        formatter.timeZone = athensCalendar.timeZone
+        formatter.setLocalizedDateFormatFromTemplate(template)
+        return formatter.string(from: date)
+    }
+}
+
+public enum FitnessActivityWeekdayLabels {
+    /// Distinct short Greek labels, Monday first to match the month-grid cell order.
+    public static let greekMondayFirst = ["Δε", "Τρ", "Τε", "Πε", "Πα", "Σα", "Κυ"]
 }
 
 /// Month layout for the rolling workout window. `nil` cells are dates outside that window.
@@ -28,7 +64,7 @@ public struct FitnessActivityMonthGrid: Identifiable, Sendable, Equatable {
 
     public static func make(
         from days: [FitnessActivityDay],
-        calendar: Calendar = .current
+        calendar: Calendar = FitnessActivityCalendar.athensCalendar
     ) -> [Self] {
         let dayByDate = Dictionary(uniqueKeysWithValues: days.map { ($0.date, $0) })
         let monthStarts = Set(days.compactMap {
@@ -81,7 +117,7 @@ public struct FitnessActivitySnapshot: Sendable, Equatable {
     public init(
         samples: [FitnessWorkoutSample],
         referenceDate: Date = Date(),
-        calendar: Calendar = .current,
+        calendar: Calendar = FitnessActivityCalendar.athensCalendar,
         querySucceeded: Bool = true
     ) {
         let currentDay = calendar.startOfDay(for: referenceDate)
@@ -91,8 +127,8 @@ public struct FitnessActivitySnapshot: Sendable, Equatable {
         self.referenceDate = referenceDate
         self.querySucceeded = querySucceeded
 
-        var currentBuckets: [Date: (count: Int, seconds: TimeInterval)] = [:]
-        var previousBuckets: [Date: (count: Int, seconds: TimeInterval)] = [:]
+        var currentBuckets: [Date: [FitnessWorkoutSample]] = [:]
+        var previousBuckets: [Date: [FitnessWorkoutSample]] = [:]
 
         for sample in samples {
             guard sample.startedAt <= referenceDate,
@@ -100,11 +136,9 @@ public struct FitnessActivitySnapshot: Sendable, Equatable {
                   sample.durationSeconds > 0 else { continue }
             let day = calendar.startOfDay(for: sample.startedAt)
             if day >= start && day <= currentDay {
-                let bucket = currentBuckets[day] ?? (0, 0)
-                currentBuckets[day] = (bucket.count + 1, bucket.seconds + sample.durationSeconds)
+                currentBuckets[day, default: []].append(sample)
             } else if day >= previousStart && day < start {
-                let bucket = previousBuckets[day] ?? (0, 0)
-                previousBuckets[day] = (bucket.count + 1, bucket.seconds + sample.durationSeconds)
+                previousBuckets[day, default: []].append(sample)
             }
         }
 
@@ -120,19 +154,22 @@ public struct FitnessActivitySnapshot: Sendable, Equatable {
         )
     }
 
-    public static func unavailable(at date: Date = Date(), calendar: Calendar = .current) -> Self {
+    public static func unavailable(
+        at date: Date = Date(),
+        calendar: Calendar = FitnessActivityCalendar.athensCalendar
+    ) -> Self {
         Self(samples: [], referenceDate: date, calendar: calendar, querySucceeded: false)
     }
 
     private static func makeDays(
         beginningAt start: Date,
         calendar: Calendar,
-        buckets: [Date: (count: Int, seconds: TimeInterval)]
+        buckets: [Date: [FitnessWorkoutSample]]
     ) -> [FitnessActivityDay] {
         (0..<30).compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: offset, to: start) else { return nil }
-            let bucket = buckets[date] ?? (0, 0)
-            return FitnessActivityDay(date: date, workoutCount: bucket.count, durationSeconds: bucket.seconds)
+            let workouts = (buckets[date] ?? []).sorted { $0.startedAt < $1.startedAt }
+            return FitnessActivityDay(date: date, workouts: workouts)
         }
     }
 }

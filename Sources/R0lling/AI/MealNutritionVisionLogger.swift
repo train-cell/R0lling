@@ -78,7 +78,7 @@ public final class MealNutritionVisionLogger: @unchecked Sendable {
         if lower.contains(where: { $0.contains("salad") || $0.contains("σαλάτα") || $0.contains("tomato") }) {
             items.append(MealItem(name: "Χωριάτικη Σαλάτα", estimatedGrams: 250, calories: 280, proteinGrams: 6, carbsGrams: 12, fatGrams: 22))
         }
-        if lower.contains(where: { $0.contains("chicken") || $0.contains("κοτόπουλο") || $0.contains("meat") || $0.contains("steak") }) {
+        if lower.contains(where: { $0.contains("chicken") || $0.contains("κοτόπουλο") }) {
             items.append(MealItem(name: "Φιλέτο Κοτόπουλο", estimatedGrams: 200, calories: 330, proteinGrams: 55, carbsGrams: 0, fatGrams: 7))
         }
         if lower.contains(where: { $0.contains("rice") || $0.contains("ρύζι") || $0.contains("pasta") || $0.contains("μακαρόνια") }) {
@@ -95,7 +95,7 @@ public final class MealNutritionVisionLogger: @unchecked Sendable {
         case 6..<11: mealType = .breakfast
         case 12..<17: mealType = .lunch
         case 19..<23: mealType = .dinner
-        default: mealType = items.first?.name.contains("Espresso") == true ? .coffee : .snack
+        default: mealType = items.contains(where: { $0.name.contains("Espresso") }) ? .coffee : .snack
         }
         
         return NutritionSnapshot(mealType: mealType, items: items)
@@ -103,7 +103,8 @@ public final class MealNutritionVisionLogger: @unchecked Sendable {
     
     /// Μορφοποίηση σε Markdown Frontmatter / Dataview block για το Obsidian
     public func formatObsidianMarkdown(snapshot: NutritionSnapshot) -> String {
-        var md = "### 🥗 Καταγραφή Γεύματος (\(snapshot.mealType.rawValue))\n"
+        var md = "### 🥗 Ενδεικτική εκτίμηση γεύματος (\(snapshot.mealType.rawValue))\n"
+        md += "- _Heuristic από OCR· οι ποσότητες και οι τιμές δεν μετρήθηκαν και χρειάζονται έλεγχο._\n"
         md += "- **Θερμίδες:** \(Int(snapshot.totalCalories)) kcal\n"
         md += "- **Πρωτεΐνη:** \(String(format: "%.1f", snapshot.totalProtein))g | "
         md += "**Υδατάνθρακες:** \(String(format: "%.1f", snapshot.totalCarbs))g | "

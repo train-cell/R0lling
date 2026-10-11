@@ -45,16 +45,17 @@ public struct SettingsView: View {
                             await appState.toggleGlassesConnection()
                         }
                     }) {
-                        Text(appState.glassesState == .disconnected ? "Σύνδεση Γυαλιών" : "Αποσύνδεση")
+                        Text(appState.glassesState.isConnected ? "Αποσύνδεση" : "Σύνδεση Γυαλιών")
                             .foregroundColor(R0llingTheme.accentPurple)
                     }
+                    .disabled(appState.glassesState.isConnectionAttemptInProgress)
 
                     if MetaDATStreamBridge.einaiLiveYlopoiimeno {
                         Toggle("Simulation Mode (Δοκιμή χωρίς γυαλιά)", isOn: $simulationMode)
                             .onChange(of: simulationMode) { _, val in
                                 Task {
-                                    await appState.glassesAdapter.toggleSimulationMode(enabled: val)
-                                    simulationMode = await appState.glassesAdapter.isSimulationMode
+                                    await appState.setGlassesSimulationMode(enabled: val)
+                                    simulationMode = appState.isSimulationMode
                                 }
                             }
                     } else {
@@ -198,6 +199,24 @@ public struct SettingsView: View {
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundColor(R0llingTheme.textSecondary)
                         .lineLimit(3)
+
+                    if appState.isObsidianVaultWatcherActive {
+                        Label("Παρακολούθηση δραστηριότητας φακέλου ενεργή", systemImage: "eye")
+                            .font(.caption)
+                            .foregroundColor(R0llingTheme.statusSuccess)
+                        if appState.obsidianVaultChangeDetected {
+                            Text("Εντοπίστηκε αλλαγή στον φάκελο. Η εισαγωγή και ο συγχρονισμός παραμένουν χειροκίνητα.")
+                                .font(.caption)
+                                .foregroundColor(R0llingTheme.textSecondary)
+                        }
+                    } else if let watcherError = appState.obsidianVaultWatcherError {
+                        Label("Η παρακολούθηση δεν είναι διαθέσιμη", systemImage: "eye.slash")
+                            .font(.caption)
+                            .foregroundColor(R0llingTheme.statusError)
+                        Text(watcherError)
+                            .font(.caption2)
+                            .foregroundColor(R0llingTheme.textSecondary)
+                    }
 
                     Button("Επιλογή Vault (Files / iCloud)") {
                         deixeiEpilogiVault = true

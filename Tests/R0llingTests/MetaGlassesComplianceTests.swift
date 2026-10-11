@@ -16,6 +16,41 @@ private final class MockSensorSink: GlassesSensorFeedSink, @unchecked Sendable {
 
 final class MetaGlassesComplianceTests: XCTestCase {
 
+    func testDATLiveHooksFailClosedUntilTheyAreImplemented() async {
+        XCTAssertFalse(MetaDATStreamBridge.einaiLiveYlopoiimeno)
+
+        await assertDATHookFailsClosed {
+            _ = try await MetaDATStreamBridge.anoixeLiveSession()
+        }
+        await assertDATHookFailsClosed {
+            _ = try await MetaDATStreamBridge.diavaseEpomenoVideoFrame()
+        }
+        await assertDATHookFailsClosed {
+            _ = try await MetaDATStreamBridge.diavaseEpomenoAudioSample()
+        }
+        await assertDATHookFailsClosed {
+            _ = try await MetaDATStreamBridge.diavaseEpomenoIMU()
+        }
+    }
+
+    private func assertDATHookFailsClosed(
+        _ operation: () async throws -> Void,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        do {
+            try await operation()
+            XCTFail("An unwired DAT hook must not report success", file: file, line: line)
+        } catch {
+            let nsError = error as NSError
+            let expectedCode = MetaDATStreamBridge.einaiSDKDiathesimo
+                ? MetaDATStreamBridge.kodikosSessionApotyxia
+                : MetaDATStreamBridge.kodikosSDKMiDiathesimo
+            XCTAssertEqual(nsError.domain, MetaDATStreamBridge.errorDomain, file: file, line: line)
+            XCTAssertEqual(nsError.code, expectedCode, file: file, line: line)
+        }
+    }
+
     func testDisconnectedStateReportsHonestBatteryNil() async {
         let adapter = MetaGlassesAdapter()
         let state = await adapter.connectionState
@@ -25,13 +60,81 @@ final class MetaGlassesComplianceTests: XCTestCase {
         XCTAssertNil(battery)
     }
 
+    func testCancellingConnectionHandshakeClearsConnectingState() async throws {
+        let adapter = MetaGlassesAdapter()
+        let connection = Task { try await adapter.connectDevice() }
+
+        // The adapter publishes `.connecting` before its cancellable handshake suspends.
+        for _ in 0..<100 {
+            if await adapter.connectionState == .connecting { break }
+            await Task.yield()
+        }
+        let connectingState = await adapter.connectionState
+        XCTAssertEqual(connectingState, .connecting)
+
+        connection.cancel()
+        do {
+            try await connection.value
+            XCTFail("A cancelled connection handshake must propagate cancellation")
+        } catch is CancellationError {
+            // Expected.
+        }
+
+        let finalState = await adapter.connectionState
+        XCTAssertEqual(finalState, .disconnected)
+    }
+
+    func testStaleHandshakeCannotOverwriteANewerConnectionAttempt() async throws {
+        let adapter = MetaGlassesAdapter()
+        let staleConnection = Task { try await adapter.connectDevice() }
+        for _ in 0..<100 {
+            if await adapter.connectionState == .connecting { break }
+            try await Task.sleep(nanoseconds: 1_000_000)
+        }
+
+        await adapter.disconnectDevice()
+        let currentConnection = Task { try await adapter.connectDevice() }
+        for _ in 0..<100 {
+            if await adapter.connectionState == .connecting { break }
+            try await Task.sleep(nanoseconds: 1_000_000)
+        }
+        try await currentConnection.value
+
+        do {
+            try await staleConnection.value
+            XCTFail("A connection invalidated by disconnect must not report success")
+        } catch is CancellationError {
+            // Expected: disconnect invalidates the older handshake generation.
+        }
+
+        let finalState = await adapter.connectionState
+        XCTAssertTrue(finalState.isConnected)
+    }
+
+    func testGlassesPrimaryActionRestartsConnectedOrPausedStreamInsteadOfDisconnecting() {
+        let connected = GlassesConnectionState.connected(deviceName: "Device", batteryPercent: nil)
+        XCTAssertTrue(connected.isConnected)
+        XCTAssertEqual(GlassesPrimaryAction.resolve(isStreaming: false, state: connected), .startStreaming)
+
+        let paused = GlassesConnectionState.paused(reason: "background")
+        XCTAssertTrue(paused.isConnected)
+        XCTAssertEqual(GlassesPrimaryAction.resolve(isStreaming: false, state: paused), .startStreaming)
+
+        let streaming = GlassesConnectionState.streaming(fps: 30, isBuffering: true)
+        XCTAssertEqual(GlassesPrimaryAction.resolve(isStreaming: false, state: streaming), .stopStreaming)
+        XCTAssertEqual(GlassesPrimaryAction.resolve(isStreaming: true, state: connected), .stopStreaming)
+        XCTAssertEqual(GlassesPrimaryAction.resolve(isStreaming: false, state: .disconnected), .connectThenStartStreaming)
+        XCTAssertEqual(GlassesPrimaryAction.resolve(isStreaming: false, state: .connecting), .waitForConnection)
+        XCTAssertFalse(GlassesConnectionState.error("failed").isConnected)
+    }
+
     func testSimulationModeForcedWithoutDatSDK() async {
         let adapter = MetaGlassesAdapter()
         // Προσπάθεια απενεργοποίησης simulation σε build χωρίς SDK
         await adapter.toggleSimulationMode(enabled: false)
         let isSim = await adapter.isSimulationMode
         if !MetaGlassesAdapter.einaiDatSDKDiathesimo {
-            // Χωρίς MetaWearablesDAT SDK, το adapter αρνείται να απενεργοποιήσει το simulation (R3-003)
+            // Χωρίς και τα δύο DAT modules, το adapter αρνείται να απενεργοποιήσει το simulation (R3-003)
             XCTAssertTrue(isSim)
         }
     }

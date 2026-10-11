@@ -8,6 +8,7 @@ public struct CalendarView: View {
     @State private var displayedEntries: [JournalEntry] = []
     @State private var entryProsEpeksergasia: JournalEntry?
     @State private var isSearching: Bool = false
+    @State private var searchRequestGate = JournalSearchRequestGate()
 
     public var body: some View {
         VStack(spacing: 0) {
@@ -41,10 +42,13 @@ public struct CalendarView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(R0llingTheme.accentPurple)
                     .font(.system(size: 14, weight: .bold))
+                    .accessibilityHidden(true)
 
                 TextField("Αναζήτηση σημειώσεων, #tags, δραστηριοτήτων...", text: $searchQuery)
                     .font(.system(size: 14))
                     .foregroundColor(R0llingTheme.textPrimary)
+                    .accessibilityLabel("Αναζήτηση στο ημερολόγιο")
+                    .accessibilityHint("Αναζήτησε σε κείμενο, τίτλους, tags και δραστηριότητες.")
                     .onChange(of: searchQuery) {
                         Task { await filterEntries() }
                     }
@@ -60,11 +64,13 @@ public struct CalendarView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(R0llingTheme.textSecondary)
                     }
+                    .accessibilityLabel("Καθαρισμός αναζήτησης")
                 }
 
                 if isSearching {
                     ProgressView()
                         .scaleEffect(0.7)
+                        .accessibilityLabel("Αναζήτηση σε εξέλιξη")
                 }
             }
             .padding(12)
@@ -164,14 +170,20 @@ public struct CalendarView: View {
 
     /// A02: search μέσω `storage.searchEntries` (title + content + tags), όχι μόνο client content.
     private func filterEntries() async {
+        let request = searchRequestGate.beginRequest()
         isSearching = true
-        defer { isSearching = false }
+        defer {
+            if searchRequestGate.canApplyResult(for: request) {
+                isSearching = false
+            }
+        }
 
         let results = await appState.searchJournal(
             query: searchQuery,
             tag: nil,
             source: selectedSourceFilter
         )
+        guard searchRequestGate.canApplyResult(for: request) else { return }
         displayedEntries = results
     }
 }

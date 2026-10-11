@@ -158,23 +158,58 @@ public actor DeepWorkSessionManager {
     private let storageKey: String
     private var state: SessionState
     private var completedSessions: [CompletedSession]
+    private var persistenceWritesBlocked: Bool
 
     public init(storageKey: String = "r0lling.deepWork.session.v1") {
         self.storageKey = storageKey
-        if let data = UserDefaults.standard.data(forKey: storageKey),
-           let persisted = try? JSONDecoder().decode(PersistedState.self, from: data) {
-            self.state = persisted.sessionState
-            self.completedSessions = persisted.completedSessions
-        } else if let data = UserDefaults.standard.data(forKey: storageKey),
-                  let legacyState = try? JSONDecoder().decode(SessionState.self, from: data) {
-            // Migrate the previous single-session payload without treating an undated
-            // legacy completion as focus performed today.
-            self.state = legacyState
-            self.completedSessions = []
+        if let storedValue = UserDefaults.standard.object(forKey: storageKey) {
+            guard let data = storedValue as? Data else {
+                self.state = .idle
+                self.completedSessions = []
+                self.persistenceWritesBlocked = true
+                return
+            }
+
+            if let persisted = try? JSONDecoder().decode(PersistedState.self, from: data) {
+                self.state = persisted.sessionState
+                self.completedSessions = persisted.completedSessions
+                self.persistenceWritesBlocked = false
+            } else if let legacyState = try? JSONDecoder().decode(SessionState.self, from: data) {
+                // Migrate the previous single-session payload without treating an undated
+                // legacy completion as focus performed today.
+                self.state = legacyState
+                self.completedSessions = []
+                self.persistenceWritesBlocked = false
+            } else {
+                self.state = .idle
+                self.completedSessions = []
+                self.persistenceWritesBlocked = true
+            }
         } else {
             self.state = .idle
             self.completedSessions = []
+            self.persistenceWritesBlocked = false
         }
+    }
+
+    /// True when saved state exists but could not be decoded; mutations remain blocked
+    /// until the caller explicitly discards the corrupt value through the reset API.
+    public var requiresPersistenceRecovery: Bool {
+        persistenceWritesBlocked
+    }
+
+    /// Explicitly discard unreadable persisted state and resume with an empty session.
+    /// Returns false when there is no blocked corrupt value or removal did not take effect.
+    @discardableResult
+    public func discardCorruptPersistenceAndReset() -> Bool {
+        guard persistenceWritesBlocked else { return false }
+        UserDefaults.standard.removeObject(forKey: storageKey)
+        guard UserDefaults.standard.object(forKey: storageKey) == nil else { return false }
+
+        state = .idle
+        completedSessions = []
+        persistenceWritesBlocked = false
+        return true
     }
 
     public func startSession(goal: String, durationMinutes: Int = DeepWorkSessionTiming.defaultDurationMinutes) {
@@ -182,6 +217,7 @@ public actor DeepWorkSessionManager {
     }
 
     func startSession(goal: String, durationMinutes: Int, startedAt: Date) {
+        guard !persistenceWritesBlocked else { return }
         let cleanGoal = goal.trimmingCharacters(in: .whitespacesAndNewlines)
         guard durationMinutes > 0, !cleanGoal.isEmpty, startedAt.timeIntervalSince1970.isFinite else { return }
         let duration = TimeInterval(durationMinutes) * 60
@@ -190,6 +226,7 @@ public actor DeepWorkSessionManager {
     }
 
     public func completeSession(debrief: String? = nil) -> TimeInterval {
+        guard !persistenceWritesBlocked else { return 0 }
         switch state {
         case .active(let startedAt, let duration, let goal):
             let completedAt = Date()
@@ -261,6 +298,7 @@ public actor DeepWorkSessionManager {
     }
 
     private func persistState() {
+        guard !persistenceWritesBlocked else { return }
         let persisted = PersistedState(sessionState: state, completedSessions: completedSessions)
         guard let data = try? JSONEncoder().encode(persisted) else { return }
         UserDefaults.standard.set(data, forKey: storageKey)
@@ -866,12 +904,17 @@ public struct HealthKitTelemetrySnapshot: Codable, Sendable, Equatable {
     public let bodyTemperatureMetadata: HealthKitReadingMetadata?
     public let recoveryScore: Int?
     public let sleepHours: Double?
+    public let sleepReport: SleepReportSnapshot?
+    /// `true` only when the latest sleep-stage HealthKit query failed; `false` means it succeeded.
+    public let sleepQueryFailed: Bool?
     public let sleepMetadata: HealthKitReadingMetadata?
     public let queriedAt: Date
 
     public init(hrvMs: Double? = nil, restingHRBpm: Int? = nil,
                 respiratoryRate: Double? = nil, bloodOxygenPercent: Double? = nil,
                 recoveryScore: Int? = nil, sleepHours: Double? = nil,
+                sleepReport: SleepReportSnapshot? = nil,
+                sleepQueryFailed: Bool? = nil,
                 bodyTemperatureCelsius: Double? = nil,
                 hrvMetadata: HealthKitReadingMetadata? = nil,
                 restingHRMetadata: HealthKitReadingMetadata? = nil,
@@ -892,6 +935,8 @@ public struct HealthKitTelemetrySnapshot: Codable, Sendable, Equatable {
         self.bodyTemperatureMetadata = bodyTemperatureMetadata
         self.recoveryScore = recoveryScore
         self.sleepHours = sleepHours
+        self.sleepReport = sleepReport
+        self.sleepQueryFailed = sleepQueryFailed
         self.sleepMetadata = sleepMetadata
         self.queriedAt = queriedAt
     }
@@ -899,6 +944,7 @@ public struct HealthKitTelemetrySnapshot: Codable, Sendable, Equatable {
     public var hasReadings: Bool {
         hrvMs != nil || restingHRBpm != nil || respiratoryRate != nil
             || bloodOxygenPercent != nil || bodyTemperatureCelsius != nil || sleepHours != nil
+            || sleepReport != nil
     }
 }
 

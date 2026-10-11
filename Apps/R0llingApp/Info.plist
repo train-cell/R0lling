@@ -77,7 +77,7 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>Χρησιμοποιείται για ξεκλείδωμα της ιδιωτικής προεπισκόπησης με βιομετρική ταυτοποίηση.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Το R0lling εμφανίζει προαιρετικές μετρήσεις HRV, καρδιακών παλμών ηρεμίας, αναπνευστικού ρυθμού, οξυγόνου αίματος, θερμοκρασίας σώματος, ύπνου και καταγεγραμμένων προπονήσεων από το Apple Health.</string>
+	<string>Το R0lling εμφανίζει προαιρετικές μετρήσεις HRV, καρδιακών παλμών ηρεμίας και κατά τον ύπνο, αναπνευστικού ρυθμού, οξυγόνου αίματος, θερμοκρασίας σώματος, φάσεων ύπνου και καταγεγραμμένων προπονήσεων από το Apple Health.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Η εγγραφή δεδομένων στο Apple Health δεν είναι διαθέσιμη σε αυτή την έκδοση.</string>
 	<key>NSAppTransportSecurity</key>

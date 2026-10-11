@@ -41,7 +41,7 @@ public enum H264AnnexBRemuxer {
                 code: kodikosElleipsisSPSPPS,
                 userInfo: [NSLocalizedDescriptionKey:
                     "Incomplete H.264 Annex-B: λείπουν SPS (type 7) ή PPS (type 8). " +
-                    "Σύνδεσε MetaWearablesDAT + Gen 2 — βλ. docs/LANE_CLIP_META.md."]
+                    "Σύνδεσε MWDATCore/MWDATCamera + Gen 2 — βλ. docs/LANE_CLIP_META.md."]
             )
         }
 

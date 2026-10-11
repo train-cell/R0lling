@@ -7,6 +7,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   python-verify:
     name: Python examples / source presence (not Swift validation)
@@ -26,6 +29,15 @@ jobs:
 
       - name: Inspect source/config presence (no runtime compliance)
         run: python verification/verify_theme_apple_meta_compliance.py
+
+      - name: Guard assistant chat context wiring
+        run: python verification/verify_assistant_chat_context.py
+
+      - name: Guard transcript cue honesty and AppState wiring
+        run: python verification/verify_transcript_keyword_tagging.py
+
+      - name: Guard source/UI invariants unavailable to Linux type-checking
+        run: python verification/verify_ui_source_contracts.py
 
   build-and-test:
     name: Swift build + test (macOS)
@@ -54,6 +66,32 @@ jobs:
 
       - name: Swift Version
         run: swift --version
+
+      - name: Run focused production-source regression suites
+        run: |
+          bash verification/run_ai_request_xctests.sh
+          bash verification/run_ai_router_cancellation_tests.sh
+          bash verification/run_voice_command_tests.sh
+          bash verification/run_journal_storage_xctests.sh
+          bash verification/run_highlight_reel_commit_tests.sh
+          bash verification/run_sleep_episode_tests.sh
+          bash verification/run_speech_completion_registry_tests.sh
+          bash verification/run_meal_nutrition_tests.sh
+          bash verification/run_fitness_activity_tests.sh
+          bash verification/run_knowledge_graph_tests.sh
+          bash verification/run_agent_memory_transaction_tests.sh
+          bash verification/run_obsidian_watcher_tests.sh
+          bash verification/run_hyperlapse_tests.sh
+          bash verification/run_storage_guard_tests.sh
+          bash verification/run_backup_restore_xctests.sh
+          bash verification/run_obsidian_bridge_xctests.sh
+          bash verification/run_streak_manager_tests.sh
+          bash verification/run_vision_analysis_pipeline_tests.sh
+          bash verification/run_transcript_keyword_tagger_tests.sh
+          bash verification/run_clip_watermark_contract_probe.sh
+          bash verification/run_glasses_connection_cancellation_probe.sh
+          bash verification/run_on_device_vision_probe.sh
+          bash verification/run_portable_source_probes.sh
 
       - name: Build R0lling (macOS target)
         run: |
@@ -86,7 +124,9 @@ jobs:
     name: Build & Package iOS App (.ipa)
     runs-on: macos-14
     timeout-minutes: 25
-    needs: [build-and-test]
+    # Do not publish an IPA artifact if either the Swift checks or the
+    # independent source/config checks failed.
+    needs: [build-and-test, python-verify]
 
     steps:
       - name: Checkout repository

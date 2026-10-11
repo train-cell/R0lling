@@ -40,6 +40,20 @@ private struct AgentFileIdentity: Equatable {
     }
 }
 
+private struct AgentMemoryTransactionRecord: Codable {
+    struct File: Codable {
+        let targetName: String
+        let stagedName: String
+        let backupName: String?
+        let originalContents: Data?
+        let originalPermissions: UInt16?
+        let newContents: Data
+    }
+
+    let version: Int
+    let files: [File]
+}
+
 private final class AgentOpenedFile {
     let descriptor: Int32
     let identity: AgentFileIdentity
@@ -58,6 +72,11 @@ private final class AgentOpenedFile {
 /// O_NOFOLLOW and *at operations prevent a swapped symlink from redirecting writes.
 private final class AgentDirectoryHandle {
     fileprivate static let maximumManagedTextBytes = 4 * 1024 * 1024
+    private static let transactionRecordName = ".memory-transaction.json"
+    private static let maximumTransactionRecordBytes = 34 * 1024 * 1024
+    private static let managedMemoryFileNames: Set<String> = [
+        "Memory.md", "Preferences.md", "Open-loops.md"
+    ]
     private let vaultDescriptor: Int32
     private let agentDescriptor: Int32
     let vaultIdentity: AgentFileIdentity
@@ -174,11 +193,10 @@ private final class AgentDirectoryHandle {
     }
 
     func readText(named name: String) throws -> String? {
-        guard let file = try openExistingFile(named: name) else { return nil }
-        let data = try Self.readAll(
-            from: file.descriptor,
+        guard let data = try readData(
+            named: name,
             maximumBytes: Self.maximumManagedTextBytes
-        )
+        ) else { return nil }
         guard let text = String(data: data, encoding: .utf8) else {
             throw NSError(
                 domain: "R0lling.Agent",
@@ -189,7 +207,16 @@ private final class AgentDirectoryHandle {
         return text
     }
 
+    func readData(named name: String, maximumBytes: Int) throws -> Data? {
+        guard let file = try openExistingFile(named: name, maximumBytes: maximumBytes) else { return nil }
+        return try Self.readAll(from: file.descriptor, maximumBytes: maximumBytes)
+    }
+
     func openExistingFile(named name: String) throws -> AgentOpenedFile? {
+        try openExistingFile(named: name, maximumBytes: Self.maximumManagedTextBytes)
+    }
+
+    func openExistingFile(named name: String, maximumBytes: Int) throws -> AgentOpenedFile? {
         var pathMetadata = stat()
         let pathResult = name.withCString { filename in
             fstatat(agentDescriptor, filename, &pathMetadata, AT_SYMLINK_NOFOLLOW)
@@ -228,11 +255,186 @@ private final class AgentDirectoryHandle {
             _ = close(fileFD)
             throw Self.nonRegularAgentFileError()
         }
-        guard openedMetadata.st_size <= off_t(Self.maximumManagedTextBytes) else {
+        guard openedMetadata.st_size <= off_t(maximumBytes) else {
             _ = close(fileFD)
-            throw Self.oversizedAgentFileError(maximumBytes: Self.maximumManagedTextBytes)
+            throw Self.oversizedAgentFileError(maximumBytes: maximumBytes)
         }
         return AgentOpenedFile(descriptor: fileFD, identity: openedIdentity)
+    }
+
+    func synchronizeDirectory() throws {
+        guard fsync(agentDescriptor) == 0 else {
+            throw Self.posixError("Δεν ήταν δυνατό να συγχρονιστεί ο φάκελος Agent memory.")
+        }
+    }
+
+    func publishTransactionRecord(_ record: AgentMemoryTransactionRecord) throws {
+        try ensureStillAttached()
+        let data = try JSONEncoder().encode(record)
+        guard data.count <= Self.maximumTransactionRecordBytes else {
+            throw Self.oversizedAgentFileError(maximumBytes: Self.maximumTransactionRecordBytes)
+        }
+
+        let stagedName = ".memory-transaction.\(UUID().uuidString).staged"
+        _ = try createFile(named: stagedName, data: data)
+        var shouldRemoveStaged = true
+        defer {
+            if shouldRemoveStaged { removeRecoveryFile(named: stagedName) }
+        }
+
+        try ensureStillAttached()
+        let result = stagedName.withCString { staged in
+            Self.transactionRecordName.withCString { target in
+                linkat(agentDescriptor, staged, agentDescriptor, target, 0)
+            }
+        }
+        guard result == 0 else {
+            if errno == EEXIST { throw Self.concurrentAgentFileChangeError() }
+            throw Self.posixError("Δεν ήταν δυνατό να δημοσιευτεί το transaction Agent memory.")
+        }
+        _ = stagedName.withCString { unlinkat(agentDescriptor, $0, 0) }
+        shouldRemoveStaged = false
+    }
+
+    /// Completes or rolls back a save interrupted after its durable intent record was published.
+    func recoverPendingMemoryTransaction() throws {
+        try ensureStillAttached()
+        guard let data = try readData(
+            named: Self.transactionRecordName,
+            maximumBytes: Self.maximumTransactionRecordBytes
+        ) else { return }
+        let record: AgentMemoryTransactionRecord
+        do {
+            record = try JSONDecoder().decode(AgentMemoryTransactionRecord.self, from: data)
+        } catch {
+            throw Self.invalidTransactionRecordError()
+        }
+        try validate(record)
+
+        let allNewFilesAreInstalled = try record.files.allSatisfy { item in
+            try file(named: item.targetName, matches: item.newContents)
+        }
+        if allNewFilesAreInstalled {
+            try removeTransactionArtifacts(for: record)
+            return
+        }
+
+        for item in record.files.reversed() {
+            try ensureStillAttached()
+            let targetIsNew = try file(named: item.targetName, matches: item.newContents)
+            let targetIsOriginal: Bool
+            if let originalContents = item.originalContents {
+                targetIsOriginal = try file(named: item.targetName, matches: originalContents)
+            } else {
+                if let current = try openExistingFile(named: item.targetName) {
+                    _ = current
+                    targetIsOriginal = false
+                } else {
+                    targetIsOriginal = true
+                }
+            }
+            if targetIsOriginal { continue }
+            guard targetIsNew else { throw Self.concurrentAgentFileChangeError() }
+
+            if let originalContents = item.originalContents {
+                if let backupName = item.backupName,
+                   try file(named: backupName, matches: originalContents) {
+                    let result = backupName.withCString { backup in
+                        item.targetName.withCString { target in renameat(agentDescriptor, backup, agentDescriptor, target) }
+                    }
+                    guard result == 0 else {
+                        throw Self.posixError("Δεν ήταν δυνατό να επανέλθει αρχείο Agent memory μετά από διακοπή.")
+                    }
+                } else {
+                    let recoveryName = ".memory-recovery.\(UUID().uuidString).staged"
+                    _ = try createFile(
+                        named: recoveryName,
+                        data: originalContents,
+                        permissions: mode_t(item.originalPermissions ?? 0o600)
+                    )
+                    let result = recoveryName.withCString { staged in
+                        item.targetName.withCString { target in renameat(agentDescriptor, staged, agentDescriptor, target) }
+                    }
+                    guard result == 0 else {
+                        removeRecoveryFile(named: recoveryName)
+                        throw Self.posixError("Δεν ήταν δυνατό να επανέλθει αρχείο Agent memory μετά από διακοπή.")
+                    }
+                }
+            } else {
+                let result = item.targetName.withCString { target in unlinkat(agentDescriptor, target, 0) }
+                guard result == 0 else {
+                    throw Self.posixError("Δεν ήταν δυνατό να αναιρεθεί νέο αρχείο Agent memory μετά από διακοπή.")
+                }
+            }
+            try synchronizeDirectory()
+        }
+
+        try removeTransactionArtifacts(for: record)
+    }
+
+    private func validate(_ record: AgentMemoryTransactionRecord) throws {
+        guard record.version == 1,
+              record.files.count == Self.managedMemoryFileNames.count,
+              Set(record.files.map(\.targetName)) == Self.managedMemoryFileNames else {
+            throw Self.invalidTransactionRecordError()
+        }
+        for item in record.files {
+            guard isSafeLeafName(item.stagedName),
+                  item.stagedName.hasPrefix(".\(item.targetName)."),
+                  item.stagedName.hasSuffix(".staged"),
+                  item.newContents.count <= Self.maximumManagedTextBytes else {
+                throw Self.invalidTransactionRecordError()
+            }
+            if let backupName = item.backupName {
+                guard item.originalContents != nil,
+                      isSafeLeafName(backupName),
+                      backupName.hasPrefix(".\(item.targetName)."),
+                      backupName.hasSuffix(".backup") else {
+                    throw Self.invalidTransactionRecordError()
+                }
+            } else if item.originalContents != nil {
+                throw Self.invalidTransactionRecordError()
+            }
+            guard item.originalContents.map({ $0.count <= Self.maximumManagedTextBytes }) ?? true else {
+                throw Self.invalidTransactionRecordError()
+            }
+        }
+    }
+
+    fileprivate func removeTransactionArtifacts(for record: AgentMemoryTransactionRecord) throws {
+        try ensureStillAttached()
+        for item in record.files {
+            try ensureStillAttached()
+            try removeFileIfPresent(named: item.stagedName)
+            if let backupName = item.backupName { try removeFileIfPresent(named: backupName) }
+        }
+        try removeFileIfPresent(named: Self.transactionRecordName)
+        try synchronizeDirectory()
+    }
+
+    fileprivate func removeTransactionRecord() throws {
+        try ensureStillAttached()
+        try removeFileIfPresent(named: Self.transactionRecordName)
+        try synchronizeDirectory()
+    }
+
+    private func removeFileIfPresent(named name: String) throws {
+        var metadata = stat()
+        let result = name.withCString { fstatat(agentDescriptor, $0, &metadata, AT_SYMLINK_NOFOLLOW) }
+        if result != 0 {
+            if errno == ENOENT { return }
+            throw Self.posixError("Δεν ήταν δυνατό να ελεγχθεί αρχείο ανάκτησης Agent memory.")
+        }
+        guard AgentFileIdentity(metadata).isRegularFile else { throw Self.nonRegularAgentFileError() }
+        let unlinkResult = name.withCString { unlinkat(agentDescriptor, $0, 0) }
+        guard unlinkResult == 0 else { throw Self.posixError("Δεν ήταν δυνατό να καθαριστεί αρχείο ανάκτησης Agent memory.") }
+    }
+
+    private func isSafeLeafName(_ name: String) -> Bool {
+        !name.isEmpty && name.utf8.allSatisfy { byte in
+            (byte >= 48 && byte <= 57) || (byte >= 65 && byte <= 90) ||
+                (byte >= 97 && byte <= 122) || byte == 45 || byte == 46 || byte == 95
+        }
     }
 
     func createFile(named name: String, data: Data, permissions: mode_t = 0o600) throws -> AgentFileIdentity {
@@ -272,7 +474,15 @@ private final class AgentDirectoryHandle {
         return AgentFileIdentity(metadata)
     }
 
-    func copyFile(from sourceFD: Int32, to name: String, permissions: mode_t) throws -> AgentFileIdentity {
+    func copyFile(
+        from sourceFD: Int32,
+        to name: String,
+        permissions: mode_t,
+        maximumBytes: Int
+    ) throws -> AgentFileIdentity {
+        guard maximumBytes >= 0 else {
+            throw Self.oversizedAgentFileError(maximumBytes: maximumBytes)
+        }
         let destinationFD = name.withCString { filename in
             openat(
                 agentDescriptor,
@@ -294,6 +504,7 @@ private final class AgentDirectoryHandle {
             }
         }
 
+        var copiedByteCount = 0
         var bytes = [UInt8](repeating: 0, count: 64 * 1024)
         while true {
             let count = bytes.withUnsafeMutableBytes { buffer in
@@ -304,7 +515,14 @@ private final class AgentDirectoryHandle {
                 if errno == EINTR { continue }
                 throw Self.posixError("Δεν ήταν δυνατό να διαβαστεί το αρχείο Agent memory για αντίγραφο.")
             }
-            try writeAll(bytes: bytes, count: Int(count), to: destinationFD)
+            let chunkByteCount = Int(count)
+            guard maximumBytes >= 0,
+                  copiedByteCount <= maximumBytes,
+                  chunkByteCount <= maximumBytes - copiedByteCount else {
+                throw Self.oversizedAgentFileError(maximumBytes: maximumBytes)
+            }
+            try writeAll(bytes: bytes, count: chunkByteCount, to: destinationFD)
+            copiedByteCount += chunkByteCount
         }
 
         guard fchmod(destinationFD, permissions) == 0, fsync(destinationFD) == 0 else {
@@ -389,6 +607,36 @@ private final class AgentDirectoryHandle {
         _ = name.withCString { unlinkat(agentDescriptor, $0, 0) }
     }
 
+#if DEBUG
+    func appendToExistingFileForTesting(
+        named name: String,
+        data: Data,
+        expectedIdentity: AgentFileIdentity
+    ) throws {
+        let descriptor = name.withCString { filename in
+            openat(agentDescriptor, filename, O_WRONLY | O_APPEND | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
+        }
+        guard descriptor >= 0 else {
+            throw Self.posixError("Δεν ήταν δυνατό να προσομοιωθεί η ταυτόχρονη αλλαγή του Agent memory.")
+        }
+        defer { _ = close(descriptor) }
+
+        var metadata = stat()
+        guard fstat(descriptor, &metadata) == 0 else {
+            throw Self.posixError("Δεν ήταν δυνατό να επαληθευτεί το Agent memory στη δοκιμή.")
+        }
+        let identity = AgentFileIdentity(metadata)
+        guard identity.isRegularFile,
+              identity.identifiesSameObject(as: expectedIdentity) else {
+            throw Self.nonRegularAgentFileError()
+        }
+        try writeAll(data, to: descriptor)
+        guard fsync(descriptor) == 0 else {
+            throw Self.posixError("Δεν ήταν δυνατό να συγχρονιστεί η προσομοιωμένη αλλαγή Agent memory.")
+        }
+    }
+#endif
+
     func isStillAttached() -> Bool {
         (try? ensureStillAttached()) != nil
     }
@@ -436,7 +684,7 @@ private final class AgentDirectoryHandle {
         }
     }
 
-    private func file(named name: String, matches expected: Data) throws -> Bool {
+    fileprivate func file(named name: String, matches expected: Data) throws -> Bool {
         guard let source = try openExistingFile(named: name) else { return false }
         var offset = 0
         while offset < expected.count {
@@ -600,6 +848,26 @@ private final class AgentDirectoryHandle {
         )
     }
 
+    fileprivate static func concurrentAgentFileChangeErrorForTransaction() -> NSError {
+        concurrentAgentFileChangeError()
+    }
+
+    fileprivate static func simulatedInterruptionErrorForTesting() -> NSError {
+        NSError(
+            domain: "R0lling.Agent",
+            code: 6112,
+            userInfo: [NSLocalizedDescriptionKey: "Simulated process interruption after Agent memory commit."]
+        )
+    }
+
+    private static func invalidTransactionRecordError() -> NSError {
+        NSError(
+            domain: "R0lling.Agent",
+            code: 6111,
+            userInfo: [NSLocalizedDescriptionKey: "Το αρχείο ανάκτησης Agent memory δεν είναι έγκυρο. Τα αρχεία vault διατηρήθηκαν."]
+        )
+    }
+
     private static func posixError(_ message: String) -> NSError {
         NSError(
             domain: "R0lling.Agent",
@@ -625,8 +893,15 @@ public actor AgentFolderManager {
         let stagedIdentity: AgentFileIdentity
         let expectedTargetIdentity: AgentFileIdentity?
         let newContents: Data
+        let originalContents: Data?
+        let originalPermissions: UInt16?
         var backupName: String?
     }
+
+    private var simulatedInterruptionAfterCommitCountForTesting: Int?
+#if DEBUG
+    private var simulatedBackupGrowthForTesting: (fileName: String, data: Data)?
+#endif
 
     public init(vaultURL: URL? = nil) {
         if let url = vaultURL {
@@ -654,6 +929,16 @@ public actor AgentFolderManager {
         baseVaultURL
     }
 
+    internal func simulateMemorySaveInterruptionForTesting(afterCommitCount: Int?) {
+        simulatedInterruptionAfterCommitCountForTesting = afterCommitCount
+    }
+
+#if DEBUG
+    internal func simulateMemoryBackupGrowthForTesting(fileName: String, appending data: Data) {
+        simulatedBackupGrowthForTesting = (fileName, data)
+    }
+#endif
+
     /// Φόρτωση των Agent Markdown αρχείων με no-follow, descriptor-relative access.
     public func loadAgentMemory() throws -> AgentMemory {
         let scope = baseVaultURL?.startAccessingSecurityScopedResource() ?? false
@@ -666,6 +951,7 @@ public actor AgentFolderManager {
                 expectedVaultIdentity: pinnedVaultIdentity
             )
             pinnedVaultIdentity = directory.vaultIdentity
+            try directory.recoverPendingMemoryTransaction()
             let memoryText = try directory.readText(named: Self.memoryFileName) ?? "# Σημειώσεις Μνήμης Βοηθού\n\n"
             let preferencesText = try directory.readText(named: Self.preferencesFileName) ?? "# Προτιμήσεις Χρήστη\n\n"
             let openLoopsText = try directory.readText(named: Self.openLoopsFileName) ?? "# Εκκρεμότητες & Ανοιχτά Θέματα\n\n"
@@ -711,6 +997,7 @@ public actor AgentFolderManager {
             expectedVaultIdentity: expectedVaultIdentity
         )
         pinnedVaultIdentity = directory.vaultIdentity
+        try directory.recoverPendingMemoryTransaction()
         let contents: [(String, String)] = [
             (Self.memoryFileName, memory.memoryNotes),
             (Self.preferencesFileName, memory.userPreferences),
@@ -726,6 +1013,7 @@ public actor AgentFolderManager {
         var stagedFiles: [StagedMemoryFile] = []
         var committedIndices: [Int] = []
         var preserveBackupNames = Set<String>()
+        var transactionRecordPublished = false
         defer {
             for item in stagedFiles {
                 directory.removeRecoveryFile(named: item.stagedName)
@@ -737,6 +1025,7 @@ public actor AgentFolderManager {
 
         do {
             // Stage every file and backup before committing any target.
+            var transactionFiles: [AgentMemoryTransactionRecord.File] = []
             for (targetName, text) in contents {
                 try directory.ensureStillAttached()
                 let existingFile = try directory.openExistingFile(named: targetName)
@@ -744,6 +1033,22 @@ public actor AgentFolderManager {
                 let stagedName = ".\(targetName).\(token).staged"
                 let permissions = existingFile?.identity.permissions ?? 0o600
                 let newContents = Data(text.utf8)
+                let originalContents: Data?
+                let hadOriginal: Bool
+                if let existingFile {
+                    _ = existingFile
+                    hadOriginal = true
+                    originalContents = try directory.readData(
+                        named: targetName,
+                        maximumBytes: AgentDirectoryHandle.maximumManagedTextBytes
+                    )
+                } else {
+                    hadOriginal = false
+                    originalContents = nil
+                }
+                if hadOriginal && originalContents == nil {
+                    throw AgentDirectoryHandle.concurrentAgentFileChangeErrorForTransaction()
+                }
                 let stagedIdentity = try directory.createFile(
                     named: stagedName,
                     data: newContents,
@@ -755,21 +1060,52 @@ public actor AgentFolderManager {
                     stagedIdentity: stagedIdentity,
                     expectedTargetIdentity: existingFile?.identity,
                     newContents: newContents,
+                    originalContents: originalContents,
+                    originalPermissions: existingFile.map { UInt16($0.identity.permissions) },
                     backupName: nil
                 ))
 
+                var backupName: String?
                 if let existingFile {
-                    let backupName = ".\(targetName).\(token).backup"
+#if DEBUG
+                    if let growth = simulatedBackupGrowthForTesting, growth.fileName == targetName {
+                        simulatedBackupGrowthForTesting = nil
+                        try directory.appendToExistingFileForTesting(
+                            named: targetName,
+                            data: growth.data,
+                            expectedIdentity: existingFile.identity
+                        )
+                    }
+#endif
+                    let createdBackupName = ".\(targetName).\(token).backup"
                     _ = try directory.copyFile(
                         from: existingFile.descriptor,
-                        to: backupName,
-                        permissions: existingFile.identity.permissions
+                        to: createdBackupName,
+                        permissions: existingFile.identity.permissions,
+                        maximumBytes: AgentDirectoryHandle.maximumManagedTextBytes
                     )
-                    stagedFiles[stagedFiles.count - 1].backupName = backupName
+                    guard let originalContents,
+                          try directory.file(named: createdBackupName, matches: originalContents) else {
+                        throw AgentDirectoryHandle.concurrentAgentFileChangeErrorForTransaction()
+                    }
+                    backupName = createdBackupName
+                    stagedFiles[stagedFiles.count - 1].backupName = createdBackupName
                 }
+                transactionFiles.append(AgentMemoryTransactionRecord.File(
+                    targetName: targetName,
+                    stagedName: stagedName,
+                    backupName: backupName,
+                    originalContents: originalContents,
+                    originalPermissions: existingFile.map { UInt16($0.identity.permissions) },
+                    newContents: newContents
+                ))
                 try directory.ensureStillAttached()
             }
 
+            try directory.synchronizeDirectory()
+            try directory.publishTransactionRecord(AgentMemoryTransactionRecord(version: 1, files: transactionFiles))
+            transactionRecordPublished = true
+            try directory.synchronizeDirectory()
             for index in stagedFiles.indices {
                 let item = stagedFiles[index]
                 try directory.commit(
@@ -779,10 +1115,22 @@ public actor AgentFolderManager {
                     backupName: item.backupName
                 )
                 committedIndices.append(index)
+                try directory.synchronizeDirectory()
                 try directory.ensureStillAttached()
+                if simulatedInterruptionAfterCommitCountForTesting == committedIndices.count {
+                    simulatedInterruptionAfterCommitCountForTesting = nil
+                    throw AgentDirectoryHandle.simulatedInterruptionErrorForTesting()
+                }
             }
         } catch {
             let originalError = error
+            let interruption = originalError as NSError
+            if interruption.domain == "R0lling.Agent" && interruption.code == 6112 {
+                for item in stagedFiles {
+                    if let backupName = item.backupName { preserveBackupNames.insert(backupName) }
+                }
+                throw originalError
+            }
             var rollbackErrors: [String] = []
             for index in committedIndices.reversed() {
                 let item = stagedFiles[index]
@@ -793,6 +1141,7 @@ public actor AgentFolderManager {
                         backupName: item.backupName,
                         expectedNewContents: item.newContents
                     )
+                    try directory.synchronizeDirectory()
                 } catch {
                     if let backupName = item.backupName {
                         preserveBackupNames.insert(backupName)
@@ -802,6 +1151,9 @@ public actor AgentFolderManager {
             }
 
             if !rollbackErrors.isEmpty {
+                for item in stagedFiles {
+                    if let backupName = item.backupName { preserveBackupNames.insert(backupName) }
+                }
                 throw NSError(
                     domain: "R0lling.Agent",
                     code: 6103,
@@ -813,8 +1165,40 @@ public actor AgentFolderManager {
                     ]
                 )
             }
+            if transactionRecordPublished {
+                do {
+                    try directory.removeTransactionRecord()
+                } catch {
+                    for item in stagedFiles {
+                        if let backupName = item.backupName { preserveBackupNames.insert(backupName) }
+                    }
+                    throw NSError(
+                        domain: "R0lling.Agent",
+                        code: 6103,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: "Η επαναφορά Agent memory ολοκληρώθηκε, αλλά δεν καθαρίστηκε το αρχείο ανάκτησης. Τα αντίγραφα ασφαλείας διατηρήθηκαν.",
+                            NSUnderlyingErrorKey: originalError,
+                            "R0lling.Agent.RecoveryCleanupError": error.localizedDescription
+                        ]
+                    )
+                }
+            }
             throw originalError
         }
+
+        try directory.removeTransactionArtifacts(for: AgentMemoryTransactionRecord(
+            version: 1,
+            files: stagedFiles.map { item in
+                AgentMemoryTransactionRecord.File(
+                    targetName: item.targetName,
+                    stagedName: item.stagedName,
+                    backupName: item.backupName,
+                    originalContents: item.originalContents,
+                    originalPermissions: item.originalPermissions,
+                    newContents: item.newContents
+                )
+            }
+        ))
     }
 
     private static func withVaultCoordination<T>(

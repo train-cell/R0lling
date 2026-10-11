@@ -2,6 +2,14 @@ import XCTest
 @testable import R0lling
 
 final class FitnessActivityTests: XCTestCase {
+    func testGreekFitnessWeekdayLabelsAreDistinctAndMondayFirst() {
+        XCTAssertEqual(
+            FitnessActivityWeekdayLabels.greekMondayFirst,
+            ["Δε", "Τρ", "Τε", "Πε", "Πα", "Σα", "Κυ"]
+        )
+        XCTAssertEqual(Set(FitnessActivityWeekdayLabels.greekMondayFirst).count, 7)
+    }
+
     func testSnapshotBucketsCurrentAndPreviousThirtyDayWorkouts() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
@@ -86,5 +94,26 @@ final class FitnessActivityTests: XCTestCase {
         XCTAssertEqual(series.count, 30)
         XCTAssertEqual(series[0], 1.5, accuracy: 0.0001)
         XCTAssertEqual(try XCTUnwrap(series.last), 1.5, accuracy: 0.0001)
+    }
+
+    func testDefaultActivityBucketsUseAthensDayAndRetainWorkoutDetails() throws {
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let referenceDate = try XCTUnwrap(utc.date(from: DateComponents(year: 2026, month: 10, day: 9, hour: 12)))
+        let workoutStart = try XCTUnwrap(utc.date(from: DateComponents(year: 2026, month: 10, day: 8, hour: 22, minute: 30)))
+
+        XCTAssertEqual(FitnessActivityCalendar.athensCalendar.timeZone.identifier, "Europe/Athens")
+        let sample = FitnessWorkoutSample(
+            startedAt: workoutStart,
+            durationSeconds: 1_800,
+            activityName: "Τρέξιμο"
+        )
+        let snapshot = FitnessActivitySnapshot(samples: [sample], referenceDate: referenceDate)
+        let today = try XCTUnwrap(snapshot.currentDays.last)
+
+        XCTAssertEqual(today.workoutCount, 1)
+        XCTAssertEqual(today.workouts, [sample])
+        XCTAssertEqual(today.durationSeconds, 1_800, accuracy: 0.001)
+        XCTAssertEqual(FitnessActivityCalendar.formatted(workoutStart, template: "d"), "9")
     }
 }

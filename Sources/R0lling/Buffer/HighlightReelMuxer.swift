@@ -13,6 +13,8 @@ public actor HighlightReelMuxer {
     public struct ReelExportResult: Sendable {
         public let fileURL: URL
         public let relativePath: String
+        /// The saved attachment is returned so the caller can persist a journal reference.
+        public let attachment: MediaAttachment
         public let totalClipsIncluded: Int
         public let totalDurationSeconds: Double
         public let isPlayable: Bool
@@ -54,6 +56,7 @@ public actor HighlightReelMuxer {
 
         var cursor = CMTime.zero
         var includedCount = 0
+        var includedAudio = false
 
         for att in clipAttachments {
             try Task.checkCancellation()
@@ -99,6 +102,7 @@ public actor HighlightReelMuxer {
                     of: sourceAudio,
                     at: CMTimeAdd(cursor, offset)
                 )
+                includedAudio = true
             }
 
             cursor = CMTimeAdd(cursor, timeRange.duration)
@@ -148,16 +152,22 @@ public actor HighlightReelMuxer {
 
         try Task.checkCancellation()
         let filename = "highlight_reel_\(Int(Date().timeIntervalSince1970)).mp4"
-        let savedAttachment = try await mediaStorage.saveMediaFile(
+        var savedAttachment = try await mediaStorage.saveMediaFile(
             from: tempURL,
             originalFilename: filename,
             mediaType: .video
         )
-        let targetURL = try mediaStorage.getMediaFileURL(relativePath: savedAttachment.relativePath)
+        savedAttachment.durationSeconds = cursor.seconds
+        savedAttachment.hasAudio = includedAudio
+        let targetURL = try await HighlightReelMediaFinalizer.resolveURL(
+            for: savedAttachment,
+            using: mediaStorage
+        )
 
         return ReelExportResult(
             fileURL: targetURL,
             relativePath: savedAttachment.relativePath,
+            attachment: savedAttachment,
             totalClipsIncluded: includedCount,
             totalDurationSeconds: cursor.seconds,
             isPlayable: true

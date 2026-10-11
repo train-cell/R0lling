@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Κύρια οθόνη ημερήσιας ροής (Today View) με Strava Activity Feed & Bevel 3-Ring Telemetry
+/// Κύρια ημερήσια οθόνη με ημερολόγιο, μετρήσεις υγείας και εργαλεία παραγωγικότητας.
 public struct TodayView: View {
     @EnvironmentObject private var appState: AppState
     @Binding private var quickAction: TodayQuickAction?
@@ -9,10 +9,20 @@ public struct TodayView: View {
     @State private var entryProsEpeksergasia: JournalEntry?
     @State private var isFileImporterPresented = false
     @State private var isTodayDetailsExpanded = false
+    @State private var isShareComposerPresented = false
+    @State private var isDatePickerPresented = false
     @FocusState private var composerIsFocused: Bool
+    private let onOpenSettings: () -> Void
+    private let onOpenHealth: () -> Void
 
-    public init(quickAction: Binding<TodayQuickAction?> = .constant(nil)) {
+    public init(
+        quickAction: Binding<TodayQuickAction?> = .constant(nil),
+        onOpenSettings: @escaping () -> Void = {},
+        onOpenHealth: @escaping () -> Void = {}
+    ) {
         self._quickAction = quickAction
+        self.onOpenSettings = onOpenSettings
+        self.onOpenHealth = onOpenHealth
     }
 
     public var body: some View {
@@ -22,7 +32,7 @@ public struct TodayView: View {
 
                 ScrollView {
                     LazyVStack(spacing: 16) {
-                        if appState.isStreaming {
+                        if appState.isStreaming && isSelectedDayToday {
                             LiveViewfinderCard(
                                 isStreaming: appState.isStreaming,
                                 isSimulation: appState.isSimulationMode,
@@ -38,35 +48,39 @@ public struct TodayView: View {
                         // Sovereign Life OS — Bevel 3-Ring Concentric Telemetry
                         BevelConcentricTelemetryCard(
                             score: appState.cognitiveTelemetry,
-                            activeFocusDeadline: appState.deepWorkEndsAt,
+                            activeFocusDeadline: isSelectedDayToday ? appState.deepWorkEndsAt : nil,
                             completedFocusSecondsToday: appState.completedFocusSecondsToday,
-                            entryCount: appState.todayEntries.count
+                            entryCount: appState.todayEntries.count,
+                            daySummaryTitle: selectedDaySummaryTitle
                         )
 
-                        HealthKitTelemetryCardView(
+                        TodayHealthSummaryCard(
                             snapshot: appState.liveHealthSnapshot,
                             didCompleteAuthorizationRequest: appState.didCompleteHealthKitAccessRequest,
                             onRequestAuth: {
                                 Task { await appState.requestHealthKitAccess() }
-                            }
+                            },
+                            onOpenHealth: onOpenHealth
                         )
 
-                        DisclosureGroup(isExpanded: $isTodayDetailsExpanded) {
-                            VStack(spacing: 12) {
-                                DeepWorkSentinelCard()
-                                SovereignToDoListView()
-                                SovereignScratchpadView()
-                                SovereignStopwatchTimerView()
+                        if isSelectedDayToday {
+                            DisclosureGroup(isExpanded: $isTodayDetailsExpanded) {
+                                VStack(spacing: 12) {
+                                    DeepWorkSentinelCard()
+                                    SovereignToDoListView()
+                                    SovereignScratchpadView()
+                                    SovereignStopwatchTimerView()
+                                }
+                                .padding(.top, 12)
+                            } label: {
+                                Label("Εργαλεία", systemImage: "slider.horizontal.3")
+                                    .font(.headline.weight(.semibold))
+                                    .foregroundColor(R0llingTheme.textPrimary)
                             }
-                            .padding(.top, 12)
-                        } label: {
-                            Label("Εργαλεία", systemImage: "slider.horizontal.3")
-                                .font(.headline.weight(.semibold))
-                                .foregroundColor(R0llingTheme.textPrimary)
+                            .tint(R0llingTheme.accentLavender)
+                            .padding(14)
+                            .r0llingBevelSurface(cornerRadius: 18)
                         }
-                        .tint(R0llingTheme.accentLavender)
-                        .padding(14)
-                        .r0llingBevelSurface(cornerRadius: 18)
 
                         if !appState.timeCapsuleMemories.isEmpty {
                             timeCapsuleBanner
@@ -110,13 +124,17 @@ public struct TodayView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 14)
-                    .padding(.bottom, appState.isStreaming ? 150 : 90)
+                    .padding(.bottom, appState.isStreaming && isSelectedDayToday ? 150 : 90)
                 }
 
-                composerBar
+                if isSelectedDayToday {
+                    composerBar
+                } else {
+                    historicalDayFooter
+                }
             }
 
-            if appState.isStreaming {
+            if appState.isStreaming && isSelectedDayToday {
                 FloatingClipBar(
                     bufferDuration: appState.bufferDuration,
                     isStreaming: appState.isStreaming,
@@ -143,8 +161,45 @@ public struct TodayView: View {
                 onCancel: { entryProsEpeksergasia = nil }
             )
         }
+        .sheet(isPresented: $isShareComposerPresented) {
+            TodayShareComposerView(
+                entries: appState.todayEntries,
+                health: appState.liveHealthSnapshot
+            )
+        }
+        .sheet(isPresented: $isDatePickerPresented) {
+            NavigationStack {
+                DatePicker(
+                    "Επιλογή ημερομηνίας",
+                    selection: $appState.selectedDate,
+                    in: Date.distantPast...Date(),
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
+                .tint(R0llingTheme.accentLavender)
+                .padding(.horizontal, 16)
+                .navigationTitle("Ημερολόγιο")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Σήμερα") {
+                            appState.selectedDate = Date()
+                            isDatePickerPresented = false
+                        }
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Τέλος") { isDatePickerPresented = false }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .task(id: quickAction) {
             guard let quickAction else { return }
+            if !isSelectedDayToday {
+                appState.selectedDate = Date()
+                await appState.refreshEntries()
+            }
             switch quickAction {
             case .newNote:
                 composerIsFocused = true
@@ -153,66 +208,228 @@ public struct TodayView: View {
             }
             self.quickAction = nil
         }
+        .onChange(of: appState.selectedDate) { _, selectedDate in
+            let normalizedDate = Calendar.current.startOfDay(for: selectedDate)
+            guard normalizedDate == selectedDate else {
+                appState.selectedDate = normalizedDate
+                return
+            }
+            Task { await appState.refreshEntries() }
+        }
     }
 
     private var headerView: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("R0lling")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(R0llingTheme.textSecondary)
-                Spacer()
-                Button(action: {
-                    Task {
-                        if appState.glassesState.isLive {
-                            await appState.toggleLiveStream()
-                        } else {
-                            await appState.toggleGlassesConnection()
-                            if !appState.isStreaming {
-                                await appState.toggleLiveStream()
-                            }
+                Spacer(minLength: 0)
+                HStack(spacing: 4) {
+                    if isSelectedDayToday {
+                        Button {
+                            isShareComposerPresented = true
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(R0llingTheme.textPrimary)
+                                .frame(width: 44, height: 44)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Κοινοποίηση σημερινών δεδομένων")
+                        .accessibilityHint("Ανοίγει την προεπισκόπηση και τις επιλογές κοινοποίησης.")
+                    } else {
+                        Button {
+                            appState.selectedDate = Date()
+                        } label: {
+                            Image(systemName: "arrow.uturn.backward")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(R0llingTheme.textPrimary)
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Επιστροφή στις σημερινές καταγραφές")
                     }
-                }) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(appState.isStreaming ? R0llingTheme.statusSuccess : R0llingTheme.textMuted)
-                            .frame(width: 8, height: 8)
-                        Image(systemName: "eyeglasses")
-                            .font(.body.weight(.semibold))
-                        Text(appState.isStreaming ? (appState.isSimulationMode ? "Δοκιμαστική ροή" : "Ζωντανή ροή") : appState.glassesState.statusDescription)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                        Image(systemName: "chevron.down")
-                            .font(.caption2.weight(.bold))
+
+                    Button(action: onOpenSettings) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 17, weight: .semibold, design: .rounded))
+                            .foregroundColor(R0llingTheme.bgPrimary)
+                            .frame(width: 32, height: 32)
+                            .background(R0llingTheme.accentLavender, in: Circle())
+                            .frame(width: 44, height: 44)
                     }
-                    .foregroundColor(R0llingTheme.textPrimary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .r0llingBevelCapsule()
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Ρυθμίσεις")
+                    .accessibilityHint("Ανοίγει τις ρυθμίσεις της εφαρμογής.")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(appState.isStreaming ? "Ζωντανή ροή γυαλιών" : "Κατάσταση σύνδεσης γυαλιών")
+                .padding(4)
+                .r0llingBevelSurface(cornerRadius: 28)
             }
-            HStack(spacing: 8) {
-                Text("Σήμερα, \(compactGreekDate)")
-                    .font(.largeTitle.weight(.bold))
-                    .foregroundColor(R0llingTheme.textPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-                    .accessibilityAddTraits(.isHeader)
-            }
+            dateAndGlassesRow
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .background(R0llingTheme.bgPrimary)
     }
 
-    private var compactGreekDate: String {
+    @ViewBuilder
+    private var dateAndGlassesRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 10) {
+                datePickerButton(font: .largeTitle.weight(.bold), lineLimit: 1, fixedWidth: true)
+
+                Spacer(minLength: 0)
+                glassesStatusControls
+            }
+
+            HStack(alignment: .top, spacing: 10) {
+                datePickerButton(font: .title2.weight(.bold), lineLimit: 2, fixedWidth: false)
+
+                Spacer(minLength: 0)
+                glassesStatusControls
+            }
+        }
+    }
+
+    private var glassesPrimaryActionButton: some View {
+        Button(action: {
+            Task { await appState.toggleGlassesPrimaryAction() }
+        }) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "eyeglasses")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(R0llingTheme.textPrimary)
+                    .frame(width: 44, height: 44)
+
+                Circle()
+                    .fill(appState.isStreaming ? R0llingTheme.statusSuccess : R0llingTheme.textMuted)
+                    .frame(width: 8, height: 8)
+                    .overlay(Circle().stroke(R0llingTheme.bgElevated, lineWidth: 1.5))
+                    .offset(x: -5, y: 5)
+            }
+            .r0llingBevelSurface(cornerRadius: 22)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(glassesControlAccessibilityLabel)
+        .accessibilityValue(appState.glassesState.statusDescription)
+        .accessibilityHint(glassesControlAccessibilityHint)
+        .disabled(appState.glassesState.isConnectionAttemptInProgress)
+    }
+
+    private var glassesStatusControls: some View {
+        HStack(spacing: 8) {
+            glassesPrimaryActionButton
+            glassesStatusChip
+        }
+    }
+
+    private var glassesStatusChip: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(glassesStatusColor)
+                .frame(width: 7, height: 7)
+                .accessibilityHidden(true)
+            Text(appState.glassesState.statusDescription)
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(R0llingTheme.textSecondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .minimumScaleFactor(0.75)
+        }
+        .padding(.horizontal, 10)
+        .frame(minHeight: 34)
+        .r0llingBevelSurface(cornerRadius: 17)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Κατάσταση γυαλιών")
+        .accessibilityValue(appState.glassesState.statusDescription)
+    }
+
+    private var glassesStatusColor: Color {
+        if appState.isStreaming { return R0llingTheme.statusSuccess }
+        if appState.glassesState.isConnectionAttemptInProgress { return R0llingTheme.accentAmber }
+        if appState.glassesState.isConnected { return R0llingTheme.accentCyan }
+        return R0llingTheme.textMuted
+    }
+
+    private func datePickerButton(font: Font, lineLimit: Int, fixedWidth: Bool) -> some View {
+        Button {
+            isDatePickerPresented = true
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(selectedDateTitle)
+                    .font(font)
+                    .foregroundColor(R0llingTheme.textPrimary)
+                    .lineLimit(lineLimit)
+                    .fixedSize(horizontal: fixedWidth, vertical: false)
+                    .accessibilityAddTraits(.isHeader)
+
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.bold))
+                    .foregroundColor(R0llingTheme.textSecondary)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Επιλογή ημερομηνίας, \(selectedDateTitle)")
+        .accessibilityHint("Ανοίγει το ημερολόγιο για προβολή καταγραφών άλλης ημέρας.")
+    }
+
+    private var isSelectedDayToday: Bool {
+        Calendar.current.isDateInToday(appState.selectedDate)
+    }
+
+    private var selectedDateTitle: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "el_GR")
-        formatter.setLocalizedDateFormatFromTemplate("dMMMM")
-        return formatter.string(from: Date())
+        formatter.setLocalizedDateFormatFromTemplate(isSelectedDayToday ? "dMMMM" : "EEEEdMMMM")
+        let formattedDate = formatter.string(from: appState.selectedDate)
+        return isSelectedDayToday ? "Σήμερα, \(formattedDate)" : formattedDate
+    }
+
+    private var selectedDaySummaryTitle: String {
+        guard !isSelectedDayToday else { return "Η σημερινή εικόνα" }
+        return "Η εικόνα για \(selectedDateTitle)"
+    }
+
+    private var historicalDayFooter: some View {
+        Button {
+            appState.selectedDate = Date()
+        } label: {
+            Label("Επιστροφή στο σήμερα για νέα καταγραφή", systemImage: "calendar")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(R0llingTheme.textPrimary)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .contentShape(RoundedRectangle(cornerRadius: 18))
+                .r0llingBevelSurface(cornerRadius: 18)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+        .accessibilityHint("Η προβολή ιστορικού είναι μόνο για ανάγνωση.")
+    }
+
+    private var glassesControlAccessibilityLabel: String {
+        switch GlassesPrimaryAction.resolve(isStreaming: appState.isStreaming, state: appState.glassesState) {
+        case .waitForConnection: "Σύνδεση γυαλιών σε εξέλιξη"
+        case .startStreaming: "Έναρξη ροής γυαλιών"
+        case .stopStreaming:
+            appState.isSimulationMode ? "Διακοπή δοκιμαστικής ροής" : "Διακοπή ζωντανής ροής"
+        case .connectThenStartStreaming: "Σύνδεση γυαλιών και έναρξη ροής"
+        }
+    }
+
+    private var glassesControlAccessibilityHint: String {
+        switch GlassesPrimaryAction.resolve(isStreaming: appState.isStreaming, state: appState.glassesState) {
+        case .waitForConnection: "Περίμενε να ολοκληρωθεί η σύνδεση."
+        case .startStreaming:
+            appState.isSimulationMode
+                ? "Ξεκινά δοκιμαστική ροή με συνθετικά δεδομένα."
+                : "Ξεκινά τη ροή από τα συνδεδεμένα γυαλιά."
+        case .stopStreaming: "Σταματά την τρέχουσα ροή."
+        case .connectThenStartStreaming:
+            appState.isSimulationMode
+                ? "Συνδέει την προσομοίωση και ξεκινά ροή συνθετικών δεδομένων."
+                : "Συνδέει τα γυαλιά και ξεκινά τη ροή."
+        }
     }
 
     private var timeCapsuleBanner: some View {
@@ -235,10 +452,6 @@ public struct TodayView: View {
         }
         .padding(14)
         .r0llingBevelSurface(cornerRadius: 14)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(R0llingTheme.bevelCyan.opacity(0.3), lineWidth: 1)
-        )
     }
 
     private var emptyStateView: some View {
@@ -253,12 +466,14 @@ public struct TodayView: View {
             }
             .padding(.top, 30)
 
-            Text("ΚΑΜΙΑ ΚΑΤΑΓΡΑΦΗ ΣΗΜΕΡΑ")
+            Text(isSelectedDayToday ? "ΚΑΜΙΑ ΚΑΤΑΓΡΑΦΗ ΣΗΜΕΡΑ" : "ΚΑΜΙΑ ΚΑΤΑΓΡΑΦΗ ΑΥΤΗ ΤΗ ΜΕΡΑ")
                 .font(.headline.weight(.heavy).monospaced())
                 .foregroundColor(R0llingTheme.textPrimary)
                 .tracking(1.2)
 
-            Text("Ξεκίνα τη ροή από τα Meta Glasses, σημείωσε μια σκέψη, ή επισύναψε φωτογραφία/βίντεο από Photos.")
+            Text(isSelectedDayToday
+                ? "Ξεκίνα τη ροή από τα Meta Glasses, σημείωσε μια σκέψη, ή επισύναψε φωτογραφία/βίντεο από Photos."
+                : "Δεν υπάρχουν καταγραφές για αυτή την ημερομηνία. Επέστρεψε στο σήμερα για νέα καταγραφή.")
                 .font(.body)
                 .foregroundColor(R0llingTheme.textSecondary)
                 .multilineTextAlignment(.center)

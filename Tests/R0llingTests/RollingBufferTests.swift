@@ -159,6 +159,9 @@ final class RollingBufferTests: XCTestCase {
         let reel = try await muxer.createDailyHighlightReel(for: entries)
         XCTAssertEqual(reel.totalClipsIncluded, 2)
         XCTAssertGreaterThan(reel.totalDurationSeconds, 1.0)
+        XCTAssertEqual(reel.attachment.relativePath, reel.relativePath)
+        XCTAssertEqual(reel.attachment.mediaType, .video)
+        XCTAssertEqual(reel.attachment.durationSeconds ?? -1, reel.totalDurationSeconds, accuracy: 0.001)
 
         let exportedAsset = AVURLAsset(url: reel.fileURL)
         let isPlayable = try await exportedAsset.load(.isPlayable)

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Adapter για Meta Glasses Gen 2.
-/// R3-003: Χωρίς MetaWearablesDAT SDK το non-simulation path ΔΕΝ παρουσιάζει ψευδή σύνδεση.
+/// R3-003: Χωρίς τα MWDATCore + MWDATCamera modules το non-simulation path ΔΕΝ παρουσιάζει ψευδή σύνδεση.
 /// A06: disconnect / interrupt → clear buffer + νέα generation.
 /// A07: background/lock → PAUSED + honest UI message (όχι continuous capture χωρίς proof).
 /// Sensor feeds: acoustic + IMU pipeline end-to-end (flags στο AppState ελέγχουν auto-clip).
@@ -17,6 +17,8 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
     /// Θυμάται αν έτρεχε streaming πριν το background pause (για auto-resume).
     private var itanStreamingPrinPause: Bool = false
     private var reconnectAttempts: Int = 0
+    /// Invalidates an in-flight connection when it is cancelled or disconnected.
+    private var connectionAttemptGeneration: UInt64 = 0
 
     /// `true` όταν το build έχει πρόσβαση στο Meta Wearables DAT module.
     nonisolated public static var einaiDatSDKDiathesimo: Bool {
@@ -90,45 +92,70 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
         if !enabled && !MetaDATStreamBridge.einaiLiveYlopoiimeno {
             // R3-003: Απαγορεύεται «real» mode χωρίς SDK — κρατάμε simulation.
             self.simulationEnabled = true
-            print("[MetaGlassesAdapter] Real DAT mode μη διαθέσιμο χωρίς MetaWearablesDAT — παραμένει Simulation.")
+            print("[MetaGlassesAdapter] Real DAT mode μη διαθέσιμο χωρίς MWDATCore/MWDATCamera — παραμένει Simulation.")
             return
         }
         self.simulationEnabled = enabled
     }
 
     public func connectDevice() async throws {
+        connectionAttemptGeneration &+= 1
+        let attemptGeneration = connectionAttemptGeneration
         state = .connecting
-        try await Task.sleep(nanoseconds: 300_000_000) // 300ms handshake / UI feedback
+        do {
+            try Task.checkCancellation()
+            try await Task.sleep(nanoseconds: 300_000_000) // 300ms handshake / UI feedback
+            try Task.checkCancellation()
+            guard connectionAttemptGeneration == attemptGeneration else {
+                throw CancellationError()
+            }
 
-        if simulationEnabled {
-            // ΡΗΤΑ labeled simulation — όχι ψευδής hardware σύνδεση.
+            if simulationEnabled {
+                // ΡΗΤΑ labeled simulation — όχι ψευδής hardware σύνδεση.
+                state = .connected(
+                    deviceName: "Meta Ray-Ban Gen 2 (SIMULATION — όχι φυσική συσκευή)",
+                    batteryPercent: 94
+                )
+                reconnectAttempts = 0
+                return
+            }
+
+            #if canImport(MWDATCore) && canImport(MWDATCamera)
+            let session = try await MetaDATStreamBridge.anoixeLiveSession()
+            try Task.checkCancellation()
+            guard connectionAttemptGeneration == attemptGeneration else {
+                throw CancellationError()
+            }
             state = .connected(
-                deviceName: "Meta Ray-Ban Gen 2 (SIMULATION — όχι φυσική συσκευή)",
-                batteryPercent: 94
+                deviceName: session.deviceName,
+                batteryPercent: session.batteryPercent
             )
             reconnectAttempts = 0
-            return
+            #else
+            state = .disconnected
+            throw NSError(
+                domain: "R0lling.Glasses",
+                code: 4002,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Το Meta Wearables DAT SDK δεν είναι συνδεδεμένο σε αυτό το build. Ενεργοποίησε Simulation Mode ή πρόσθεσε το SDK στο Xcode."]
+            )
+            #endif
+        } catch {
+            // A cancelled/stale attempt must not overwrite a newer connection attempt.
+            if connectionAttemptGeneration == attemptGeneration {
+#if canImport(MWDATCore) && canImport(MWDATCamera)
+                if !simulationEnabled {
+                    await MetaDATStreamBridge.kleiseLiveSession()
+                }
+#endif
+                state = error is CancellationError ? .disconnected : .error(error.localizedDescription)
+            }
+            throw error
         }
-
-        #if canImport(MetaWearablesDAT)
-        let session = try await MetaDATStreamBridge.anoixeLiveSession()
-        state = .connected(
-            deviceName: session.deviceName,
-            batteryPercent: session.batteryPercent
-        )
-        reconnectAttempts = 0
-        #else
-        state = .disconnected
-        throw NSError(
-            domain: "R0lling.Glasses",
-            code: 4002,
-            userInfo: [NSLocalizedDescriptionKey:
-                "Το Meta Wearables DAT SDK δεν είναι συνδεδεμένο σε αυτό το build. Ενεργοποίησε Simulation Mode ή πρόσθεσε το SDK στο Xcode."]
-        )
-        #endif
     }
 
     public func disconnectDevice() async {
+        connectionAttemptGeneration &+= 1
         await stopStreaming()
         if policy.clearBufferOnDisconnect {
             await bufferService?.markStreamInterrupted(reason: "disconnect")
@@ -153,7 +180,7 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
         }
 
         if !simulationEnabled {
-            #if canImport(MetaWearablesDAT)
+            #if canImport(MWDATCore) && canImport(MWDATCamera)
             guard MetaDATStreamBridge.einaiLiveYlopoiimeno else {
                 throw NSError(
                     domain: MetaDATStreamBridge.errorDomain,
@@ -166,7 +193,7 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
             throw NSError(
                 domain: "R0lling.Glasses",
                 code: 4002,
-                userInfo: [NSLocalizedDescriptionKey: "Live stream απαιτεί MetaWearablesDAT ή Simulation Mode."]
+                userInfo: [NSLocalizedDescriptionKey: "Live stream απαιτεί MWDATCore + MWDATCamera ή Simulation Mode."]
             )
             #endif
         }
@@ -257,7 +284,7 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
             if simulationEnabled {
                 return generateSyntheticJPEG()
             }
-            #if canImport(MetaWearablesDAT)
+            #if canImport(MWDATCore) && canImport(MWDATCamera)
             throw NSError(domain: MetaDATStreamBridge.errorDomain, code: 4011, userInfo: [
                 NSLocalizedDescriptionKey: "Η πραγματική λήψη φωτογραφίας DAT δεν έχει υλοποιηθεί."
             ])

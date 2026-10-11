@@ -34,15 +34,11 @@ public final class DirectAPIConnector: AIConnectorProtocol, @unchecked Sendable 
 
         try Task.checkCancellation()
 
-        let messages = OpenAIChatRequestBuilder.buildMessages(
+        let body = try OpenAIChatRequestBuilder.buildBoundedRequestBody(
             payload: payload,
             defaultSystemPrompt: "Είσαι ο προσωπικός βοηθός R0lling στο iPhone του χρήστη. Απαντάς στα Ελληνικά με σαφήνεια, ακρίβεια και φιλικό τόνο.",
-            memoryHeader: "Μνήμη & Προτιμήσεις Χρήστη:"
-        )
-
-        let body = try OpenAIChatRequestBuilder.buildRequestBody(
+            memoryHeader: "Μνήμη & Προτιμήσεις Χρήστη:",
             model: modelName,
-            messages: messages,
             temperature: 0.7
         )
 
@@ -86,6 +82,7 @@ public final class DirectAPIConnector: AIConnectorProtocol, @unchecked Sendable 
     }
 
     public func describeImage(imageData: Data, question: String?) async throws -> String {
+        try OpenAIChatRequestBuilder.addingVisionFrameBytes(imageData.count)
         let b64 = imageData.base64EncodedString()
         let promptText = question ?? "Τι βλέπω σε αυτή την εικόνα από τα Meta Glasses μου; Περιέγραψέ το συνοπτικά στα Ελληνικά."
         let payload = AIRequestPayload(prompt: promptText, imageBase64: b64)

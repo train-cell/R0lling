@@ -321,28 +321,35 @@ def test_super_features_20():
     assert can_alert("Car approaching", now + 121), "Alert after cooldown must trigger"
     print(f"    {PASS} [8/20] ProximityAlertManager: Deduplication cooldown mechanics example assertions completed.")
 
-    # 9. Voice Emotion Tagging (Prosody Scoring)
-    def estimate_emotion(pitch_hz, energy_rms):
-        if pitch_hz > 240 and energy_rms > 0.4:
-            return "excited"
-        elif pitch_hz < 130 and energy_rms < 0.15:
-            return "calm"
-        elif pitch_hz > 220 and energy_rms < 0.2:
-            return "anxious"
-        return "neutral"
+    # 9. Transcript keyword cues (illustrative only; the production Swift runner tests the actual tagger)
+    def transcript_keyword_cues(transcript):
+        words = set(re.findall(r"[^\W_]+", transcript.lower(), flags=re.UNICODE))
+        cues = []
+        if words.intersection({"wow", "amazing"}) or "!" in transcript:
+            cues.append("κείμενο: ενθουσιασμός")
+        if words.intersection({"urgent", "επείγον"}):
+            cues.append("κείμενο: επείγον")
+        if "?" in transcript:
+            cues.append("κείμενο: σκέψη")
+        if words.intersection({"idea", "project"}):
+            cues.append("κείμενο: ιδέα")
+        return cues
 
-    assert estimate_emotion(280, 0.6) == "excited"
-    assert estimate_emotion(110, 0.08) == "calm"
-    assert estimate_emotion(170, 0.25) == "neutral"
-    print(f"    {PASS} [9/20] VoiceEmotionAnalyzer: Acoustic prosody classifier example assertions completed.")
+    assert transcript_keyword_cues("Amazing project!") == [
+        "κείμενο: ενθουσιασμός", "κείμενο: ιδέα"
+    ]
+    assert transcript_keyword_cues("Is this a project?") == [
+        "κείμενο: σκέψη", "κείμενο: ιδέα"
+    ]
+    print(f"    {PASS} [9/20] TranscriptKeywordTagger: explicit text-cue example assertions completed (not production Swift coverage).")
 
-    # 10. Local Entity Recognizer & Privacy Scrubber
-    raw_transcript = "Συνάντησα τον Γιάννη στο τηλέφωνο 6971234567 και IBAN GR1201101250000000123456789"
+    # 10. Illustrative PII regex example only; this does not execute the Swift scrubber.
+    raw_transcript = "Συνάντησα τον Γιάννη στο τηλέφωνο 6971234567 και δοκιμαστικό IBAN GR1201101250000000012345678"
     scrubbed = re.sub(r"\b69\d{8}\b", "[PHONE_REDACTED]", raw_transcript)
     scrubbed = re.sub(r"\bGR\d{25}\b", "[IBAN_REDACTED]", scrubbed)
     assert "[PHONE_REDACTED]" in scrubbed and "[IBAN_REDACTED]" in scrubbed
     assert "6971234567" not in scrubbed
-    print(f"    {PASS} [10/20] LocalEntityRecognizer: PII redaction and entity regex parser example assertions completed.")
+    print(f"    {PASS} [10/20] IllustrativePIIPatternExample: phone/IBAN regex assertions completed (not production Swift coverage).")
 
     # 11. Obsidian Canvas JSON Generation
     canvas_entries = [

@@ -1,4 +1,4 @@
-> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+> Current status (2026-10-10): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
 
 # R0lling — Clip Buffer + Meta Glasses Lane (`LANE_CLIP_META`)
 
@@ -43,16 +43,16 @@
 | `AVAsset.isPlayable` smoke | Χρειάζεται Mac/iOS runtime | XCTest σε GHA/Mac |
 | Continuous background capture | Meta sample συχνά κλείνει session | `promisesContinuousBackgroundCapture = false` μέχρι proof |
 | Hey Meta wake | Experimental SDK | Εκτός αυτού του lane |
-| Live acoustic/IMU από hardware | DAT mic/IMU hooks | Μόνο synthetic samples· το live bridge επιστρέφει nil και τα readiness flags μένουν false |
+| Live acoustic/IMU από hardware | DAT mic/IMU hooks | Μόνο synthetic samples· τα unwired live hooks αποτυγχάνουν με 4010 χωρίς SDK ή 4011 όταν το SDK έχει γίνει import, και τα readiness flags μένουν false |
 
 ---
 
 ## 3. Future implementation outline (not an enablement checklist)
 
-The steps below describe engineering work that still needs to happen. They do not enable a live device path. Merely adding the DAT package does not make this bridge operational: the current `canImport` branch still throws `4011` for sessions/frames, `kleiseLiveSession` is empty, and audio/IMU pulls return `nil`. Do not switch the app to real mode until those hooks have a reviewed implementation and device evidence.
+The steps below describe engineering work that still needs to happen. They do not enable a live device path. Merely adding the DAT package does not make this bridge operational: the current `canImport` branch still throws `4011` for session/video/audio/IMU reads, `kleiseLiveSession` is a no-op because no session is opened, and `einaiLiveYlopoiimeno` remains `false`. Do not switch the app to real mode until those hooks have a reviewed implementation and device evidence.
 
 ### Βήμα 0 — Προαπαιτούμενα
-1. macOS 14+ · Xcode 16+ · iPhone iOS 17.2+ · Meta Ray-Ban Gen 2  
+1. Official CameraAccess sample currently lists iOS 17.2+, Xcode 26.4+, and Swift 6.3+; a supported iPhone and Meta glasses are required for hardware validation. See [Meta CameraAccess prerequisites](https://github.com/facebook/meta-wearables-dat-ios/blob/main/samples/CameraAccess/README.md).
 2. Meta Wearables Developer Center app + Client Token  
 3. Meta View → Developer Mode (7 taps) → Wireless Camera Streaming  
 
@@ -61,23 +61,24 @@ The steps below describe engineering work that still needs to happen. They do no
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/facebook/meta-wearables-dat-ios.git", from: "1.0.0")
+    .package(url: "https://github.com/facebook/meta-wearables-dat-ios.git", from: "1.0.1")
 ],
 targets: [
     .target(
         name: "R0lling",
         dependencies: [
-            .product(name: "MetaWearablesDAT", package: "meta-wearables-dat-ios")
+            .product(name: "MWDATCore", package: "meta-wearables-dat-ios"),
+            .product(name: "MWDATCamera", package: "meta-wearables-dat-ios")
         ],
         ...
     )
 ]
 ```
 
-> Αν το product name διαφέρει, δες το README του DAT repo και διόρθωσε το `.product(name:)`.
+The repository's current `Package.swift` uses Swift tools 5.10 and targets iOS 17.0, while Meta's current CameraAccess prerequisites list Xcode 26.4+, Swift 6.3+, and iOS 17.2+. The official iOS repository lists 1.0.1 as the latest stable release on 2026-10-10 ([changelog](https://github.com/facebook/meta-wearables-dat-ios/blob/main/CHANGELOG.md)); the dependency snippet is only a version example. Update and validate the app/toolchain settings before adding the package. This app has not integrated the SDK.
 
 ### Βήμα 2 — Wire `MetaDATStreamBridge`
-Άνοιξε `Sources/R0lling/Glasses/MetaDATStreamBridge.swift` μέσα στα `#if canImport(MetaWearablesDAT)` blocks:
+Άνοιξε `Sources/R0lling/Glasses/MetaDATStreamBridge.swift` μέσα στα `#if canImport(MWDATCore) && canImport(MWDATCamera)` blocks:
 
 1. Πριν το `camera.startStreaming`, επιβεβαίωσε ποιοι codecs υποστηρίζονται από το SDK και τα γυαλιά. Το παρόν `H264AnnexBRemuxer` δέχεται μόνο H.264 Annex-B (SPS/PPS NAL types 7/8). Αν το DAT δίνει μόνο HEVC, χρειάζεται ξεχωριστή HEVC remux διαδρομή ή τεκμηριωμένη ρύθμιση H.264· μην υποθέσεις ότι τα δύο formats είναι εναλλάξιμα.
 2. `anoixeLiveSession()` — αντικατέστησε το `throw 4011` με πραγματικό connect και `camera.startStreaming` από το **CameraAccess** sample, χρησιμοποιώντας τον codec που επαληθεύτηκε στο προηγούμενο βήμα.

@@ -3,6 +3,18 @@ import CryptoKit
 
 /// Local diary storage. The complete serialized document is authenticated and encrypted at rest.
 public actor EncryptedDiaryStore {
+    static let maximumEncryptedDocumentBytes = 8 * 1024 * 1024
+    static let maximumEntryContentBytes = 512 * 1024
+    static let maximumFutureLetterPayloadBytes = 512 * 1024
+    static let maximumDecisionTextBytes = 16 * 1024
+    static let maximumDecisionAssumptionBytes = 16 * 1024
+    static let maximumDecisionAssumptions = 32
+    static let maximumDecisionOutcomeBytes = 128 * 1024
+    private static let maximumEntries = 1_000
+    private static let maximumFutureLetters = 200
+    private static let maximumDecisionRecords = 500
+    private static let aesGCMCombinedOverheadBytes = 12 + 16
+
     /// Capability minted only after a successful biometric check and revoked on lock.
     public struct Authorization: Sendable {
         fileprivate let id: UUID
@@ -199,8 +211,9 @@ public actor EncryptedDiaryStore {
         guard !cleanTitle.isEmpty, cleanTitle.count <= 100 else {
             throw diaryError(code: 7, message: "Ο τίτλος πρέπει να έχει από 1 έως 100 χαρακτήρες.")
         }
-        guard !cleanPayload.isEmpty else {
-            throw diaryError(code: 8, message: "Γράψε το μήνυμα πριν το σφραγίσεις.")
+        guard !cleanPayload.isEmpty,
+              cleanPayload.utf8.count <= Self.maximumFutureLetterPayloadBytes else {
+            throw diaryError(code: 8, message: "Το μήνυμα πρέπει να έχει περιεχόμενο και να μην υπερβαίνει τα 512 KiB.")
         }
         guard unlockDate > Date() else {
             throw diaryError(code: 9, message: "Επίλεξε ημερομηνία ξεκλειδώματος στο μέλλον.")
@@ -238,6 +251,15 @@ public actor EncryptedDiaryStore {
         guard !title.isEmpty, !assumptions.isEmpty else {
             throw diaryError(code: 10, message: "Η απόφαση και τουλάχιστον μία παραδοχή είναι απαραίτητες.")
         }
+        guard title.utf8.count <= Self.maximumDecisionTextBytes,
+              assumptions.count <= Self.maximumDecisionAssumptions,
+              assumptions.allSatisfy({ $0.utf8.count <= Self.maximumDecisionAssumptionBytes }) else {
+            throw diaryError(code: 19, message: "Το κείμενο απόφασης ή οι βασικές παραδοχές υπερβαίνουν τα όρια του vault.")
+        }
+        let cleanOutcome = record.outcomeReview?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard (cleanOutcome?.utf8.count ?? 0) <= Self.maximumDecisionOutcomeBytes else {
+            throw diaryError(code: 19, message: "Το αποτέλεσμα αναθεώρησης υπερβαίνει το όριο των 128 KiB.")
+        }
         guard (0...100).contains(record.confidencePercent), record.reviewDate >= record.createdAt else {
             throw diaryError(code: 11, message: "Η βεβαιότητα πρέπει να είναι 0–100% και η αναθεώρηση να μην προηγείται της απόφασης.")
         }
@@ -249,7 +271,7 @@ public actor EncryptedDiaryStore {
             confidencePercent: record.confidencePercent,
             createdAt: record.createdAt,
             reviewDate: record.reviewDate,
-            outcomeReview: record.outcomeReview,
+            outcomeReview: cleanOutcome,
             isReviewed: record.isReviewed
         )
         var document = try readDocument()
@@ -283,6 +305,9 @@ public actor EncryptedDiaryStore {
         let cleanOutcome = outcome.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanOutcome.isEmpty else {
             throw diaryError(code: 12, message: "Καταχώρισε το αποτέλεσμα πριν ολοκληρώσεις την ανασκόπηση.")
+        }
+        guard cleanOutcome.utf8.count <= Self.maximumDecisionOutcomeBytes else {
+            throw diaryError(code: 19, message: "Το αποτέλεσμα αναθεώρησης υπερβαίνει το όριο των 128 KiB.")
         }
         var document = try readDocument()
         guard let index = document.decisionRecords.firstIndex(where: { $0.id == id }) else {
@@ -325,8 +350,9 @@ public actor EncryptedDiaryStore {
     ) throws -> Entry {
         try requireAuthorization(authorization)
         let cleanContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanContent.isEmpty else {
-            throw diaryError(code: 1, message: "Γράψε το περιεχόμενο πριν από την αποθήκευση.")
+        guard !cleanContent.isEmpty,
+              cleanContent.utf8.count <= Self.maximumEntryContentBytes else {
+            throw diaryError(code: 1, message: "Το περιεχόμενο πρέπει να έχει κείμενο και να μην υπερβαίνει τα 512 KiB.")
         }
 
         var document = try readDocument()
@@ -370,15 +396,30 @@ public actor EncryptedDiaryStore {
             }
         }
 
+        guard FileManager.default.fileExists(atPath: storageURL.path) else {
+            return Document(schemaVersion: 1, entries: [])
+        }
+
         let encryptedData: Data
         do {
-            encryptedData = try Data(contentsOf: storageURL)
-        } catch {
-            let fileError = error as NSError
-            if fileError.domain == NSCocoaErrorDomain,
-               fileError.code == NSFileReadNoSuchFileError {
-                return Document(schemaVersion: 1, entries: [])
+            encryptedData = try BoundedRegularFileReader.readData(
+                at: storageURL,
+                maximumBytes: Self.maximumEncryptedDocumentBytes
+            )
+        } catch let error as BoundedRegularFileReaderError {
+            if case .exceedsMaximumBytes = error {
+                throw diaryError(
+                    code: 17,
+                    message: "Το κρυπτογραφημένο ιδιωτικό ημερολόγιο υπερβαίνει το όριο των 8 MiB. Τα αρχικά δεδομένα διατηρήθηκαν.",
+                    underlying: error
+                )
             }
+            throw diaryError(
+                code: 4,
+                message: "Το αρχείο του ιδιωτικού ημερολογίου δεν είναι ασφαλές για ανάγνωση. Τα αρχικά δεδομένα διατηρήθηκαν.",
+                underlying: error
+            )
+        } catch {
             throw diaryError(
                 code: 4,
                 message: "Δεν ήταν δυνατό να διαβαστεί το κρυπτογραφημένο ημερολόγιο. Τα αρχικά δεδομένα διατηρήθηκαν.",
@@ -397,8 +438,13 @@ public actor EncryptedDiaryStore {
                   Set(document.decisionRecords.map(\.id)).count == document.decisionRecords.count else {
                 throw diaryError(code: 3, message: "Το ιδιωτικό ημερολόγιο έχει μη υποστηριζόμενη έκδοση ή διπλότυπες εγγραφές.")
             }
+            try validateDocumentBounds(document)
             return document
         } catch {
+            let diaryNSError = error as NSError
+            if diaryNSError.domain == "R0lling.EncryptedDiary", diaryNSError.code == 19 {
+                throw error
+            }
             throw diaryError(
                 code: 4,
                 message: "Δεν ήταν δυνατό να ανοίξει το κρυπτογραφημένο ημερολόγιο. Τα αρχικά δεδομένα διατηρήθηκαν.",
@@ -409,11 +455,19 @@ public actor EncryptedDiaryStore {
 
     private func writeDocument(_ document: Document) throws {
         do {
+            try validateDocumentBounds(document)
             let key = try VaultCryptography.key(tag: keyTag, create: true)
             let plaintext = try encoder.encode(document)
+            let maximumPlaintextBytes = Self.maximumEncryptedDocumentBytes - Self.aesGCMCombinedOverheadBytes
+            guard plaintext.count <= maximumPlaintextBytes else {
+                throw diaryError(code: 19, message: "Το ιδιωτικό ημερολόγιο υπερβαίνει το όριο των 8 MiB.")
+            }
             let sealedBox = try AES.GCM.seal(plaintext, using: key)
             guard let encryptedData = sealedBox.combined else {
                 throw diaryError(code: 5, message: "Η κρυπτογράφηση AES-GCM απέτυχε.")
+            }
+            guard encryptedData.count <= Self.maximumEncryptedDocumentBytes else {
+                throw diaryError(code: 19, message: "Το κρυπτογραφημένο ημερολόγιο υπερβαίνει το όριο των 8 MiB.")
             }
             try FileManager.default.createDirectory(
                 at: storageURL.deletingLastPathComponent(),
@@ -442,11 +496,86 @@ public actor EncryptedDiaryStore {
                 throw error
             }
         } catch {
+            let diaryNSError = error as NSError
+            if diaryNSError.domain == "R0lling.EncryptedDiary", diaryNSError.code == 19 {
+                throw error
+            }
             throw diaryError(
                 code: 6,
                 message: "Δεν ήταν δυνατό να αποθηκευτεί το ιδιωτικό ημερολόγιο.",
                 underlying: error
             )
+        }
+    }
+
+    /// Bounds collection counts, individual text fields, and worst-case encoded size before JSON allocation.
+    private func validateDocumentBounds(_ document: Document) throws {
+        guard document.entries.count <= Self.maximumEntries,
+              document.futureLetters.count <= Self.maximumFutureLetters,
+              document.decisionRecords.count <= Self.maximumDecisionRecords else {
+            throw diaryError(code: 19, message: "Το ιδιωτικό ημερολόγιο έφτασε το όριο αριθμού εγγραφών.")
+        }
+
+        let itemCount = document.entries.count
+            + document.futureLetters.count
+            + document.decisionRecords.count
+            + document.decisionRecords.reduce(0) { $0 + $1.coreAssumptions.count }
+        var estimatedJSONBytes = 1_024 + (itemCount * 128)
+
+        func addBoundedText(_ text: String, maximumBytes: Int) throws {
+            guard text.utf8.count <= maximumBytes else {
+                throw diaryError(code: 19, message: "Πεδίο του ιδιωτικού ημερολογίου υπερβαίνει το επιτρεπόμενο όριο μεγέθους.")
+            }
+
+            var encodedUpperBound = 0
+            for scalar in text.unicodeScalars {
+                let scalarBytes: Int
+                switch scalar.value {
+                case 0...0x7F: scalarBytes = 1
+                case 0x80...0x7FF: scalarBytes = 2
+                case 0x800...0xFFFF: scalarBytes = 3
+                default: scalarBytes = 4
+                }
+                let escapedBytes: Int
+                switch scalar.value {
+                case 0x22, 0x5C: escapedBytes = 1 // quote or backslash
+                case 0...0x1F:
+                    escapedBytes = [0x08, 0x09, 0x0A, 0x0C, 0x0D].contains(scalar.value) ? 1 : 5
+                case 0x2028, 0x2029: escapedBytes = 3
+                default: escapedBytes = 0
+                }
+                let next = encodedUpperBound.addingReportingOverflow(scalarBytes + escapedBytes)
+                guard !next.overflow else {
+                    throw diaryError(code: 19, message: "Το ιδιωτικό ημερολόγιο υπερβαίνει το όριο μεγέθους.")
+                }
+                encodedUpperBound = next.partialValue
+            }
+            let total = estimatedJSONBytes.addingReportingOverflow(encodedUpperBound)
+            guard !total.overflow,
+                  total.partialValue <= Self.maximumEncryptedDocumentBytes - Self.aesGCMCombinedOverheadBytes else {
+                throw diaryError(code: 19, message: "Το ιδιωτικό ημερολόγιο υπερβαίνει το όριο των 8 MiB.")
+            }
+            estimatedJSONBytes = total.partialValue
+        }
+
+        for entry in document.entries {
+            try addBoundedText(entry.content, maximumBytes: Self.maximumEntryContentBytes)
+        }
+        for letter in document.futureLetters {
+            try addBoundedText(letter.titleHint, maximumBytes: 400)
+            try addBoundedText(letter.payloadText, maximumBytes: Self.maximumFutureLetterPayloadBytes)
+        }
+        for decision in document.decisionRecords {
+            try addBoundedText(decision.decisionText, maximumBytes: Self.maximumDecisionTextBytes)
+            guard decision.coreAssumptions.count <= Self.maximumDecisionAssumptions else {
+                throw diaryError(code: 19, message: "Μια απόφαση μπορεί να έχει έως 32 βασικές παραδοχές.")
+            }
+            for assumption in decision.coreAssumptions {
+                try addBoundedText(assumption, maximumBytes: Self.maximumDecisionAssumptionBytes)
+            }
+            if let outcomeReview = decision.outcomeReview {
+                try addBoundedText(outcomeReview, maximumBytes: Self.maximumDecisionOutcomeBytes)
+            }
         }
     }
 

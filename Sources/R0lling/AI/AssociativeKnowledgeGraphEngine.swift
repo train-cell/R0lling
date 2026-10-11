@@ -50,14 +50,31 @@ public final class AssociativeKnowledgeGraphEngine: @unchecked Sendable {
             addTriple(t)
         }
     }
+
+    /// Replace the graph with one complete snapshot (for example, the entries
+    /// selected for a single export) without retaining triples from earlier runs.
+    public func replaceTriples(_ snapshot: [RDFTriple]) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        var replacement: [RDFTriple] = []
+        for triple in snapshot where !replacement.contains(where: {
+            $0.subject == triple.subject && $0.predicate == triple.predicate && $0.object == triple.object
+        }) {
+            replacement.append(triple)
+        }
+        triples = replacement
+    }
     
     /// Εξαγωγή τριπλέτων από κείμενο με χρήση Pattern Matching & Heuristics
     public func extractTriples(from text: String, date: Date = Date()) -> [RDFTriple] {
         var extracted: [RDFTriple] = []
-        let lower = text.lowercased()
         
         // Patterns: "Συνάντηση με X", "Met with X", "Συνάντησα τον X"
-        if let range = lower.range(of: "συνάντηση με ") ?? lower.range(of: "συνάντησα τον ") ?? lower.range(of: "met with ") {
+        if let range = firstCaseInsensitiveRange(
+            in: text,
+            matching: ["συνάντηση με ", "συνάντησα τον ", "met with "]
+        ) {
             let entity = String(text[range.upperBound...]).components(separatedBy: CharacterSet(charactersIn: " .,;")).first ?? ""
             if !entity.isEmpty {
                 extracted.append(RDFTriple(subject: "User", predicate: "metWith", object: entity.capitalized, timestamp: date))
@@ -65,7 +82,10 @@ public final class AssociativeKnowledgeGraphEngine: @unchecked Sendable {
         }
         
         // Patterns: "Στο γραφείο", "Στο σπίτι", "at X", "στο X"
-        if let range = lower.range(of: "στο ") ?? lower.range(of: "στην ") ?? lower.range(of: "στη ") ?? lower.range(of: "at ") {
+        if let range = firstCaseInsensitiveRange(
+            in: text,
+            matching: ["στο ", "στην ", "στη ", "at "]
+        ) {
             let place = String(text[range.upperBound...]).components(separatedBy: CharacterSet(charactersIn: " .,;")).first ?? ""
             if !place.isEmpty {
                 extracted.append(RDFTriple(subject: "User", predicate: "visitedLocation", object: place.capitalized, timestamp: date))
@@ -73,7 +93,10 @@ public final class AssociativeKnowledgeGraphEngine: @unchecked Sendable {
         }
         
         // Patterns: "Συζητήσαμε για X", "discussed X"
-        if let range = lower.range(of: "συζητήσαμε για ") ?? lower.range(of: "μίλησα για ") ?? lower.range(of: "discussed ") {
+        if let range = firstCaseInsensitiveRange(
+            in: text,
+            matching: ["συζητήσαμε για ", "μίλησα για ", "discussed "]
+        ) {
             let topic = String(text[range.upperBound...]).components(separatedBy: CharacterSet(charactersIn: ".,;")).first ?? ""
             if !topic.isEmpty {
                 extracted.append(RDFTriple(subject: "User", predicate: "discussedTopic", object: topic.trimmingCharacters(in: .whitespaces), timestamp: date))
@@ -81,6 +104,15 @@ public final class AssociativeKnowledgeGraphEngine: @unchecked Sendable {
         }
         
         return extracted
+    }
+
+    private func firstCaseInsensitiveRange(in text: String, matching patterns: [String]) -> Range<String.Index>? {
+        for pattern in patterns {
+            if let range = text.range(of: pattern, options: .caseInsensitive) {
+                return range
+            }
+        }
+        return nil
     }
     
     /// Εξαγωγή του γράφου σε Obsidian Mermaid format (`graph TD`)
@@ -90,10 +122,18 @@ public final class AssociativeKnowledgeGraphEngine: @unchecked Sendable {
         lock.unlock()
         
         var output = "```mermaid\ngraph TD\n"
+        var nodeIDs: [String: String] = [:]
+        func nodeID(for label: String) -> String {
+            if let existingID = nodeIDs[label] { return existingID }
+            let newID = "node_\(nodeIDs.count)"
+            nodeIDs[label] = newID
+            return newID
+        }
+
         for t in currentTriples {
-            let cleanSub = sanitizeIdentifier(t.subject)
-            let cleanObj = sanitizeIdentifier(t.object)
-            output += "    \(cleanSub)[\"\(t.subject)\"] -->|\"\(t.predicate)\"| \(cleanObj)[\"\(t.object)\"]\n"
+            let subjectID = nodeID(for: t.subject)
+            let objectID = nodeID(for: t.object)
+            output += "    \(subjectID)[\"\(mermaidLabel(t.subject))\"] -->|\(mermaidLabel(t.predicate))| \(objectID)[\"\(mermaidLabel(t.object))\"]\n"
         }
         output += "```\n"
         return output
@@ -109,7 +149,7 @@ public final class AssociativeKnowledgeGraphEngine: @unchecked Sendable {
         dot += "    rankdir=LR;\n"
         dot += "    node [shape=box, style=rounded, fontname=\"Helvetica\"];\n"
         for t in currentTriples {
-            dot += "    \"\(t.subject)\" -> \"\(t.object)\" [label=\"\(t.predicate)\"];\n"
+            dot += "    \"\(graphvizString(t.subject))\" -> \"\(graphvizString(t.object))\" [label=\"\(graphvizString(t.predicate))\"];\n"
         }
         dot += "}\n"
         return dot
@@ -123,10 +163,32 @@ public final class AssociativeKnowledgeGraphEngine: @unchecked Sendable {
         return triples.filter { $0.subject.lowercased() == target || $0.object.lowercased() == target }
     }
     
-    private func sanitizeIdentifier(_ str: String) -> String {
-        return str.replacingOccurrences(of: " ", with: "_")
-                  .replacingOccurrences(of: "-", with: "_")
-                  .filter { $0.isLetter || $0.isNumber || $0 == "_" }
+    /// Mermaid flowchart labels accept decimal entity codes for reserved syntax.
+    /// Encoding punctuation (including `#`) prevents source text from creating
+    /// statements or injecting entity references; line breaks become spaces.
+    private func mermaidLabel(_ value: String) -> String {
+        value.unicodeScalars.map { scalar in
+            if CharacterSet.alphanumerics.contains(scalar) { return String(scalar) }
+            if CharacterSet.whitespacesAndNewlines.contains(scalar) || CharacterSet.controlCharacters.contains(scalar) {
+                return " "
+            }
+            return "#\(scalar.value);"
+        }.joined()
+    }
+
+    /// Escape Graphviz quoted strings and neutralize controls so source text stays
+    /// inside one DOT statement. Backslashes are doubled to avoid escString codes.
+    private func graphvizString(_ value: String) -> String {
+        value.unicodeScalars.map { scalar in
+            if CharacterSet.whitespacesAndNewlines.contains(scalar) || CharacterSet.controlCharacters.contains(scalar) {
+                return " "
+            }
+            switch scalar.value {
+            case 0x5C: return "\\\\"
+            case 0x22: return "\\\""
+            default: return String(scalar)
+            }
+        }.joined()
     }
     
     public var allTriples: [RDFTriple] {

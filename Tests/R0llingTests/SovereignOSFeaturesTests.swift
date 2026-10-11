@@ -281,6 +281,7 @@ final class SovereignOSFeaturesTests: XCTestCase {
             hrvMetadata: metadata,
             bodyTemperatureCelsius: 36.7,
             bodyTemperatureMetadata: temperatureMetadata,
+            sleepQueryFailed: true,
             queriedAt: measuredAt.addingTimeInterval(600)
         )
 
@@ -290,9 +291,53 @@ final class SovereignOSFeaturesTests: XCTestCase {
         XCTAssertEqual(decoded.hrvMetadata, metadata)
         XCTAssertEqual(decoded.bodyTemperatureCelsius, 36.7)
         XCTAssertEqual(decoded.bodyTemperatureMetadata, temperatureMetadata)
+        XCTAssertEqual(decoded.sleepQueryFailed, true)
         XCTAssertTrue(decoded.hasReadings)
         XCTAssertEqual(decoded.queriedAt, snapshot.queriedAt)
         XCTAssertTrue(HealthKitTelemetrySnapshot(bodyTemperatureCelsius: 36.7).hasReadings)
+
+        var legacySnapshot = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        legacySnapshot.removeValue(forKey: "sleepQueryFailed")
+        let legacyData = try JSONSerialization.data(withJSONObject: legacySnapshot)
+        XCTAssertNil(try JSONDecoder().decode(HealthKitTelemetrySnapshot.self, from: legacyData).sleepQueryFailed)
+    }
+
+    func testHealthMetricDisplayScaleClampsAndRejectsNonFiniteValues() {
+        XCTAssertEqual(HealthMetricDisplayScale.progress(for: 50, within: 0...100), 0.5)
+        XCTAssertEqual(HealthMetricDisplayScale.progress(for: -5, within: 0...100), 0)
+        XCTAssertEqual(HealthMetricDisplayScale.progress(for: 150, within: 0...100), 1)
+        XCTAssertNil(HealthMetricDisplayScale.progress(for: nil, within: 0...100))
+        XCTAssertNil(HealthMetricDisplayScale.progress(for: .nan, within: 0...100))
+        XCTAssertNil(HealthMetricDisplayScale.progress(for: 1, within: 5...5))
+    }
+
+    func testHealthKitAccessPresentationDoesNotOfferRepeatRequestAfterCallback() {
+        let initial = HealthKitAccessPresentation.resolve(hasMeasurements: false, didCompleteRequest: false)
+        XCTAssertEqual(initial, .requestAccess)
+        XCTAssertTrue(initial.shouldShowRequestButton)
+        XCTAssertNil(initial.explanation)
+
+        let completedWithoutReadableData = HealthKitAccessPresentation.resolve(
+            hasMeasurements: false,
+            didCompleteRequest: true
+        )
+        XCTAssertEqual(completedWithoutReadableData, .noReadableMeasurements)
+        XCTAssertFalse(completedWithoutReadableData.shouldShowRequestButton)
+        XCTAssertTrue(completedWithoutReadableData.statusText.contains("ΑΝΑΓΝΩΣΙΜΑ"))
+        XCTAssertNotNil(completedWithoutReadableData.explanation)
+
+        let available = HealthKitAccessPresentation.resolve(hasMeasurements: true, didCompleteRequest: true)
+        XCTAssertEqual(available, .measurementsAvailable)
+        XCTAssertFalse(available.shouldShowRequestButton)
+    }
+
+    func testJournalTimeZoneIdentifierRejectsInvalidInputAndNormalizesBlankInput() {
+        XCTAssertEqual(JournalTimeZoneIdentifier.normalized(" Europe/Athens "), "Europe/Athens")
+        XCTAssertEqual(
+            JournalTimeZoneIdentifier.normalized("  ", fallback: TimeZone(secondsFromGMT: 0)!),
+            "GMT"
+        )
+        XCTAssertNil(JournalTimeZoneIdentifier.normalized("Not/A_Real_Zone"))
     }
 
     func testFutureLetterboxEngine() async {

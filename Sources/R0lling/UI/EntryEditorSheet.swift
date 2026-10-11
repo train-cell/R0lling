@@ -52,11 +52,18 @@ public struct EntryEditorSheet: View {
                         selection: $editedTimestamp,
                         displayedComponents: [.date, .hourAndMinute]
                     )
-                    TextField("Time Zone identifier", text: $timeZoneIdentifier)
+                    TextField("π.χ. Europe/Athens", text: $timeZoneIdentifier)
 #if os(iOS)
                         .textInputAutocapitalization(.never)
 #endif
                         .autocorrectionDisabled()
+                        .accessibilityHint("Άφησε το πεδίο κενό για την τρέχουσα ζώνη ώρας.")
+                    if !timeZoneIsValid {
+                        Label("Μη έγκυρη ζώνη ώρας. Χρησιμοποίησε αναγνωριστικό IANA, όπως Europe/Athens, ή άφησε το πεδίο κενό.", systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundColor(R0llingTheme.statusError)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     Text("Ημερολογιακή ημέρα: \(provoliDateKey)")
                         .font(.footnote)
                         .foregroundColor(R0llingTheme.textSecondary)
@@ -86,12 +93,14 @@ public struct EntryEditorSheet: View {
                         let locationName = locationNameText.trimmingCharacters(in: .whitespacesAndNewlines)
                         updated.locationName = locationName.isEmpty ? nil : locationName
                         updated.timestamp = editedTimestamp
-                        let tz = timeZoneIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
-                        updated.timeZoneIdentifier = tz.isEmpty ? TimeZone.current.identifier : tz
+                        guard let normalizedTimeZone = JournalTimeZoneIdentifier.normalized(timeZoneIdentifier) else {
+                            return
+                        }
+                        updated.timeZoneIdentifier = normalizedTimeZone
                         updated.lastModified = Date()
                         onSave(updated)
                     }
-                    .disabled(contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !timeZoneIsValid)
                 }
             }
         }
@@ -99,7 +108,14 @@ public struct EntryEditorSheet: View {
     }
 
     private var provoliDateKey: String {
-        let zone = TimeZone(identifier: timeZoneIdentifier) ?? .current
+        guard let normalized = JournalTimeZoneIdentifier.normalized(timeZoneIdentifier),
+              let zone = TimeZone(identifier: normalized) else {
+            return "—"
+        }
         return JournalEntry.makeDateKey(for: editedTimestamp, timeZone: zone)
+    }
+
+    private var timeZoneIsValid: Bool {
+        JournalTimeZoneIdentifier.normalized(timeZoneIdentifier) != nil
     }
 }

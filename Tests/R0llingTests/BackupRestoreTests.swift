@@ -133,6 +133,102 @@ final class BackupRestoreTests: XCTestCase {
         XCTAssertTrue(restoredMemory.memoryNotes.contains("keep this note"))
     }
 
+    func testBackupCreationRespectsMediaFreeSpaceReserveBeforeCopying() async throws {
+        let bytes = Data("source media remains intact".utf8)
+        let attachment = try await mediaStorage.saveMediaFile(
+            data: bytes,
+            originalFilename: "reserve-check.jpg",
+            mediaType: .photo
+        )
+        try await storage.saveEntry(JournalEntry(content: "reserve check", attachments: [attachment]))
+
+        let required = Int64(bytes.count) + ELAXISTOS_ELEUTHEROS_XOROS_BYTES
+        let constrainedStorage = MediaStorageService(
+            // Keep the actual source media root; only the reported free space changes.
+            baseDirectory: tempDirectory.appendingPathComponent("Media"),
+            paradekampseElegxoXorou: true,
+            availableFreeDiskSpaceProvider: { required - 1 }
+        )
+        let constrainedEngine = BackupRestoreEngine(
+            storage: storage,
+            mediaStorage: constrainedStorage,
+            agentManager: agentManager
+        )
+
+        do {
+            _ = try await constrainedEngine.createBackupBundle()
+            XCTFail("Backup creation must preserve the configured media free-space reserve")
+        } catch let error as MediaApothikeusiError {
+            XCTAssertEqual(error, .anepikisXoros(diathesima: required - 1, apaitoumena: required))
+        }
+
+        let sourceURL = try mediaStorage.getMediaFileURL(relativePath: attachment.relativePath)
+        XCTAssertEqual(try Data(contentsOf: sourceURL), bytes)
+    }
+
+    func testRestoreRejectsInsufficientMediaSpaceBeforeJournalCommit() async throws {
+        let bytes = Data("restore media".utf8)
+        let attachment = try await mediaStorage.saveMediaFile(
+            data: bytes,
+            originalFilename: "restore-space.jpg",
+            mediaType: .photo
+        )
+        try await storage.saveEntry(JournalEntry(content: "restore space", attachments: [attachment]))
+        let bundleURL = try await backupEngine.createBackupBundle()
+
+        let targetRoot = tempDirectory.appendingPathComponent("InsufficientSpaceTarget", isDirectory: true)
+        let targetStorage = JSONFileStorageService(storageURL: targetRoot.appendingPathComponent("journal.json"))
+        let required = Int64(bytes.count) + ELAXISTOS_ELEUTHEROS_XOROS_BYTES
+        let targetMedia = MediaStorageService(
+            baseDirectory: targetRoot.appendingPathComponent("Media"),
+            paradekampseElegxoXorou: true,
+            availableFreeDiskSpaceProvider: { required - 1 }
+        )
+        let targetAgent = AgentFolderManager(vaultURL: targetRoot.appendingPathComponent("Vault"))
+        let targetEngine = BackupRestoreEngine(
+            storage: targetStorage,
+            mediaStorage: targetMedia,
+            agentManager: targetAgent
+        )
+
+        do {
+            _ = try await targetEngine.restoreFromBackupBundle(bundleURL: bundleURL)
+            XCTFail("Restore must reject the media copy before committing its journal row")
+        } catch let error as MediaApothikeusiError {
+            XCTAssertEqual(error, .anepikisXoros(diathesima: required - 1, apaitoumena: required))
+        }
+
+        let restoredEntries = try await targetStorage.getAllEntries()
+        XCTAssertTrue(restoredEntries.isEmpty)
+        let targetURL = try targetMedia.getMediaFileURL(relativePath: attachment.relativePath)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: targetURL.path))
+    }
+
+    #if os(iOS)
+    func testPlaintextBackupFilesUseDataProtectionUntilFirstUnlock() async throws {
+        let attachment = try await mediaStorage.saveMediaFile(
+            data: Data("protected backup media".utf8),
+            originalFilename: "protected.jpg",
+            mediaType: .photo
+        )
+        try await storage.saveEntry(JournalEntry(content: "protected backup", attachments: [attachment]))
+        let bundleURL = try await backupEngine.createBackupBundle()
+        let manifestURL = bundleURL.appendingPathComponent("manifest.json")
+        let mediaURL = try PathAsfaleia.asfalhs_resolved_url(
+            relativePath: "Media/\(attachment.relativePath)",
+            baseDirectory: bundleURL
+        )
+
+        for url in [manifestURL, mediaURL] {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            XCTAssertEqual(
+                attributes[.protectionKey] as? FileProtectionType,
+                .completeUntilFirstUserAuthentication
+            )
+        }
+    }
+    #endif
+
     func testRestoreUsesBackupBytesWhenTargetPathIsAnExistingDirectory() async throws {
         let bytes = Data("trusted backup bytes".utf8)
         let attachment = try await mediaStorage.saveMediaFile(
@@ -549,6 +645,14 @@ private actor InsertRaceJournalStorage: JournalStorageProtocol {
 
     func saveEntry(_ entry: JournalEntry) async throws {
         try await base.saveEntry(entry)
+    }
+
+    func updateEntryIfPresent(_ entry: JournalEntry) async throws -> Bool {
+        try await base.updateEntryIfPresent(entry)
+    }
+
+    func appendAttachmentIfPresent(_ attachment: MediaAttachment, toEntryID id: UUID) async throws -> JournalEntry? {
+        try await base.appendAttachmentIfPresent(attachment, toEntryID: id)
     }
 
     func insertEntriesIfAbsentAtomically(_ entries: [JournalEntry]) async throws -> Set<UUID> {

@@ -86,7 +86,7 @@ def test_r3_003() -> None:
     src = read("Sources/R0lling/Glasses/MetaGlassesAdapter.swift")
     check(
         "SDK gate",
-        "canImport(MetaWearablesDAT)" in src and "4002" in src,
+        "canImport(MWDATCore)" in src and "canImport(MWDATCamera)" in src and "4002" in src,
         "non-sim without SDK throws 4002",
     )
     check(

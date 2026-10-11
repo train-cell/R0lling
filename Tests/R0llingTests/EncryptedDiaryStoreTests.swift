@@ -99,6 +99,96 @@ final class EncryptedDiaryStoreTests: XCTestCase {
         }
     }
 
+    func testOversizedEncryptedDocumentIsRejectedAndPreserved() async throws {
+        let authorization = await store.testingAuthorization()
+        let oversizedBytes = Data(repeating: 0x4A, count: EncryptedDiaryStore.maximumEncryptedDocumentBytes + 1)
+        try oversizedBytes.write(to: storageURL, options: .atomic)
+
+        do {
+            _ = try await store.entries(using: authorization)
+            XCTFail("Oversized encrypted documents must fail before allocation/decryption")
+        } catch {
+            XCTAssertEqual((error as NSError).code, 17)
+            XCTAssertEqual(try Data(contentsOf: storageURL), oversizedBytes)
+        }
+
+        do {
+            _ = try await store.save(content: "replacement", using: authorization)
+            XCTFail("A write must not replace an oversized unreadable document")
+        } catch {
+            XCTAssertEqual(try Data(contentsOf: storageURL), oversizedBytes)
+        }
+    }
+
+    func testPrivateDiaryRejectsOversizedTextAndDecisionLists() async throws {
+        let authorization = await store.testingAuthorization()
+
+        do {
+            _ = try await store.save(
+                content: String(repeating: "x", count: EncryptedDiaryStore.maximumEntryContentBytes + 1),
+                using: authorization
+            )
+            XCTFail("Oversized diary text must be rejected")
+        } catch {
+            XCTAssertEqual((error as NSError).code, 1)
+        }
+
+        do {
+            _ = try await store.sealFutureLetter(
+                titleHint: "Future",
+                unlockDate: Date().addingTimeInterval(3_600),
+                payloadText: String(repeating: "x", count: EncryptedDiaryStore.maximumFutureLetterPayloadBytes + 1),
+                using: authorization
+            )
+            XCTFail("Oversized future letter must be rejected")
+        } catch {
+            XCTAssertEqual((error as NSError).code, 8)
+        }
+
+        let tooManyAssumptions = DecisionRecord(
+            decisionText: "Decision",
+            coreAssumptions: Array(repeating: "Assumption", count: EncryptedDiaryStore.maximumDecisionAssumptions + 1),
+            confidencePercent: 50
+        )
+        do {
+            _ = try await store.saveDecision(tooManyAssumptions, using: authorization)
+            XCTFail("Too many decision assumptions must be rejected")
+        } catch {
+            XCTAssertEqual((error as NSError).code, 10)
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: storageURL.path))
+    }
+
+    func testPrivateDiaryRejectsAggregateDocumentGrowthAndPreservesPriorCiphertext() async throws {
+        let authorization = await store.testingAuthorization()
+        let largeAssumptions = Array(
+            repeating: String(repeating: "a", count: EncryptedDiaryStore.maximumDecisionAssumptionBytes),
+            count: EncryptedDiaryStore.maximumDecisionAssumptions
+        )
+
+        for index in 0..<16 {
+            let decision = DecisionRecord(
+                decisionText: "Decision \(index)",
+                coreAssumptions: largeAssumptions,
+                confidencePercent: 50
+            )
+            if index < 15 {
+                _ = try await store.saveDecision(decision, using: authorization)
+                continue
+            }
+
+            let priorCiphertext = try Data(contentsOf: storageURL)
+            do {
+                _ = try await store.saveDecision(decision, using: authorization)
+                XCTFail("The encrypted document must stop at its total size limit")
+            } catch {
+                XCTAssertEqual((error as NSError).code, 19)
+                XCTAssertEqual(try Data(contentsOf: storageURL), priorCiphertext)
+            }
+        }
+    }
+
     func testFutureLettersPersistAndRejectPastUnlockDate() async throws {
         let authorization = await store.testingAuthorization()
         let now = Date()

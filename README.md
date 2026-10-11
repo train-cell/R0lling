@@ -4,7 +4,7 @@ Clip the moment. Keep the day.
 
 R0lling is a personal journal implemented as a Swift package with an iOS app host. Notes and media are stored locally. Linking an Obsidian vault is an explicit setup action; while linked, journal saves and edits export automatically. AI requests remain user-triggered.
 
-On iOS, journal writes, media imports, and restored media use Apple's file protection until the first unlock after a device restart; existing journal/media files are migrated when loaded or accessed. This is OS-managed encryption at rest, not app-level encryption; backup bundles remain plaintext.
+On iOS, journal writes, media imports, restored media, and temporary backup staging files use Apple's file protection until the first unlock after a device restart; existing journal/media files are migrated when loaded or accessed. This is OS-managed protection, not app-level encryption. Backup contents remain plaintext at the application level, and exported copies follow the selected Files provider's protection policy.
 
 The package uses Swift tools 5.10 and Swift 5 language mode with StrictConcurrency checking. The iOS host targets iOS 17.2. These settings do not establish Swift 6 concurrency compliance.
 
@@ -14,9 +14,9 @@ The table describes source paths in this checkout. It does not mean the Apple ru
 
 | Feature | Current status |
 |---|---|
-| Journal CRUD, search, date correction, media viewer | Implemented; corrupted/unsupported JSON fails closed without overwriting it |
+| Journal CRUD, search, date correction, media viewer | Implemented; corrupted/unsupported JSON fails closed without overwriting it; imported media keeps its source basename for display while bytes use generated sandbox names |
 | Obsidian export | Files picker, bookmarks, Markdown, attachment copies, conflict sidecars; export errors propagate |
-| Backup/restore | Plain JSON + media + optional Agent memory; copy errors propagate; no backup encryption |
+| Backup/restore | Plain JSON + media + optional Agent memory; copy errors propagate; media copies preserve the 50 MiB free-space reserve; temporary staging uses iOS file protection; no backup encryption |
 | AI chat | Direct HTTPS or Hermes gateway; selected endpoint is validated on save; Keychain credentials can be removed from Settings; settings persisted |
 | Chat context | Journal and Agent memory OFF by default; up to five recent entries; optional manually entered note location is sent only with its separate opt-in |
 | Explicit AI summary/recall | Sends the selected entries to the configured provider; summary context is limited to five |
@@ -34,7 +34,7 @@ The table describes source paths in this checkout. It does not mean the Apple ru
 | Decision journal | Encrypted decisions and assumptions with confidence tracking and a due-date-gated 90-day review. Store APIs require the same post-biometric authorization capability; the Keychain item is not itself biometry-bound or Secure Enclave-backed. Excluded from OS backups |
 | Shamir / secure zeroization | Core 2-of-3 split/recovery API with authenticated shares; no share-delivery UI or independent security audit. Secure zeroization remains unavailable |
 
-AI actions send data to a provider. Hermes is a configurable gateway, not an enforced air gap. There is no outbound byte counter or firewall enforcement. The app does not automatically redact journal text for PII.
+AI actions send data to a provider. Hermes is a configurable gateway, not an enforced air gap. Each Direct/Hermes request has a 10 MiB JSON body cap (and vision input has a 7 MiB aggregate JPEG cap) before submission, but there is no cumulative outbound-traffic counter or firewall enforcement. The shared request builder redacts common email, mod-97-checksum-valid IBAN, Luhn-valid card, US SSN, contextual Greek AFM, and phone patterns from outbound text, including journal content. This best-effort pattern scrubber does not inspect image pixels or infer names and free-form addresses, and cannot guarantee complete PII removal.
 
 ## Evidence and limitations
 

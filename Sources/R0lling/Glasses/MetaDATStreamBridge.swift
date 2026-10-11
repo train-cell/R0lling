@@ -1,14 +1,17 @@
 import Foundation
 
-#if canImport(MetaWearablesDAT)
-import MetaWearablesDAT
+#if canImport(MWDATCore) && canImport(MWDATCamera)
+import MWDATCore
+import MWDATCamera
 #endif
 
 /// Γέφυρα προς το Meta Wearables DAT SDK.
 ///
-/// Σε builds **χωρίς** `MetaWearablesDAT` (Windows SPM / CI χωρίς vendor), κάθε live API
-/// πετάει σαφές error — **ποτέ** ψευδή σύνδεση. Σε Mac με DAT linked (`#if canImport`),
-/// τα hooks γεμίζουν με πραγματικές session κλήσεις (βλ. `docs/LANE_CLIP_META.md`).
+/// Builds χωρίς και τα δύο DAT modules (`MWDATCore` + `MWDATCamera`) απορρίπτουν
+/// κάθε live αίτημα με σαφές error.
+/// Η εισαγωγή του SDK από μόνη της δεν ενεργοποιεί τη σύνδεση: τα session, video,
+/// audio και IMU hooks παραμένουν stubs και το real mode είναι απενεργοποιημένο.
+/// Δες `docs/LANE_CLIP_META.md` για την απαιτούμενη υλοποίηση και επαλήθευση.
 public enum MetaDATStreamBridge {
     /// Module presence does not imply a working camera/session integration.
     public static let einaiLiveYlopoiimeno = false
@@ -19,9 +22,9 @@ public enum MetaDATStreamBridge {
     /// Session ανοίγει μόνο με πραγματικό device token / Dev Mode.
     public static let kodikosSessionApotyxia: Int = 4011
 
-    /// `true` μόνο όταν το MetaWearablesDAT module είναι importable.
+    /// `true` μόνο όταν είναι importable και το `MWDATCore` και το `MWDATCamera`.
     public static var einaiSDKDiathesimo: Bool {
-        #if canImport(MetaWearablesDAT)
+        #if canImport(MWDATCore) && canImport(MWDATCamera)
         return true
         #else
         return false
@@ -48,27 +51,17 @@ public enum MetaDATStreamBridge {
         }
     }
 
-    /// Ανοίγει live streaming session στα Gen 2.
-    /// - Throws: `4010` χωρίς SDK· `4011` σε αποτυχία pairing/session.
+    /// Προσπαθεί να ανοίξει live streaming session στα Gen 2.
+    /// Αυτή η υλοποίηση δεν ανοίγει session και αποτυγχάνει κλειστά.
+    /// - Throws: `4010` χωρίς SDK· `4011` όταν το SDK υπάρχει αλλά το hook δεν είναι wired.
     public static func anoixeLiveSession() async throws -> LiveSessionHandle {
-        #if canImport(MetaWearablesDAT)
-        // MARK: DAT wiring point (Mac + Gen 2)
-        // Αντικατέστησε με: Wearables session start / CameraAccess startStreaming
-        // σύμφωνα με το επίσημο sample CameraAccess του meta-wearables-dat-ios.
-        //
-        // Παράδειγμα δομής (ψευδοκώδικας — συμπλήρωσε με πραγματικά DAT types):
-        //   let session = try await WearablesSession.shared.connect()
-        //   επιβεβαίωσε codec SDK/device και συμβατότητα remux πριν ξεκινήσει το stream
-        //   η τρέχουσα H264AnnexBRemuxer δέχεται H.264 Annex-B, όχι HEVC
-        //   return LiveSessionHandle(deviceName: session.device.name, ...)
-        //
-        // Μέχρι να γίνει wire με πραγματικά σύμβολα SDK, ρίχνουμε 4011 ώστε
-        // να μην εμφανίζεται ψευδής «connected» χωρίς επιτυχή DAT call.
+        #if canImport(MWDATCore) && canImport(MWDATCamera)
+        // Do not report connected merely because the vendor module can be imported.
         throw NSError(
             domain: errorDomain,
             code: kodikosSessionApotyxia,
             userInfo: [NSLocalizedDescriptionKey:
-                "MetaWearablesDAT είναι linked αλλά το live session hook δεν έχει γίνει wire ακόμα. " +
+                "MWDATCore/MWDATCamera είναι linked αλλά το live session hook δεν έχει γίνει wire ακόμα. " +
                 "Ολοκλήρωσε και έλεγξε το session/frame bridge πριν ενεργοποιήσεις real mode — " +
                 "docs/LANE_CLIP_META.md §3."]
         )
@@ -77,8 +70,7 @@ public enum MetaDATStreamBridge {
             domain: errorDomain,
             code: kodikosSDKMiDiathesimo,
             userInfo: [NSLocalizedDescriptionKey:
-                "Το Meta Wearables DAT SDK δεν είναι συνδεδεμένο σε αυτό το build " +
-                "(canImport(MetaWearablesDAT) == false). " +
+                "Τα Meta Wearables DAT modules MWDATCore και MWDATCamera δεν είναι και τα δύο συνδεδεμένα σε αυτό το build. " +
                 "Ενεργοποίησε Simulation Mode ή πρόσθεσε το SPM dependency στο Mac — docs/LANE_CLIP_META.md."]
         )
         #endif
@@ -86,15 +78,14 @@ public enum MetaDATStreamBridge {
 
     /// Κλείνει live session αν υπάρχει.
     public static func kleiseLiveSession() async {
-        #if canImport(MetaWearablesDAT)
-        // Wire: session.camera.stopStreaming() + disconnect
+        #if canImport(MWDATCore) && canImport(MWDATCamera)
+        // No DAT session is opened by this stub, so there is nothing to close.
         #endif
     }
 
-    /// Διαβάζει ένα compressed video frame από το DAT stream (Annex-B ή length-prefixed).
-    /// - Returns: `nil` αν δεν υπάρχει νέο frame (poll miss).
+    /// DAT video-frame hook. It currently fails closed in every build configuration.
     public static func diavaseEpomenoVideoFrame() async throws -> BufferedSample? {
-        #if canImport(MetaWearablesDAT)
+        #if canImport(MWDATCore) && canImport(MWDATCamera)
         throw NSError(
             domain: errorDomain,
             code: kodikosSessionApotyxia,
@@ -105,33 +96,43 @@ public enum MetaDATStreamBridge {
         throw NSError(
             domain: errorDomain,
             code: kodikosSDKMiDiathesimo,
-            userInfo: [NSLocalizedDescriptionKey: "DAT frame pull αδύνατο χωρίς MetaWearablesDAT."]
+            userInfo: [NSLocalizedDescriptionKey: "DAT frame pull αδύνατο χωρίς τα MWDATCore/MWDATCamera modules."]
         )
         #endif
     }
 
     /// Διαβάζει συγχρονισμένο audio sample από τη ροή των γυαλιών (αν παρέχεται).
     public static func diavaseEpomenoAudioSample() async throws -> BufferedSample? {
-        #if canImport(MetaWearablesDAT)
-        return nil
+        #if canImport(MWDATCore) && canImport(MWDATCamera)
+        throw NSError(
+            domain: errorDomain,
+            code: kodikosSessionApotyxia,
+            userInfo: [NSLocalizedDescriptionKey:
+                "DAT audio capture δεν έχει γίνει wire. Το SDK module υπάρχει, αλλά δεν παρέχεται live audio sample."]
+        )
         #else
         throw NSError(
             domain: errorDomain,
             code: kodikosSDKMiDiathesimo,
-            userInfo: [NSLocalizedDescriptionKey: "DAT audio pull αδύνατο χωρίς MetaWearablesDAT."]
+            userInfo: [NSLocalizedDescriptionKey: "DAT audio pull αδύνατο χωρίς τα MWDATCore/MWDATCamera modules."]
         )
         #endif
     }
 
     /// Διαβάζει IMU sample (pitch/roll/yaw) αν το SDK το εκθέτει.
     public static func diavaseEpomenoIMU() async throws -> HeadGestureDetector.IMUSample? {
-        #if canImport(MetaWearablesDAT)
-        return nil
+        #if canImport(MWDATCore) && canImport(MWDATCamera)
+        throw NSError(
+            domain: errorDomain,
+            code: kodikosSessionApotyxia,
+            userInfo: [NSLocalizedDescriptionKey:
+                "DAT IMU capture δεν έχει γίνει wire. Το SDK module υπάρχει, αλλά δεν παρέχεται live IMU sample."]
+        )
         #else
         throw NSError(
             domain: errorDomain,
             code: kodikosSDKMiDiathesimo,
-            userInfo: [NSLocalizedDescriptionKey: "DAT IMU pull αδύνατο χωρίς MetaWearablesDAT."]
+            userInfo: [NSLocalizedDescriptionKey: "DAT IMU pull αδύνατο χωρίς τα MWDATCore/MWDATCamera modules."]
         )
         #endif
     }

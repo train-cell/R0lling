@@ -211,6 +211,28 @@ def test_a03_media_attach_display() -> None:
         "PHPicker via PhotosUI",
     )
     check(
+        "Photos staging preflight",
+        "validatePhotosStagingSource" in picker
+        and "requiredFreeSpace(payloadBytes: payloadBytes)" in media
+        and "testPhotosImportPreflightChecksRegularFileAndCapacityForBothCopies" in tests,
+        "regular file and two-copy capacity checked before Photos temp copy",
+    )
+    check(
+        "Playable video import allowlist",
+        'ext != "avi"' in importer
+        and 'ext != "mkv"' in importer
+        and '"mp4", "mov", "m4v"' in importer
+        and "testImporterRejectsContainersWithoutReliableAVPlayerSupportEvenWithMovieUTType" in tests,
+        "AVI/MKV rejected; accepted video containers are explicit",
+    )
+    check(
+        "Playback failure is visible",
+        "asset.load(.isPlayable)" in components
+        and "failedToPlayToEndTimeNotification" in components
+        and "playbackErrorMessage" in components,
+        "AVFoundation preflight and runtime playback errors reach the viewer",
+    )
+    check(
         "fileImporter audio/video",
         "fileImporter" in picker and ".audio" in picker,
         "Files path for audio",

@@ -23,62 +23,67 @@ public struct R0llingApp: App {
 public struct MainTabView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedDestination: MainDestination = .today
     @State private var isQuickActionsPresented = false
-    @State private var pendingQuickAction: QuickSheetAction?
     @State private var pendingTodayQuickAction: TodayQuickAction?
+    @AccessibilityFocusState private var quickActionAccessibilityFocus: QuickActionAccessibilityFocus?
 
     private let primaryDestinations: [MainDestination] = [.today, .journal, .fitness, .wellness]
 
     public var body: some View {
-        destinationView
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                floatingNavigation
+        ZStack(alignment: .bottom) {
+            destinationView
+            quickActionsOverlay
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            floatingNavigation
+        }
+        .background(R0llingTheme.bgPrimary.ignoresSafeArea())
+        .onChange(of: scenePhase) { _, newPhase in
+            // A07: background / lock / foreground → honest pause/resume policy.
+            Task {
+                await appState.handleScenePhaseChange(newPhase)
             }
-            .background(R0llingTheme.bgPrimary.ignoresSafeArea())
-            .onChange(of: scenePhase) { _, newPhase in
-                // A07: background / lock / foreground → honest pause/resume policy.
-                Task {
-                    await appState.handleScenePhaseChange(newPhase)
-                }
+        }
+        .overlay(alignment: .top) {
+            if let toast = appState.toastMessage {
+                Text(toast)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(R0llingTheme.textPrimary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 11)
+                    .background(R0llingTheme.bgElevated, in: Capsule())
+                    .overlay(Capsule().stroke(R0llingTheme.borderSubtle, lineWidth: 1))
+                    .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .padding(.top, 10)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(100)
             }
-            .sheet(isPresented: $isQuickActionsPresented, onDismiss: applyPendingQuickAction) {
-                quickActionsSheet
-                    .presentationDetents(quickActionsSheetDetents)
-                    .presentationContentInteraction(.scrolls)
-                    .presentationDragIndicator(.visible)
-                    .presentationBackground(R0llingTheme.bgSurface)
+        }
+        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: isQuickActionsPresented)
+        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: appState.toastMessage)
+        .onChange(of: isQuickActionsPresented) { _, isPresented in
+            Task { @MainActor in
+                await Task.yield()
+                quickActionAccessibilityFocus = isPresented ? .action(QuickAction.allCases[0]) : .launcher
             }
-            .overlay(alignment: .top) {
-                if let toast = appState.toastMessage {
-                    Text(toast)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(R0llingTheme.textPrimary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 11)
-                        .background(R0llingTheme.bgElevated, in: Capsule())
-                        .overlay(Capsule().stroke(R0llingTheme.borderSubtle, lineWidth: 1))
-                        .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
-                        .padding(.top, 10)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .zIndex(100)
-                }
-            }
-            .animation(.spring(response: 0.32, dampingFraction: 0.86), value: appState.toastMessage)
+        }
     }
 
     @ViewBuilder
     private var destinationView: some View {
         switch selectedDestination {
         case .today:
-            TodayView(quickAction: $pendingTodayQuickAction)
+            TodayView(
+                quickAction: $pendingTodayQuickAction,
+                onOpenSettings: { selectedDestination = .settings },
+                onOpenHealth: { selectedDestination = .wellness }
+            )
         case .journal:
             CalendarView()
         case .fitness:
-            FitnessView()
+            FitnessView(onOpenQuickActions: openQuickActions)
         case .wellness:
             BiohackingHubView()
         case .vault:
@@ -122,9 +127,13 @@ public struct MainTabView: View {
             .shadow(color: .black.opacity(0.24), radius: 12, x: 0, y: 4)
 
             Button {
-                isQuickActionsPresented = true
+                if isQuickActionsPresented {
+                    closeQuickActions()
+                } else {
+                    openQuickActions()
+                }
             } label: {
-                Image(systemName: "plus")
+                Image(systemName: isQuickActionsPresented ? "xmark" : "plus")
                     .font(.system(size: 22, weight: .medium))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .frame(width: 58, height: 58)
@@ -150,7 +159,10 @@ public struct MainTabView: View {
                     .shadow(color: .black.opacity(0.24), radius: 12, x: 0, y: 4)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Περισσότερες λειτουργίες")
+            .accessibilityLabel(isQuickActionsPresented ? "Κλείσιμο γρήγορων ενεργειών" : "Περισσότερες λειτουργίες")
+            .accessibilityHint(isQuickActionsPresented ? "Κλείνει το μενού ενεργειών." : "Ανοίγει το μενού ενεργειών.")
+            .accessibilityAddTraits(isQuickActionsPresented ? .isSelected : [])
+            .accessibilityFocused($quickActionAccessibilityFocus, equals: .launcher)
         }
         .padding(.horizontal, 12)
         .padding(.top, 8)
@@ -166,10 +178,39 @@ public struct MainTabView: View {
         }
     }
 
+    @ViewBuilder
+    private var quickActionsOverlay: some View {
+        if isQuickActionsPresented {
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(0.58)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: closeQuickActions)
+                    .accessibilityLabel("Κλείσιμο γρήγορων ενεργειών")
+                    .accessibilityAddTraits(.isButton)
+                    .transition(.opacity)
+
+                GeometryReader { geometry in
+                    quickActionsPanel
+                        .frame(maxWidth: min(520, max(0, geometry.size.width - 24)))
+                        .frame(maxHeight: min(520, max(1, geometry.size.height - 16)))
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 8)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            .zIndex(1)
+            .transition(.opacity)
+            .accessibilityAddTraits(.isModal)
+        }
+    }
+
     private func destinationButton(_ destination: MainDestination) -> some View {
         let isSelected = selectedDestination == destination
         return Button {
             selectedDestination = destination
+            if isQuickActionsPresented { closeQuickActions() }
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: destination.symbol)
@@ -199,56 +240,48 @@ public struct MainTabView: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    private var quickActionsSheet: some View {
+    private var quickActionsPanel: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Περισσότερα")
-                    .font(.title3.weight(.semibold))
+                Text("Γρήγορες ενέργειες")
+                    .font(.headline.weight(.semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                 Spacer()
-                Button("Κλείσιμο", systemImage: "xmark") {
-                    isQuickActionsPresented = false
+                Button(action: closeQuickActions) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(R0llingTheme.textPrimary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
                 }
-                .labelStyle(.iconOnly)
-                .accessibilityLabel("Κλείσιμο")
+                .buttonStyle(.plain)
+                .accessibilityLabel("Κλείσιμο γρήγορων ενεργειών")
+                .keyboardShortcut(.cancelAction)
+                .accessibilityFocused($quickActionAccessibilityFocus, equals: .close)
             }
 
             ScrollView {
                 LazyVGrid(columns: quickActionGridColumns, spacing: 12) {
-                    ForEach(QuickSheetAction.allCases, id: \.self) { action in
+                    ForEach(QuickAction.allCases, id: \.self) { action in
                         quickActionButton(action)
                     }
                 }
             }
         }
         .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .r0llingBevelSurface(cornerRadius: 24)
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    private var quickActionsSheetDetents: Set<PresentationDetent> {
-        if dynamicTypeSize.isAccessibilitySize || verticalSizeClass == .compact {
-            return [.large]
-        }
-        if horizontalSizeClass == .compact {
-            return [.medium, .large]
-        }
-        return [.height(350), .large]
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Γρήγορες ενέργειες")
     }
 
     private var quickActionGridColumns: [GridItem] {
-        let count = dynamicTypeSize.isAccessibilitySize
-            ? 1
-            : (horizontalSizeClass == .compact ? 2 : 3)
+        let count = dynamicTypeSize.isAccessibilitySize ? 1 : 3
         return Array(repeating: GridItem(.flexible(), spacing: 12), count: count)
     }
 
-    private func quickActionButton(_ action: QuickSheetAction) -> some View {
+    private func quickActionButton(_ action: QuickAction) -> some View {
         Button {
-            pendingQuickAction = action
-            isQuickActionsPresented = false
+            openQuickAction(action)
         } label: {
             VStack(spacing: 8) {
                 Image(systemName: action.symbol)
@@ -267,11 +300,23 @@ public struct MainTabView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(action.title)
+        .accessibilityFocused($quickActionAccessibilityFocus, equals: .action(action))
     }
 
-    private func applyPendingQuickAction() {
-        guard let action = pendingQuickAction else { return }
-        pendingQuickAction = nil
+    private func closeQuickActions() {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+            isQuickActionsPresented = false
+        }
+    }
+
+    private func openQuickActions() {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+            isQuickActionsPresented = true
+        }
+    }
+
+    private func openQuickAction(_ action: QuickAction) {
+        closeQuickActions()
         switch action {
         case .newNote:
             selectedDestination = .today
@@ -283,8 +328,6 @@ public struct MainTabView: View {
             selectedDestination = .assistant
         case .studio:
             selectedDestination = .studio
-        case .journal:
-            selectedDestination = .journal
         case .vault:
             selectedDestination = .vault
         case .settings:
@@ -298,12 +341,11 @@ public enum TodayQuickAction: Equatable {
     case importFile
 }
 
-private enum QuickSheetAction: CaseIterable, Hashable {
+private enum QuickAction: CaseIterable, Hashable {
     case newNote
     case importFile
     case assistant
     case studio
-    case journal
     case vault
     case settings
 
@@ -313,7 +355,6 @@ private enum QuickSheetAction: CaseIterable, Hashable {
         case .importFile: "Εισαγωγή αρχείου"
         case .assistant: "Βοηθός"
         case .studio: "Studio"
-        case .journal: "Ημερολόγιο"
         case .vault: "Ιδιωτικό vault"
         case .settings: "Ρυθμίσεις"
         }
@@ -325,11 +366,16 @@ private enum QuickSheetAction: CaseIterable, Hashable {
         case .importFile: "folder.badge.plus"
         case .assistant: "sparkles"
         case .studio: "brain.head.profile"
-        case .journal: "book.closed.fill"
         case .vault: "lock.shield.fill"
         case .settings: "gearshape.fill"
         }
     }
+}
+
+private enum QuickActionAccessibilityFocus: Hashable {
+    case launcher
+    case close
+    case action(QuickAction)
 }
 
 private enum MainDestination: Hashable {

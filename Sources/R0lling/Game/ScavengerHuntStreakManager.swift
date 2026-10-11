@@ -44,7 +44,23 @@ public final class ScavengerHuntStreakManager: @unchecked Sendable {
     }
 
     public var currentStreak: Int {
-        return streakData.currentStreak
+        currentStreak(asOf: Date(), timeZone: .current)
+    }
+
+    /// Returns the persisted streak only while its last completion is today or yesterday
+    /// in the requested calendar/time zone. A missed local calendar day expires the streak
+    /// immediately without rewriting its history or best-streak record.
+    public func currentStreak(asOf date: Date = Date(), timeZone: TimeZone = .current) -> Int {
+        guard let lastCompletedDateKey = streakData.lastCompletedDateKey else { return 0 }
+        let todayKey = Self.dateKey(for: date, timeZone: timeZone)
+        guard lastCompletedDateKey != todayKey else { return streakData.currentStreak }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: date) ?? date
+        return lastCompletedDateKey == Self.dateKey(for: yesterday, timeZone: timeZone)
+            ? streakData.currentStreak
+            : 0
     }
 
     public var bestStreak: Int {
@@ -59,24 +75,19 @@ public final class ScavengerHuntStreakManager: @unchecked Sendable {
     /// `didPersist` = false αν υπάρχει corrupt persisted state ή το UserDefaults encode απέτυχε.
     public func recordMissionCompleted(date: Date = Date(), timeZone: TimeZone = .current) -> (newStreak: Int, newlyUnlockedBadge: String?, didPersist: Bool) {
         guard canPersist else {
-            return (streakData.currentStreak, nil, false)
+            return (currentStreak(asOf: date, timeZone: timeZone), nil, false)
         }
 
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = timeZone
-        formatter.dateFormat = "yyyy-MM-dd"
-        let todayKey = formatter.string(from: date)
+        let todayKey = Self.dateKey(for: date, timeZone: timeZone)
 
         guard streakData.lastCompletedDateKey != todayKey else {
-            return (streakData.currentStreak, nil, true) // Ήδη ολοκληρώθηκε σήμερα
+            return (currentStreak(asOf: date, timeZone: timeZone), nil, true) // Ήδη ολοκληρώθηκε σήμερα
         }
 
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         let yesterday = calendar.date(byAdding: .day, value: -1, to: date) ?? date
-        let yesterdayKey = formatter.string(from: yesterday)
+        let yesterdayKey = Self.dateKey(for: yesterday, timeZone: timeZone)
 
         if streakData.lastCompletedDateKey == yesterdayKey {
             streakData.currentStreak += 1
@@ -117,5 +128,14 @@ public final class ScavengerHuntStreakManager: @unchecked Sendable {
             print("[ScavengerHunt] Persist failed: \(error.localizedDescription)")
             return false
         }
+    }
+
+    private static func dateKey(for date: Date, timeZone: TimeZone) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
 }

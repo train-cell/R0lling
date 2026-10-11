@@ -32,6 +32,7 @@ final class MediaStorageTests: XCTestCase {
         )
 
         XCTAssertEqual(attachment.mediaType, .photo)
+        XCTAssertEqual(attachment.originalFilename, "travel.jpg")
         XCTAssertEqual(attachment.byteSize, Int64(jpegBytes.count))
         XCTAssertTrue(attachment.relativePath.hasPrefix("Photos/"))
         XCTAssertTrue(attachment.relativePath.hasSuffix(".jpg"))
@@ -91,6 +92,18 @@ final class MediaStorageTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
     }
 
+    func testStoredOriginalFilenameIsOnlyTheSuppliedPathLeaf() async throws {
+        let attachment = try await mediaStorage.saveMediaFile(
+            data: Data([0xFF, 0xD8, 0xFF, 0xD9]),
+            originalFilename: "Trips\\2026\\travel.jpg",
+            mediaType: .photo
+        )
+
+        XCTAssertEqual(attachment.originalFilename, "travel.jpg")
+        XCTAssertFalse(attachment.originalFilename.contains("\\"))
+        XCTAssertFalse(attachment.originalFilename.contains("/"))
+    }
+
     func testFileBackedImportCopiesAssetIntoSandbox() async throws {
         let sourceDirectory = tempDirectory.appendingPathComponent("External", isDirectory: true)
         try FileManager.default.createDirectory(at: sourceDirectory, withIntermediateDirectories: true)
@@ -105,6 +118,7 @@ final class MediaStorageTests: XCTestCase {
         )
 
         XCTAssertEqual(attachment.byteSize, Int64(sourceBytes.count))
+        XCTAssertEqual(attachment.originalFilename, "recording.mov")
         XCTAssertTrue(attachment.relativePath.hasPrefix("Videos/"))
         XCTAssertTrue(attachment.relativePath.hasSuffix(".mov"))
         let sandboxURL = try mediaStorage.getMediaFileURL(relativePath: attachment.relativePath)
@@ -125,6 +139,37 @@ final class MediaStorageTests: XCTestCase {
         } catch {
             XCTFail("Αναμενόταν MediaApothikeusiError, πήρε \(error)")
         }
+    }
+
+    func testInMemoryMediaReservesPayloadAndMinimumFreeSpace() async throws {
+        let payload = Data(repeating: 0x4A, count: 1024)
+        let required = Int64(payload.count) + ELAXISTOS_ELEUTHEROS_XOROS_BYTES
+        let insufficient = MediaStorageService(
+            baseDirectory: tempDirectory.appendingPathComponent("Insufficient"),
+            availableFreeDiskSpaceProvider: { required - 1 }
+        )
+
+        do {
+            _ = try await insufficient.saveMediaFile(
+                data: payload,
+                originalFilename: "too-large.jpg",
+                mediaType: .photo
+            )
+            XCTFail("In-memory media writes must reserve the payload plus the free-space margin")
+        } catch let error as MediaApothikeusiError {
+            XCTAssertEqual(error, .anepikisXoros(diathesima: required - 1, apaitoumena: required))
+        }
+
+        let sufficient = MediaStorageService(
+            baseDirectory: tempDirectory.appendingPathComponent("Sufficient"),
+            availableFreeDiskSpaceProvider: { required }
+        )
+        let attachment = try await sufficient.saveMediaFile(
+            data: payload,
+            originalFilename: "at-limit.jpg",
+            mediaType: .photo
+        )
+        XCTAssertEqual(attachment.byteSize, Int64(payload.count))
     }
 
     func testPathTraversalRejected() async throws {
@@ -205,6 +250,14 @@ final class MediaStorageTests: XCTestCase {
             .video
         )
         XCTAssertEqual(
+            try JournalMediaImporter.mediaType(giaOnomaArxeiou: "clip.mp4"),
+            .video
+        )
+        XCTAssertEqual(
+            try JournalMediaImporter.mediaType(giaOnomaArxeiou: "clip.m4v"),
+            .video
+        )
+        XCTAssertEqual(
             try JournalMediaImporter.mediaType(giaOnomaArxeiou: "voice.m4a"),
             .audio
         )
@@ -214,6 +267,41 @@ final class MediaStorageTests: XCTestCase {
         XCTAssertThrowsError(
             try JournalMediaImporter.mediaType(giaOnomaArxeiou: "notes.docx")
         )
+    }
+
+    func testImporterRejectsContainersWithoutReliableAVPlayerSupportEvenWithMovieUTType() {
+        for filename in ["clip.avi", "clip.mkv"] {
+            XCTAssertThrowsError(
+                try JournalMediaImporter.mediaType(
+                    giaOnomaArxeiou: filename,
+                    utTypeIdentifier: "public.movie"
+                ),
+                filename
+            )
+        }
+    }
+
+    func testPhotosImportPreflightChecksRegularFileAndCapacityForBothCopies() throws {
+        let sourceURL = tempDirectory.appendingPathComponent("photo.jpg")
+        try Data(repeating: 0x2A, count: 1024).write(to: sourceURL)
+        let required = try XCTUnwrap(MediaImportPreflight.requiredFreeSpace(payloadBytes: 1024))
+
+        XCTAssertEqual(
+            try MediaImportPreflight.validatePhotosStagingSource(at: sourceURL, availableBytes: required),
+            1024
+        )
+        XCTAssertThrowsError(
+            try MediaImportPreflight.validatePhotosStagingSource(at: sourceURL, availableBytes: required - 1)
+        ) { error in
+            XCTAssertEqual(
+                error as? MediaApothikeusiError,
+                .anepikisXoros(diathesima: required - 1, apaitoumena: required)
+            )
+        }
+        XCTAssertThrowsError(
+            try MediaImportPreflight.validatePhotosStagingSource(at: tempDirectory, availableBytes: required)
+        )
+        XCTAssertNil(MediaImportPreflight.requiredFreeSpace(payloadBytes: Int64.max))
     }
 
     func testVisionImageSanitizerRemovesGPSAndEXIFButKeepsOrientation() throws {

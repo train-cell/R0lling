@@ -5,7 +5,7 @@ import Foundation
 /// Τα `SUPER_FEATURE_*_FEED_WIRED` flags στο `AppState` ελέγχουν μόνο αν τα triggers
 /// παράγουν auto-clip toasts. Η ροή δεδομένων περνάει πάντα από αυτό το protocol
 /// ώστε το flip flag = 100% χωρίς νέο wiring.
-public protocol GlassesSensorFeedSink: AnyObject {
+public protocol GlassesSensorFeedSink: AnyObject, Sendable {
     /// RMS / dBFS στάθμη ήχου από mic stream (γυαλιά ή iPhone fallback).
     func receiveAcousticLevel(decibels: Float)
     /// IMU δείγμα κεφαλής από γυαλιά.
@@ -45,11 +45,43 @@ public enum GlassesConnectionState: Sendable, Equatable {
         return false
     }
 
+    public var isConnected: Bool {
+        switch self {
+        case .connected, .streaming, .paused:
+            return true
+        case .disconnected, .searching, .connecting, .error:
+            return false
+        }
+    }
+
+    public var isConnectionAttemptInProgress: Bool {
+        switch self {
+        case .searching, .connecting:
+            return true
+        case .disconnected, .connected, .streaming, .paused, .error:
+            return false
+        }
+    }
+
     public var isPaused: Bool {
         if case .paused = self {
             return true
         }
         return false
+    }
+}
+
+enum GlassesPrimaryAction: Equatable {
+    case waitForConnection
+    case startStreaming
+    case stopStreaming
+    case connectThenStartStreaming
+
+    static func resolve(isStreaming: Bool, state: GlassesConnectionState) -> Self {
+        if isStreaming || state.isLive { return .stopStreaming }
+        if state.isConnectionAttemptInProgress { return .waitForConnection }
+        if state.isConnected { return .startStreaming }
+        return .connectThenStartStreaming
     }
 }
 

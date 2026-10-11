@@ -34,6 +34,92 @@ final class JournalStorageTests: XCTestCase {
         XCTAssertEqual(retrieved?.tags, ["test", "dev"])
     }
 
+    func testOversizedJournalIsRejectedWithoutChangingOriginalFile() async throws {
+        let fileURL = tempDirectory.appendingPathComponent("oversized-journal.json")
+        let sizeLimit = 256
+        let marker = Data([0x7B])
+        XCTAssertTrue(FileManager.default.createFile(atPath: fileURL.path, contents: marker))
+        let file = try FileHandle(forWritingTo: fileURL)
+        try file.truncate(atOffset: UInt64(sizeLimit + 1))
+        try file.close()
+
+        let guardedStorage = JSONFileStorageService(
+            storageURL: fileURL,
+            testingMaximumFileBytes: sizeLimit
+        )
+        do {
+            _ = try await guardedStorage.getAllEntries()
+            XCTFail("An oversized journal must be rejected before loading")
+        } catch {
+            // The read fails closed before JSON decoding or allocating the full file.
+        }
+        do {
+            try await guardedStorage.saveEntry(JournalEntry(content: "must not replace original"))
+            XCTFail("A failed oversized-journal load must keep later mutations blocked")
+        } catch {
+            // Mutations must remain blocked until the original journal is recovered.
+        }
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        XCTAssertEqual((attributes[.size] as? NSNumber)?.intValue, sizeLimit + 1)
+        let reader = try FileHandle(forReadingFrom: fileURL)
+        let firstByte = try reader.read(upToCount: 1)
+        try reader.close()
+        XCTAssertEqual(firstByte, marker)
+    }
+
+    func testSaveRejectsOversizedPayloadBeforeCreatingJournal() async throws {
+        let fileURL = tempDirectory.appendingPathComponent("too-large-entry.json")
+        let guardedStorage = JSONFileStorageService(
+            storageURL: fileURL,
+            testingMaximumFileBytes: 4_096
+        )
+
+        do {
+            try await guardedStorage.saveEntry(JournalEntry(content: String(repeating: "x", count: 4_096)))
+            XCTFail("An oversized entry must be rejected before JSON serialization")
+        } catch let error as NSError {
+            XCTAssertEqual(error.domain, "R0lling.Journal")
+            XCTAssertEqual(error.code, 4)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
+    }
+
+    func testUpdateEntryIfPresentRejectsDeletedIDs() async throws {
+        let entry = JournalEntry(content: "original")
+        try await storage.saveEntry(entry)
+        try await storage.deleteEntry(id: entry.id)
+
+        var stale = entry
+        stale.content = "stale update must not resurrect"
+        let didUpdate = try await storage.updateEntryIfPresent(stale)
+        let retrieved = try await storage.getEntry(id: entry.id)
+        XCTAssertFalse(didUpdate)
+        XCTAssertNil(retrieved)
+    }
+
+    func testAppendAttachmentIfPresentIsAtomicAndRejectsDeletedIDs() async throws {
+        let entry = JournalEntry(content: "with media")
+        try await storage.saveEntry(entry)
+        let attachment = MediaAttachment(
+            relativePath: "Photos/example.jpg",
+            mediaType: .photo,
+            byteSize: 4,
+            durationSeconds: nil,
+            captureTimestamp: Date(),
+            width: nil,
+            height: nil,
+            hasAudio: false
+        )
+
+        let updated = try await storage.appendAttachmentIfPresent(attachment, toEntryID: entry.id)
+        XCTAssertEqual(updated?.attachments.map(\.id), [attachment.id])
+
+        try await storage.deleteEntry(id: entry.id)
+        let appendedAfterDelete = try await storage.appendAttachmentIfPresent(attachment, toEntryID: entry.id)
+        XCTAssertNil(appendedAfterDelete)
+    }
+
     #if os(iOS)
     func testJournalFileUsesDataProtectionUntilFirstUnlock() async throws {
         try await storage.saveEntry(JournalEntry(content: "protected journal fixture"))

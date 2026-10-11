@@ -26,6 +26,8 @@ public final class AppState: ObservableObject {
     @Published public var isSimulationMode: Bool = true
     @Published public var deepWorkEndsAt: Date?
     @Published public private(set) var deepWorkSessionRestored = false
+    @Published public private(set) var deepWorkPersistenceNeedsRecovery = false
+    @Published public var isDeepWorkRecoveryConfirmationPresented = false
     @Published public private(set) var completedFocusSecondsToday: TimeInterval = 0
     @Published public var isListeningSpeech: Bool = false
     @Published public var toastMessage: String?
@@ -34,6 +36,9 @@ public final class AppState: ObservableObject {
     @Published public private(set) var pendingVisionNote: String?
     @Published public private(set) var pendingVisionNoteIsSaved = false
     @Published public private(set) var isSavingVisionNote = false
+    @Published public private(set) var pendingNutritionEstimate: MealNutritionVisionLogger.NutritionSnapshot?
+    @Published public private(set) var pendingNutritionEstimateIsSaved = false
+    @Published public private(set) var isSavingNutritionEstimate = false
     @Published public var currentMission: ObservationMission?
     @Published public var gameScore: Int = 0
     @Published public var gameSessionState: ObservationGameSessionState = .idle
@@ -49,7 +54,9 @@ public final class AppState: ObservableObject {
     private var pendingVisionNoteID: UUID?
     public let highlightMuxer: HighlightReelMuxer
     public let canvasGenerator = ObsidianCanvasGenerator()
-    public let emotionAnalyzer = VoiceEmotionAnalyzer()
+    public let transcriptKeywordTagger = TranscriptKeywordTagger()
+    @available(*, deprecated, renamed: "transcriptKeywordTagger")
+    public var emotionAnalyzer: VoiceEmotionAnalyzer { transcriptKeywordTagger }
     public let onDeviceVision = OnDeviceVisionService()
     public let entityRecognizer = LocalEntityRecognizer()
     public let knowledgeGraphEngine = AssociativeKnowledgeGraphEngine()
@@ -85,8 +92,15 @@ public final class AppState: ObservableObject {
     @Published public var obsidianVaultDisplayPath: String = VaultBookmarkStore.display_path_i_default()
     /// Τελευταία conflict sidecars από export (A09 UI).
     @Published public var teleutaiaObsidianConflicts: [String] = []
+    /// Root-folder activity hint only; it never imports or synchronizes vault changes.
+    @Published public private(set) var obsidianVaultChangeDetected = false
+    @Published public private(set) var isObsidianVaultWatcherActive = false
+    @Published public private(set) var obsidianVaultWatcherError: String?
 
     private var cancellables = Set<AnyCancellable>()
+    private let obsidianFileWatcher = ObsidianFileWatcher()
+    /// Keeps the selected document-provider grant alive for the open directory descriptor.
+    private var obsidianWatcherScopedURL: URL?
     /// Prevents restore and orphan cleanup from racing while media paths are referenced by the journal.
     private let mediaReferenceMutationGate: MediaReferenceMutationGate
     private var tickerTimer: Timer?
@@ -164,10 +178,13 @@ public final class AppState: ObservableObject {
 
     public func refreshEntries() async {
         do {
+            let requestedDate = selectedDate
             let all = try await storage.getAllEntries()
             self.allEntries = all
-            self.todayEntries = try await storage.getEntriesForDate(selectedDate)
-            self.timeCapsuleMemories = timeCapsuleEngine.findTimeCapsuleEntries(today: selectedDate, allEntries: all)
+            let selectedEntries = try await storage.getEntriesForDate(requestedDate)
+            guard Calendar.current.isDate(selectedDate, inSameDayAs: requestedDate) else { return }
+            self.todayEntries = selectedEntries
+            self.timeCapsuleMemories = timeCapsuleEngine.findTimeCapsuleEntries(today: requestedDate, allEntries: all)
             self.scavengerStreak = streakManager.currentStreak
             self.scavengerBadges = streakManager.badges
             await refreshLiveHealthTelemetry()
@@ -179,6 +196,11 @@ public final class AppState: ObservableObject {
     // MARK: - Sovereign OS & HealthKit Methods
     private func restoreDeepWorkSession() async {
         defer { deepWorkSessionRestored = true }
+        deepWorkPersistenceNeedsRecovery = await deepWorkManager.requiresPersistenceRecovery
+        guard !deepWorkPersistenceNeedsRecovery else {
+            deepWorkEndsAt = nil
+            return
+        }
         guard case .active(let startedAt, let duration, _) = await deepWorkManager.getState() else {
             deepWorkEndsAt = nil
             return
@@ -209,14 +231,20 @@ public final class AppState: ObservableObject {
     }
 
     public func refreshLiveHealthTelemetry() async {
+        let telemetryDate = selectedDate
+        let entryCount = todayEntries.count
         let snap = await healthKitService.fetchLiveTelemetrySnapshot()
         self.liveHealthSnapshot = snap
-        let telemetryDate = Date()
+        deepWorkPersistenceNeedsRecovery = await deepWorkManager.requiresPersistenceRecovery
+        let selectedDateIsToday = Calendar.current.isDateInToday(telemetryDate)
         let completedFocusSeconds = await deepWorkManager.focusSeconds(
             on: telemetryDate,
             includeActiveSession: false
         )
-        let focusSeconds = await deepWorkManager.focusSeconds(on: telemetryDate)
+        let focusSeconds = await deepWorkManager.focusSeconds(
+            on: telemetryDate,
+            includeActiveSession: selectedDateIsToday
+        )
         let sessionState = await deepWorkManager.getState()
         if case .active(let startedAt, let duration, _) = sessionState {
             let deadline = startedAt.addingTimeInterval(duration)
@@ -224,9 +252,10 @@ public final class AppState: ObservableObject {
         } else {
             deepWorkEndsAt = nil
         }
+        guard Calendar.current.isDate(selectedDate, inSameDayAs: telemetryDate) else { return }
         self.completedFocusSecondsToday = completedFocusSeconds
         let strainAndReady = await cognitiveCalculator.computeTelemetry(
-            entriesCount: todayEntries.count,
+            entriesCount: entryCount,
             deepWorkSeconds: focusSeconds
         )
         self.cognitiveTelemetry = strainAndReady
@@ -239,6 +268,10 @@ public final class AppState: ObservableObject {
     /// Starts or completes a real elapsed-time focus session.
     public func toggleDeepWork() async {
         guard deepWorkSessionRestored else { return }
+        guard !deepWorkPersistenceNeedsRecovery else {
+            showToast("Το ιστορικό εστίασης δεν διαβάζεται. Ανάκτησέ το πριν ξεκινήσεις νέα συνεδρία.")
+            return
+        }
         if deepWorkEndsAt != nil {
             await completeDeepWork()
         } else {
@@ -251,6 +284,20 @@ public final class AppState: ObservableObject {
         await refreshLiveHealthTelemetry()
     }
 
+    /// Called only after the user confirms discarding unreadable focus data.
+    public func discardCorruptDeepWorkPersistence() async {
+        guard deepWorkSessionRestored, deepWorkPersistenceNeedsRecovery else { return }
+        let didReset = await deepWorkManager.discardCorruptPersistenceAndReset()
+        deepWorkPersistenceNeedsRecovery = await deepWorkManager.requiresPersistenceRecovery
+        guard didReset, !deepWorkPersistenceNeedsRecovery else {
+            showToast("Δεν ήταν δυνατή η επαναφορά του ιστορικού εστίασης.")
+            return
+        }
+        deepWorkEndsAt = nil
+        await refreshLiveHealthTelemetry()
+        showToast("Το ιστορικό εστίασης επαναφέρθηκε.")
+    }
+
     /// Finishes the current session and refreshes its measured focus duration.
     public func completeDeepWork() async {
         guard deepWorkSessionRestored, deepWorkEndsAt != nil else { return }
@@ -260,27 +307,52 @@ public final class AppState: ObservableObject {
     }
 
     // MARK: - Glasses & Streaming
+    public func setGlassesSimulationMode(enabled: Bool) async {
+        await glassesAdapter.toggleSimulationMode(enabled: enabled)
+        isSimulationMode = await glassesAdapter.isSimulationMode
+        if isSimulationMode != enabled {
+            showToast("Το live Meta DAT bridge δεν είναι διαθέσιμο· παραμένει ενεργό το Simulation.")
+        }
+    }
+
     public func toggleGlassesConnection() async {
         isSimulationMode = await glassesAdapter.isSimulationMode
-        do {
-            if case .disconnected = glassesState {
+        switch glassesState {
+        case .searching, .connecting:
+            return
+        case .connected, .streaming, .paused:
+            await glassesAdapter.disconnectDevice()
+            glassesState = .disconnected
+            isStreaming = false
+            showToast("Τα Meta Glasses αποσυνδέθηκαν.")
+        case .disconnected, .error:
+            do {
                 try await glassesAdapter.connectDevice()
                 glassesState = await glassesAdapter.connectionState
                 showToast(isSimulationMode ? "Simulation γυαλιών ενεργή." : "Τα Meta Glasses συνδέθηκαν.")
-            } else {
-                await glassesAdapter.disconnectDevice()
-                glassesState = .disconnected
-                isStreaming = false
-                showToast("Τα Meta Glasses αποσυνδέθηκαν.")
+            } catch {
+                glassesState = await glassesAdapter.connectionState
+                showToast("Σφάλμα σύνδεσης: \(error.localizedDescription)")
             }
-        } catch {
-            showToast("Σφάλμα σύνδεσης: \(error.localizedDescription)")
+        }
+    }
+
+    public func toggleGlassesPrimaryAction() async {
+        switch GlassesPrimaryAction.resolve(isStreaming: isStreaming, state: glassesState) {
+        case .waitForConnection:
+            return
+        case .stopStreaming, .startStreaming:
+            await toggleLiveStream()
+        case .connectThenStartStreaming:
+            await toggleGlassesConnection()
+            guard glassesState.isConnected else { return }
+            await toggleLiveStream()
         }
     }
 
     public func toggleLiveStream() async {
         do {
-            if isStreaming {
+            if isStreaming || glassesState.isLive {
                 await glassesAdapter.stopStreaming()
                 isStreaming = false
                 glassesState = await glassesAdapter.connectionState
@@ -298,6 +370,8 @@ public final class AppState: ObservableObject {
 
     // MARK: - Clipping Action
     public func triggerClip(seconds: Double = 10.0) async {
+        var attachmentForRollback: MediaAttachment?
+        var journalCommitted = false
         do {
             let result = try await bufferService.triggerClip(requestedSeconds: seconds)
 
@@ -312,6 +386,7 @@ public final class AppState: ObservableObject {
                 durationSeconds: result.duration,
                 hasAudio: result.hasAudio
             )
+            attachmentForRollback = attachment
 
             let simulationSuffix = result.isSimulationPlaceholder
                 ? " [δοκιμαστικό placeholder — επιβεβαιωμένη αναπαραγωγή MP4]"
@@ -322,7 +397,10 @@ public final class AppState: ObservableObject {
                 attachments: [attachment]
             )
 
-            try await storage.saveEntry(entry)
+            try await mediaReferenceMutationGate.withExclusiveAccess { [self] in
+                try await storage.saveEntry(entry)
+            }
+            journalCommitted = true
             await refreshEntries()
 
             await exportEntryToObsidianIfConfigured(entry)
@@ -336,8 +414,27 @@ public final class AppState: ObservableObject {
                 showToast("⚠️ Clip αποθηκεύτηκε αλλά ΔΕΝ είναι playable.")
             }
         } catch {
+            if !journalCommitted, let attachmentForRollback {
+                await removeUnreferencedMediaAfterFailedJournalCommit(attachmentForRollback)
+            }
             showToast("Αποτυχία clip: \(error.localizedDescription)")
             EarconFeedbackService.shared.playEarcon(.error)
+        }
+    }
+
+    /// Roll back a clip file if its journal commit failed, even when the caller was canceled
+    /// while queued on the mutation gate. The independent task rechecks active references under
+    /// the same gate before deleting the file.
+    private func removeUnreferencedMediaAfterFailedJournalCommit(_ attachment: MediaAttachment) async {
+        let cleanupTask = Task { @MainActor [self] in
+            try await mediaReferenceMutationGate.withExclusiveAccess { [self] in
+                await katharismosOrphanMedia(afairoumena: [attachment])
+            }
+        }
+        do {
+            try await cleanupTask.value
+        } catch {
+            showToast("Αποτυχία καθαρισμού clip: \(error.localizedDescription)")
         }
     }
 
@@ -346,9 +443,9 @@ public final class AppState: ObservableObject {
     public func addNote(text: String, tags: [String] = [], source: EntrySource = .manual) async -> Bool {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
 
-        let detectedEmotionTags = emotionAnalyzer.analyzeTranscript(text: text)
+        let detectedTextCues = transcriptKeywordTagger.detectCues(in: text)
         let detectedEntityTags = entityRecognizer.detectEntities(textClues: [text])
-        let mergedTags = Array(Set(tags + detectedEmotionTags + detectedEntityTags))
+        let mergedTags = Array(Set(tags + detectedTextCues + detectedEntityTags))
 
         let entry = JournalEntry(
             content: text,
@@ -474,7 +571,9 @@ public final class AppState: ObservableObject {
                 else { memory = nil }
                 let result = try await aiRouter.askAssistant(
                     prompt: prompt,
-                    contextEntries: todayEntries,
+                    // Chat context follows the configured newest-journal-entry limit,
+                    // independent of the date currently selected in the calendar.
+                    contextEntries: allEntries,
                     agentMemory: memory
                 )
                 try Task.checkCancellation()
@@ -489,7 +588,7 @@ public final class AppState: ObservableObject {
         await task.value
     }
 
-    /// A11: vision path — multi-frame από buffer· fallback `capturePhoto` (protocol/sim)· OCR on-device.
+    /// A11: local-first on-device OCR; cloud vision is an optional description layer.
     public func executeWhatAmISeeing() async {
         guard !(await glassesAdapter.isSimulationMode) else {
             showToast("Η simulation δεν καταγράφει πραγματικές εικόνες για AI ανάλυση.")
@@ -513,6 +612,8 @@ public final class AppState: ObservableObject {
 
     private func executeWhatAmISeeing(selectedImage: Data?) async {
         activeAITask?.cancel()
+        pendingNutritionEstimate = nil
+        pendingNutritionEstimateIsSaved = false
         let task = Task { @MainActor in
             do {
                 try Task.checkCancellation()
@@ -523,50 +624,90 @@ public final class AppState: ObservableObject {
                     bufferFrames = []
                 }
                 let photoForOCR: Data
-                let reply: String
+                let describeWithCloud: @Sendable (Data) async throws -> String
+                let router = aiRouter
 
                 if let selectedImage {
-                    photoForOCR = try await prepareVisionImage(selectedImage)
-                    reply = try await aiRouter.askWhatAmISeeing(imageData: photoForOCR, customQuestion: nil)
+                    photoForOCR = selectedImage
+                    describeWithCloud = { image in
+                        try await router.askWhatAmISeeing(imageData: image, customQuestion: nil)
+                    }
                 } else if bufferFrames.count >= 2, let lastFrame = bufferFrames.last {
-                    photoForOCR = try await prepareVisionImage(lastFrame)
-                    reply = try await aiRouter.askWhatAmISeeingMultiFrames(
-                        frames: bufferFrames,
-                        customQuestion: nil
-                    )
+                    photoForOCR = lastFrame
+                    let frames = bufferFrames
+                    describeWithCloud = { _ in
+                        try await router.askWhatAmISeeingMultiFrames(frames: frames, customQuestion: nil)
+                    }
                 } else if let single = bufferFrames.first {
-                    photoForOCR = try await prepareVisionImage(single)
-                    reply = try await aiRouter.askWhatAmISeeing(imageData: photoForOCR, customQuestion: nil)
+                    photoForOCR = single
+                    describeWithCloud = { image in
+                        try await router.askWhatAmISeeing(imageData: image, customQuestion: nil)
+                    }
                 } else {
-                    let photoData = try await glassesAdapter.capturePhoto()
-                    photoForOCR = try await prepareVisionImage(photoData)
-                    reply = try await aiRouter.askWhatAmISeeing(imageData: photoForOCR, customQuestion: nil)
+                    photoForOCR = try await glassesAdapter.capturePhoto()
+                    describeWithCloud = { image in
+                        try await router.askWhatAmISeeing(imageData: image, customQuestion: nil)
+                    }
+                }
+                guard !photoForOCR.isEmpty,
+                      photoForOCR.count <= ImageMetadataSanitizer.maximumVisionInputBytes else {
+                    showToast("Η εικόνα είναι κενή ή υπερβαίνει το όριο των 40 MB.")
+                    return
                 }
 
+                // Local OCR runs first, so it remains usable if sanitization, credentials,
+                // network access, or the vision provider fails.
+                let visionService = onDeviceVision
+                let outcome = try await OnDeviceVisionAnalysisPipeline.analyze(
+                    imageData: photoForOCR,
+                    recognizeText: { image in
+                        await visionService.recognizeTextFromImage(imageData: image)
+                    },
+                    prepareForCloud: { image in
+                        try Task.checkCancellation()
+                        let prepared = try await Task.detached(priority: .userInitiated) {
+                            try ImageMetadataSanitizer.encodeForVision(image)
+                        }.value
+                        try Task.checkCancellation()
+                        return prepared
+                    },
+                    describeWithCloud: describeWithCloud
+                )
                 try Task.checkCancellation()
 
-                // On-device OCR (READY) πριν/μαζί με cloud vision
-                let ocrTokens = await onDeviceVision.recognizeTextFromImage(imageData: photoForOCR)
-                try Task.checkCancellation()
+                let ocrTokens = outcome.recognizedText
+                guard outcome.hasUsableResult else {
+                    showToast("Δεν προέκυψε αποτέλεσμα. Η τοπική αναγνώριση δεν βρήκε κείμενο και η περιγραφή AI δεν ήταν διαθέσιμη.")
+                    return
+                }
 
-                var visionNote = "👀 Περιγραφή εικόνας: \(reply)"
+                var noteParts: [String] = []
+                if let description = outcome.cloudDescription {
+                    noteParts.append("👀 Περιγραφή εικόνας: \(description)")
+                }
                 if !ocrTokens.isEmpty {
-                    visionNote += "\n🔤 OCR: \(ocrTokens.joined(separator: ", "))"
+                    noteParts.append("🔤 OCR στη συσκευή: \(ocrTokens.joined(separator: ", "))")
                 }
+                let visionNote = noteParts.joined(separator: "\n")
 
-                chatMessages.append((id: UUID(), isUser: false, text: "👀 [What am I seeing]: \(reply)", timestamp: Date()))
+                let chatText = outcome.cloudDescription.map { "👀 [What am I seeing]: \($0)" }
+                    ?? "🔤 [Τοπική αναγνώριση OCR]: \(ocrTokens.joined(separator: ", "))"
+                chatMessages.append((id: UUID(), isUser: false, text: chatText, timestamp: Date()))
                 pendingVisionNote = visionNote
                 pendingVisionNoteIsSaved = false
                 pendingVisionTags = ["vision", selectedImage == nil ? "glasses" : "photos"]
                 pendingVisionNoteID = UUID()
-                if selectedImage == nil {
-                    showToast("Η περιγραφή δεν αποθηκεύτηκε· γνωστά τρόφιμα μπορεί να καταγραφούν ως εκτίμηση γεύματος.")
+                prepareMealEstimateForReview(ocrTokens)
+                if pendingNutritionEstimate != nil {
+                    if outcome.cloudDescription == nil {
+                        showToast("Η τοπική OCR ολοκληρώθηκε. Έλεγξε την ενδεικτική εκτίμηση και επιβεβαίωσέ την πριν αποθηκευτεί.")
+                    } else {
+                        showToast("Η ανάλυση ολοκληρώθηκε. Η ενδεικτική εκτίμηση γεύματος χρειάζεται έλεγχο και επιβεβαίωση πριν αποθηκευτεί.")
+                    }
+                } else if outcome.cloudDescription == nil {
+                    showToast("Η τοπική αναγνώριση ολοκληρώθηκε. Η περιγραφή AI δεν ήταν διαθέσιμη.")
                 } else {
                     showToast("Η ανάλυση ολοκληρώθηκε. Το αποτέλεσμα δεν αποθηκεύτηκε ακόμη.")
-                }
-
-                if selectedImage == nil, FeatureReadinessRegistry.nutritionHeuristic.ready {
-                    await logMealFromDetectedTokens(ocrTokens)
                 }
             } catch is CancellationError {
                 showToast("Vision ακυρώθηκε.")
@@ -576,15 +717,6 @@ public final class AppState: ObservableObject {
         }
         activeAITask = task
         await task.value
-    }
-
-    private func prepareVisionImage(_ data: Data) async throws -> Data {
-        try Task.checkCancellation()
-        let prepared = try await Task.detached(priority: .userInitiated) {
-            try ImageMetadataSanitizer.encodeForVision(data)
-        }.value
-        try Task.checkCancellation()
-        return prepared
     }
 
     /// A12: ανάκληση μνήμης από journal + AI.
@@ -695,10 +827,22 @@ public final class AppState: ObservableObject {
 
     /// Εξαγωγή Obsidian μετά journal save — fail-closed toast αν vault configured αλλά export αποτύχει (CQ-P1-012).
     /// A09: conflict → toast + δημοσίευση sidecar paths.
-    private func exportEntryToObsidianIfConfigured(_ entry: JournalEntry) async {
+    private func exportEntryToObsidianIfConfigured(
+        _ entry: JournalEntry,
+        previousEntry: JournalEntry? = nil
+    ) async {
         guard await obsidianBridge.currentVaultURL != nil else { return }
         do {
-            let outcome = try await obsidianBridge.exportEntry(entry, mediaStorage: mediaStorage)
+            let outcome: ObsidianSingleExportResult
+            if let previousEntry, previousEntry.dateKey != entry.dateKey {
+                outcome = try await obsidianBridge.moveEntry(
+                    from: previousEntry,
+                    to: entry,
+                    mediaStorage: mediaStorage
+                )
+            } else {
+                outcome = try await obsidianBridge.exportEntry(entry, mediaStorage: mediaStorage)
+            }
             if outcome.hadConflict {
                 let sidecar = outcome.conflictSidecarRelativePath ?? "sidecar"
                 teleutaiaObsidianConflicts = [sidecar]
@@ -722,6 +866,7 @@ public final class AppState: ObservableObject {
             await obsidianBridge.setVaultURL(url, requiresScopedAccess: true)
             await agentManager.setVaultURL(url)
             obsidianVaultDisplayPath = url.path
+            configureObsidianVaultWatcher(url: url, requiresScopedAccess: true)
             showToast("Obsidian vault συνδέθηκε: \(url.lastPathComponent)")
         } catch {
             showToast("Σφάλμα vault bookmark: \(error.localizedDescription)")
@@ -773,16 +918,11 @@ public final class AppState: ObservableObject {
     /// Επαναφορά στο default Documents/R0lling/ObsidianVault.
     public func epanekkinisi_proepilegmenou_obsidian_vault() async {
         VaultBookmarkStore.epanekkinisi_proepilegmenou()
-        let defaultURL: URL
-        if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            defaultURL = docs.appendingPathComponent("R0lling/ObsidianVault", isDirectory: true)
-        } else {
-            defaultURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("R0lling/ObsidianVault", isDirectory: true)
-        }
+        let defaultURL = defaultObsidianVaultURL()
         await obsidianBridge.setVaultURL(defaultURL, requiresScopedAccess: false)
         await agentManager.setVaultURL(defaultURL)
         obsidianVaultDisplayPath = VaultBookmarkStore.display_path_i_default()
+        configureObsidianVaultWatcher(url: defaultURL, requiresScopedAccess: false)
         teleutaiaObsidianConflicts = []
         showToast("Επαναφορά στο τοπικό Obsidian vault.")
     }
@@ -794,13 +934,95 @@ public final class AppState: ObservableObject {
                 await obsidianBridge.setVaultURL(resolved.url, requiresScopedAccess: resolved.requiresScopedAccess)
                 await agentManager.setVaultURL(resolved.url)
                 obsidianVaultDisplayPath = resolved.url.path
+                configureObsidianVaultWatcher(
+                    url: resolved.url,
+                    requiresScopedAccess: resolved.requiresScopedAccess
+                )
             } else {
+                let defaultURL = defaultObsidianVaultURL()
+                await obsidianBridge.setVaultURL(defaultURL, requiresScopedAccess: false)
+                await agentManager.setVaultURL(defaultURL)
                 obsidianVaultDisplayPath = VaultBookmarkStore.display_path_i_default()
+                configureObsidianVaultWatcher(url: defaultURL, requiresScopedAccess: false)
             }
         } catch {
+            let defaultURL = defaultObsidianVaultURL()
+            await obsidianBridge.setVaultURL(defaultURL, requiresScopedAccess: false)
+            await agentManager.setVaultURL(defaultURL)
             obsidianVaultDisplayPath = VaultBookmarkStore.display_path_i_default()
+            configureObsidianVaultWatcher(url: defaultURL, requiresScopedAccess: false)
             showToast("Obsidian bookmark stale — χρησιμοποίησε ξανά Files picker.")
         }
+    }
+
+    private func defaultObsidianVaultURL() -> URL {
+        if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            return docs.appendingPathComponent("R0lling/ObsidianVault", isDirectory: true)
+        }
+        return FileManager.default.temporaryDirectory
+            .appendingPathComponent("R0lling/ObsidianVault", isDirectory: true)
+    }
+
+    /// Watches only root-folder activity and reports a status hint; vault import/export stays explicit.
+    private func configureObsidianVaultWatcher(url: URL, requiresScopedAccess: Bool) {
+        stopObsidianVaultWatcher()
+        obsidianVaultChangeDetected = false
+        obsidianVaultWatcherError = nil
+
+        if !requiresScopedAccess {
+            do {
+                try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            } catch {
+                obsidianVaultWatcherError = error.localizedDescription
+                return
+            }
+        } else {
+            guard url.startAccessingSecurityScopedResource() else {
+                obsidianVaultWatcherError = "Δεν ήταν δυνατή η διατήρηση της πρόσβασης Files στο επιλεγμένο vault."
+                return
+            }
+            obsidianWatcherScopedURL = url
+        }
+
+        do {
+            try obsidianFileWatcher.startWatching(
+                directoryURL: url,
+                onFileChanged: { [weak self] changedDirectory in
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        guard FileManager.default.fileExists(atPath: changedDirectory.path) else {
+                            self.stopObsidianVaultWatcher()
+                            self.obsidianVaultWatcherError = "Ο φάκελος vault μετακινήθηκε ή αφαιρέθηκε. Επίλεξέ τον ξανά από τα Files."
+                            return
+                        }
+                        self.obsidianVaultChangeDetected = true
+                    }
+                },
+                onError: { [weak self] message in
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        self.stopObsidianVaultWatcher()
+                        self.obsidianVaultWatcherError = "Η παρακολούθηση σταμάτησε μετά από σφάλμα: \(message)"
+                    }
+                }
+            )
+            isObsidianVaultWatcherActive = true
+        } catch {
+            if let scopedURL = obsidianWatcherScopedURL {
+                scopedURL.stopAccessingSecurityScopedResource()
+                obsidianWatcherScopedURL = nil
+            }
+            obsidianVaultWatcherError = error.localizedDescription
+        }
+    }
+
+    private func stopObsidianVaultWatcher() {
+        obsidianFileWatcher.stopWatching()
+        if let scopedURL = obsidianWatcherScopedURL {
+            scopedURL.stopAccessingSecurityScopedResource()
+            obsidianWatcherScopedURL = nil
+        }
+        isObsidianVaultWatcherActive = false
     }
 
     /// Batch export από Settings — ενημερώνει conflict list για UI.
@@ -898,11 +1120,31 @@ public final class AppState: ObservableObject {
             showToast("Highlight Reel απενεργοποιημένο.")
             return
         }
+        var attachmentForRollback: MediaAttachment?
+        var journalCommitted = false
         do {
             let reel = try await highlightMuxer.createDailyHighlightReel(for: todayEntries)
-            showToast("🎬 Highlight Reel (\(reel.totalClipsIncluded) clips, \(Int(reel.totalDurationSeconds))s) έτοιμο!")
+            attachmentForRollback = reel.attachment
+            guard reel.isPlayable else {
+                throw NSError(domain: "R0lling.HighlightReel", code: 3114, userInfo: [
+                    NSLocalizedDescriptionKey: "Το Highlight Reel δεν επιβεβαιώθηκε ως playable."
+                ])
+            }
+            let entry = try await HighlightReelJournalCommitter.commit(
+                attachment: reel.attachment,
+                clipCount: reel.totalClipsIncluded,
+                durationSeconds: reel.totalDurationSeconds,
+                storage: storage,
+                mutationGate: mediaReferenceMutationGate
+            )
+            journalCommitted = true
             await refreshEntries()
+            await exportEntryToObsidianIfConfigured(entry)
+            showToast("🎬 Highlight Reel (\(reel.totalClipsIncluded) clips, \(Int(reel.totalDurationSeconds))s) αποθηκεύτηκε στο journal και είναι playable.")
         } catch {
+            if !journalCommitted, let attachmentForRollback {
+                await removeUnreferencedMediaAfterFailedJournalCommit(attachmentForRollback)
+            }
             showToast("Σφάλμα Reel: \(error.localizedDescription)")
         }
     }
@@ -989,10 +1231,10 @@ public final class AppState: ObservableObject {
             showToast("Knowledge Graph απενεργοποιημένο.")
             return
         }
-        for entry in todayEntries {
-            let extracted = knowledgeGraphEngine.extractTriples(from: entry.content, date: entry.timestamp)
-            knowledgeGraphEngine.addTriples(extracted)
+        let currentTriples = todayEntries.flatMap { entry in
+            knowledgeGraphEngine.extractTriples(from: entry.content, date: entry.timestamp)
         }
+        knowledgeGraphEngine.replaceTriples(currentTriples)
         let tripleCount = knowledgeGraphEngine.allTriples.count
         guard tripleCount > 0 else {
             showToast("Knowledge Graph: καμία σχέση από τις σημερινές καταγραφές.")
@@ -1015,22 +1257,50 @@ public final class AppState: ObservableObject {
         }
     }
 
-    /// Heuristic εκτίμηση από tokens όρασης — όχι μετρημένες θερμίδες / HealthKit.
-    public func logMealFromDetectedTokens(_ tokens: [String]) async {
-        guard FeatureReadinessRegistry.nutritionHeuristic.ready else { return }
-        guard !tokens.isEmpty else { return }
-        guard let snapshot = nutritionLogger.analyzeDetectedFoodTokens(tokens: tokens) else { return }
+    /// Prepare a review-only estimate from actual OCR text; analysis never writes to the journal.
+    private func prepareMealEstimateForReview(_ tokens: [String]) {
+        guard FeatureReadinessRegistry.nutritionHeuristic.ready else {
+            pendingNutritionEstimate = nil
+            pendingNutritionEstimateIsSaved = false
+            return
+        }
+        pendingNutritionEstimate = nutritionLogger.analyzeDetectedFoodTokens(tokens: tokens)
+        pendingNutritionEstimateIsSaved = false
+    }
 
-        let md = nutritionLogger.formatObsidianMarkdown(snapshot: snapshot)
-        let entry = JournalEntry(content: md, source: .ai, tags: ["meal", "nutrition", "heuristic"])
+    /// Persist an OCR-based estimate only after the user presses the explicit save action.
+    public func savePendingNutritionEstimate() async {
+        guard !isSavingNutritionEstimate,
+              !pendingNutritionEstimateIsSaved,
+              let snapshot = pendingNutritionEstimate else { return }
+
+        isSavingNutritionEstimate = true
+        defer { isSavingNutritionEstimate = false }
+
+        let estimateID = snapshot.id
+        let entry = JournalEntry(
+            timestamp: snapshot.timestamp,
+            content: nutritionLogger.formatObsidianMarkdown(snapshot: snapshot),
+            source: .ai,
+            tags: ["meal", "nutrition", "heuristic", "ocr"]
+        )
         do {
             try await storage.saveEntry(entry)
+            if pendingNutritionEstimate?.id == estimateID {
+                pendingNutritionEstimateIsSaved = true
+            }
             await refreshEntries()
             await exportEntryToObsidianIfConfigured(entry)
-            showToast("🥗 Εκτίμηση γεύματος (~\(Int(snapshot.totalCalories)) kcal, heuristic)")
+            showToast("Η ενδεικτική εκτίμηση γεύματος αποθηκεύτηκε (~\(Int(snapshot.totalCalories)) kcal).")
         } catch {
             showToast("Σφάλμα καταγραφής γεύματος: \(error.localizedDescription)")
         }
+    }
+
+    public func discardPendingNutritionEstimate() {
+        guard !isSavingNutritionEstimate else { return }
+        pendingNutritionEstimate = nil
+        pendingNutritionEstimateIsSaved = false
     }
 
     // MARK: - Journal CRUD (A01 / A02)
@@ -1061,11 +1331,19 @@ public final class AppState: ObservableObject {
 
     /// Εναλλαγή αγαπημένου — αποτυχία → toast, όχι silent UI lie.
     public func toggleFavorite(entry: JournalEntry) async {
-        var updated = entry
-        updated.isFavorite.toggle()
-        updated.lastModified = Date()
         do {
-            try await storage.saveEntry(updated)
+            try await mediaReferenceMutationGate.withExclusiveAccess { [self] in
+                guard var current = try await storage.getEntry(id: entry.id) else {
+                    showToast("Η καταγραφή δεν βρέθηκε.")
+                    return
+                }
+                current.isFavorite.toggle()
+                current.lastModified = Date()
+                guard try await storage.updateEntryIfPresent(current) else {
+                    showToast("Η καταγραφή δεν βρέθηκε.")
+                    return
+                }
+            }
             await refreshEntries()
         } catch {
             showToast("Σφάλμα αγαπημένου: \(error.localizedDescription)")
@@ -1074,12 +1352,32 @@ public final class AppState: ObservableObject {
 
     /// A02: επεξεργασία με σταθερό ID (overwrite, χωρίς διπλότυπο).
     public func updateEntry(_ entry: JournalEntry) async {
-        var updated = entry
-        updated.lastModified = Date()
         do {
-            try await storage.saveEntry(updated)
+            let (previous, updated): (JournalEntry, JournalEntry) = try await mediaReferenceMutationGate.withExclusiveAccess { [self] in
+                guard var current = try await storage.getEntry(id: entry.id) else {
+                    throw NSError(domain: "R0lling.Journal", code: 404, userInfo: [
+                        NSLocalizedDescriptionKey: "Η καταγραφή δεν βρέθηκε και δεν ενημερώθηκε."
+                    ])
+                }
+                let previous = current
+                // Merge editable fields into the current row so a stale sheet cannot
+                // overwrite a newer favorite, source, or attachment list.
+                current.timestamp = entry.timestamp
+                current.timeZoneIdentifier = entry.timeZoneIdentifier
+                current.title = entry.title
+                current.content = entry.content
+                current.tags = entry.tags
+                current.locationName = entry.locationName
+                current.lastModified = Date()
+                guard try await storage.updateEntryIfPresent(current) else {
+                    throw NSError(domain: "R0lling.Journal", code: 404, userInfo: [
+                        NSLocalizedDescriptionKey: "Η καταγραφή διαγράφηκε πριν ολοκληρωθεί η ενημέρωση."
+                    ])
+                }
+                return (previous, current)
+            }
             await refreshEntries()
-            await exportEntryToObsidianIfConfigured(updated)
+            await exportEntryToObsidianIfConfigured(updated, previousEntry: previous)
             showToast("✅ Η καταγραφή ενημερώθηκε.")
         } catch {
             showToast("Σφάλμα επεξεργασίας: \(error.localizedDescription)")
@@ -1093,25 +1391,32 @@ public final class AppState: ObservableObject {
         timeZoneIdentifier: String? = nil
     ) async {
         do {
-            guard var entry = try await storage.getEntry(id: id) else {
+            let change: (previous: JournalEntry, updated: JournalEntry)? = try await mediaReferenceMutationGate.withExclusiveAccess { [self] in
+                guard var current = try await storage.getEntry(id: id) else { return nil }
+                let previous = current
+                current.timestamp = newTimestamp
+                if let timeZoneIdentifier {
+                    let trimmed = timeZoneIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        current.timeZoneIdentifier = trimmed
+                    }
+                }
+                current.lastModified = Date()
+                guard try await storage.updateEntryIfPresent(current) else { return nil }
+                return (previous, current)
+            }
+            guard let change else {
                 showToast("Η καταγραφή δεν βρέθηκε.")
                 return
             }
-            entry.timestamp = newTimestamp
-            if let timeZoneIdentifier {
-                let trimmed = timeZoneIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty {
-                    entry.timeZoneIdentifier = trimmed
-                }
-            }
-            entry.lastModified = Date()
-            try await storage.saveEntry(entry)
             let sameIdCount = try await storage.getAllEntries().filter { $0.id == id }.count
             guard sameIdCount == 1 else {
                 showToast("Σφάλμα ακεραιότητας: διπλότυπο ID μετά από διόρθωση ημερομηνίας.")
                 return
             }
             await refreshEntries()
+            await exportEntryToObsidianIfConfigured(change.updated, previousEntry: change.previous)
+            let entry = change.updated
             showToast("✅ Ημερομηνία → \(entry.dateKey)")
         } catch {
             showToast("Σφάλμα ημερομηνίας: \(error.localizedDescription)")
@@ -1182,17 +1487,19 @@ public final class AppState: ObservableObject {
         var journalCommitted = false
         do {
             if let toEntryId {
-                let existingEntry = try await storage.getEntry(id: toEntryId)
-                if var entry = existingEntry {
-                    entry.attachments.append(attachment)
-                    entry.lastModified = Date()
-                    try await storage.saveEntry(entry)
+                let entry: JournalEntry? = try await mediaReferenceMutationGate.withExclusiveAccess { [self] in
+                    try await storage.appendAttachmentIfPresent(attachment, toEntryID: toEntryId)
+                }
+                if let entry {
                     journalCommitted = true
                     await refreshEntries()
                     await exportEntryToObsidianIfConfigured(entry)
                     showToast("✅ Media επισυνάφθηκε στην καταγραφή.")
                     return
                 }
+                throw NSError(domain: "R0lling.Journal", code: 404, userInfo: [
+                    NSLocalizedDescriptionKey: "Η καταγραφή δεν βρέθηκε· το media δεν επισυνάφθηκε."
+                ])
             }
 
             let content = (noteText?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap {
@@ -1205,7 +1512,9 @@ public final class AppState: ObservableObject {
                 tags: [attachment.mediaType.rawValue],
                 attachments: [attachment]
             )
-            try await storage.saveEntry(entry)
+            try await mediaReferenceMutationGate.withExclusiveAccess {
+                try await storage.saveEntry(entry)
+            }
             journalCommitted = true
             await refreshEntries()
             await exportEntryToObsidianIfConfigured(entry)

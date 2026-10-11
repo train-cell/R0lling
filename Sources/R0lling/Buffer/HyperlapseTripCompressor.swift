@@ -1,19 +1,46 @@
-import Foundation
 import CoreLocation
+import Foundation
 
-/// Συμπιεστής διαδρομών Hyper-lapse (Hyper-lapse Trip Compressor)
-/// Επιλέγει frames με βάση τη γεωγραφική μετατόπιση GPS (π.χ. ανά 12 μέτρα) και γωνία πορείας.
-/// Εξαλείφει στάσεις αναμονής (φανάρια, καφέ) και συνθέτει ένα ομαλό hyper-lapse 15-30s.
-/// GPS Haversine frame-select — **ready=false** (όχι video mux · όχι AppState surface).
-public final class HyperlapseTripCompressor: @unchecked Sendable {
-    
+/// Validation failures for GPS-sampled Hyper-lapse frame selection.
+public enum HyperlapseTripCompressorError: LocalizedError, Sendable {
+    case invalidMinimumDisplacement
+    case invalidTargetFrameRate
+    case invalidMaximumFrameCount
+    case invalidSample(index: Int)
+    case nonIncreasingTimestamp(index: Int)
+    case nonIncreasingFrameIndex(index: Int)
+    case nonFiniteResult
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidMinimumDisplacement:
+            "Η ελάχιστη μετατόπιση πρέπει να είναι θετικός, πεπερασμένος αριθμός."
+        case .invalidTargetFrameRate:
+            "Το frame rate πρέπει να είναι θετικός ακέραιος αριθμός."
+        case .invalidMaximumFrameCount:
+            "Το όριο καρέ πρέπει να είναι θετικό και τουλάχιστον δύο για διαδρομή με πολλά σημεία."
+        case let .invalidSample(index):
+            "Το δείγμα διαδρομής \(index) έχει άκυρα καρέ, συντεταγμένες ή heading."
+        case let .nonIncreasingTimestamp(index):
+            "Το timestamp του δείγματος \(index) δεν αυξάνεται."
+        case let .nonIncreasingFrameIndex(index):
+            "Το frame index του δείγματος \(index) δεν αυξάνεται."
+        case .nonFiniteResult:
+            "Οι μετρικές της διαδρομής δεν μπορούν να αναπαρασταθούν ως πεπερασμένοι αριθμοί."
+        }
+    }
+}
+
+/// Επιλέγει καρέ διαδρομής βάσει GPS μετατόπισης και διατηρεί το heading για downstream rendering.
+/// Δεν κάνει capture GPS ή export video· αυτά παραμένουν ξεχωριστά, readiness-gated integration work.
+public struct HyperlapseTripCompressor: Sendable {
     public struct GeoFrameSample: Sendable {
         public let frameIndex: Int
         public let timestamp: Double
         public let coordinate: CLLocationCoordinate2D
-        public let heading: Double // degrees (0-360)
+        public let heading: Double
         public let imageRelativePath: String
-        
+
         public init(
             frameIndex: Int,
             timestamp: Double,
@@ -28,7 +55,7 @@ public final class HyperlapseTripCompressor: @unchecked Sendable {
             self.imageRelativePath = imageRelativePath
         }
     }
-    
+
     public struct HyperlapseResult: Sendable {
         public let selectedFrames: [GeoFrameSample]
         public let totalDistanceMeters: Double
@@ -36,58 +63,137 @@ public final class HyperlapseTripCompressor: @unchecked Sendable {
         public let hyperlapseDurationSeconds: Double
         public let speedupFactor: Double
     }
-    
-    public var minDisplacementMeters: Double = 12.0
-    public var targetFps: Int = 30
-    
-    public init(minDisplacementMeters: Double = 12.0, targetFps: Int = 30) {
+
+    public let minDisplacementMeters: Double
+    public let targetFps: Int
+
+    public init(minDisplacementMeters: Double = 12.0, targetFps: Int = 30) throws {
+        guard minDisplacementMeters.isFinite, minDisplacementMeters > 0 else {
+            throw HyperlapseTripCompressorError.invalidMinimumDisplacement
+        }
+        guard targetFps > 0 else {
+            throw HyperlapseTripCompressorError.invalidTargetFrameRate
+        }
         self.minDisplacementMeters = minDisplacementMeters
         self.targetFps = targetFps
     }
-    
-    /// Υπολογισμός απόστασης Haversine μεταξύ δύο σημείων
-    public static func distanceInMeters(from coord1: CLLocationCoordinate2D, to coord2: CLLocationCoordinate2D) -> Double {
-        let loc1 = CLLocation(latitude: coord1.latitude, longitude: coord1.longitude)
-        let loc2 = CLLocation(latitude: coord2.latitude, longitude: coord2.longitude)
-        return loc1.distance(from: loc2)
+
+    /// Υπολογίζει γεωδαιτική απόσταση μεταξύ δύο σημείων.
+    public static func distanceInMeters(
+        from coordinate: CLLocationCoordinate2D,
+        to otherCoordinate: CLLocationCoordinate2D
+    ) -> Double {
+        CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            .distance(from: CLLocation(latitude: otherCoordinate.latitude, longitude: otherCoordinate.longitude))
     }
-    
-    /// Επιλογή των ιδανικών frames για το hyper-lapse
-    public func compressRoute(samples: [GeoFrameSample], maxResultFrames: Int = 450) -> HyperlapseResult {
-        guard !samples.isEmpty else {
-            return HyperlapseResult(selectedFrames: [], totalDistanceMeters: 0, originalDurationSeconds: 0, hyperlapseDurationSeconds: 0, speedupFactor: 1.0)
+
+    /// Επιλέγει καρέ σε όλη τη διαδρομή και περιορίζει το αποτέλεσμα διατηρώντας αρχή και τέλος.
+    public func compressRoute(
+        samples: [GeoFrameSample],
+        maxResultFrames: Int = 450
+    ) throws -> HyperlapseResult {
+        guard maxResultFrames > 0 else {
+            throw HyperlapseTripCompressorError.invalidMaximumFrameCount
         }
-        
-        var selected: [GeoFrameSample] = [samples[0]]
-        var lastCoord = samples[0].coordinate
-        var totalDist: Double = 0.0
-        
-        for i in 1..<samples.count {
-            let sample = samples[i]
-            let dist = Self.distanceInMeters(from: lastCoord, to: sample.coordinate)
-            
-            // Επιλογή frame μόνο αν υπήρξε πραγματική μετατόπιση (αποφυγή στάσεων)
-            if dist >= minDisplacementMeters {
-                selected.append(sample)
-                totalDist += dist
-                lastCoord = sample.coordinate
-                
-                if selected.count >= maxResultFrames {
-                    break
-                }
+        try validate(samples: samples)
+        guard samples.count <= 1 || maxResultFrames >= 2 else {
+            throw HyperlapseTripCompressorError.invalidMaximumFrameCount
+        }
+
+        guard let first = samples.first else {
+            return HyperlapseResult(
+                selectedFrames: [],
+                totalDistanceMeters: 0,
+                originalDurationSeconds: 0,
+                hyperlapseDurationSeconds: 0,
+                speedupFactor: 1
+            )
+        }
+
+        var candidates = [first]
+        var lastSelectedCoordinate = first.coordinate
+        var totalDistanceMeters = 0.0
+
+        for index in samples.indices.dropFirst() {
+            let sample = samples[index]
+            let previousSample = samples[index - 1]
+            let routeSegmentDistance = Self.distanceInMeters(
+                from: previousSample.coordinate,
+                to: sample.coordinate
+            )
+            let selectedFrameDisplacement = Self.distanceInMeters(
+                from: lastSelectedCoordinate,
+                to: sample.coordinate
+            )
+            guard routeSegmentDistance.isFinite, selectedFrameDisplacement.isFinite else {
+                throw HyperlapseTripCompressorError.nonFiniteResult
+            }
+
+            totalDistanceMeters += routeSegmentDistance
+            if selectedFrameDisplacement >= minDisplacementMeters {
+                candidates.append(sample)
+                lastSelectedCoordinate = sample.coordinate
             }
         }
-        
-        let originalDuration = (samples.last?.timestamp ?? 0) - (samples.first?.timestamp ?? 0)
-        let hyperlapseDuration = Double(selected.count) / Double(targetFps)
-        let speedup = hyperlapseDuration > 0 ? (originalDuration / hyperlapseDuration) : 1.0
-        
+
+        if let finalSample = samples.last, finalSample.frameIndex != candidates.last?.frameIndex {
+            candidates.append(finalSample)
+        }
+
+        let selectedFrames = Self.downsample(candidates, limit: maxResultFrames)
+        let originalDuration = samples.count > 1 ? samples[samples.count - 1].timestamp - first.timestamp : 0
+        let hyperlapseDuration = Double(selectedFrames.count) / Double(targetFps)
+        let rawSpeedup = hyperlapseDuration > 0 ? originalDuration / hyperlapseDuration : 1
+        guard totalDistanceMeters.isFinite,
+              originalDuration.isFinite,
+              hyperlapseDuration.isFinite,
+              rawSpeedup.isFinite else {
+            throw HyperlapseTripCompressorError.nonFiniteResult
+        }
+
         return HyperlapseResult(
-            selectedFrames: selected,
-            totalDistanceMeters: totalDist,
-            originalDurationSeconds: max(0, originalDuration),
+            selectedFrames: selectedFrames,
+            totalDistanceMeters: totalDistanceMeters,
+            originalDurationSeconds: originalDuration,
             hyperlapseDurationSeconds: hyperlapseDuration,
-            speedupFactor: max(1.0, speedup)
+            speedupFactor: max(1, rawSpeedup)
         )
+    }
+
+    private func validate(samples: [GeoFrameSample]) throws {
+        var previousTimestamp: Double?
+        var previousFrameIndex: Int?
+
+        for (index, sample) in samples.enumerated() {
+            guard sample.frameIndex >= 0,
+                  sample.timestamp.isFinite,
+                  CLLocationCoordinate2DIsValid(sample.coordinate),
+                  sample.heading.isFinite,
+                  (0...360).contains(sample.heading),
+                  !sample.imageRelativePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw HyperlapseTripCompressorError.invalidSample(index: index)
+            }
+
+            if let previousTimestamp, sample.timestamp <= previousTimestamp {
+                throw HyperlapseTripCompressorError.nonIncreasingTimestamp(index: index)
+            }
+            if let previousFrameIndex, sample.frameIndex <= previousFrameIndex {
+                throw HyperlapseTripCompressorError.nonIncreasingFrameIndex(index: index)
+            }
+            previousTimestamp = sample.timestamp
+            previousFrameIndex = sample.frameIndex
+        }
+    }
+
+    private static func downsample(_ frames: [GeoFrameSample], limit: Int) -> [GeoFrameSample] {
+        guard frames.count > limit else { return frames }
+        guard limit > 1 else { return [frames[0]] }
+
+        let lastSourceIndex = frames.count - 1
+        return (0..<limit).map { outputIndex in
+            let progress = Double(outputIndex) / Double(limit - 1)
+            let sourceIndex = Int((progress * Double(lastSourceIndex)).rounded())
+            return frames[sourceIndex]
+        }
     }
 }

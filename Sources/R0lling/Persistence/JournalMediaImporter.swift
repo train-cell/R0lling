@@ -38,19 +38,30 @@ public enum JournalMediaImporter: Sendable {
         giaOnomaArxeiou onoma: String,
         utTypeIdentifier: String? = nil
     ) throws -> MediaType {
+        let ext = (onoma as NSString).pathExtension.lowercased()
+        let playableVideoExtensions: Set<String> = ["mp4", "mov", "m4v"]
+        // AVPlayer does not reliably play these containers on Apple's platforms.
+        guard ext != "avi", ext != "mkv" else {
+            throw MediaApothikeusiError.agnostosTypos(onomaArxeiou: onoma)
+        }
+
         if let utTypeIdentifier,
            let ut = UTType(utTypeIdentifier) {
             if ut.conforms(to: .image) { return .photo }
-            if ut.conforms(to: .movie) || ut.conforms(to: .video) { return .video }
+            if ut.conforms(to: .movie) || ut.conforms(to: .video) {
+                guard playableVideoExtensions.contains(ext) else {
+                    throw MediaApothikeusiError.agnostosTypos(onomaArxeiou: onoma)
+                }
+                return .video
+            }
             if ut.conforms(to: .audiovisualContent) && ut.conforms(to: .audio) { return .audio }
             if ut.conforms(to: .audio) { return .audio }
         }
 
-        let ext = (onoma as NSString).pathExtension.lowercased()
         switch ext {
         case "jpg", "jpeg", "png", "heic", "heif", "gif", "webp", "tiff", "bmp":
             return .photo
-        case "mp4", "mov", "m4v", "avi", "mkv":
+        case "mp4", "mov", "m4v":
             return .video
         case "m4a", "aac", "mp3", "wav", "caf", "aiff":
             return .audio

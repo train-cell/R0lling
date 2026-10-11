@@ -65,8 +65,10 @@
 | Απόφαση | Τιμή | Αιτιολόγηση |
 |---|---|---|
 | **Spatial / Metal / Watermark / FileWatcher** | Μετακίνηση σε `Sources/R0lling/Experimental/` | AUDIT P1-04: delete **ή** Experimental — όχι delete (μαθηματικά/schema χρήσιμα μετά device proof). |
-| **Product surface** | `FeatureReadinessRegistry.*.ready = false` · **0** AppState holds | FREEZE μέχρι A05/A10 device. |
-| **DoD CLOSED** | Experimental path + flags + README | Δεν μετράει ως product feature. |
+| **Product surface** | `FeatureReadinessRegistry.*.ready = false`; gated modules stay off | FREEZE μέχρι A05/A10 device. |
+| **DoD CLOSED** | Experimental path + flags + README | Δεν μετράει ως πλήρες product feature. |
+
+**Current exception (2026-10-10):** B12's Obsidian watcher is connected as a debounced directory-entry hint for the selected root and nested directories in Settings. It reconciles added/removed folders and same-path directory replacements by identity, skips symlink subtrees, and surfaces reconciliation errors by stopping and marking the watcher unavailable. It does not read vault files, synchronize changes, or reliably detect edits to files inside existing directories. It remains `ready=false` pending Apple runtime/device validation. This narrow status surface supersedes the historical “0 AppState holds” assertion for the watcher only; other Experimental modules remain frozen.
 
 ---
 
@@ -75,5 +77,5 @@
 | Απόφαση | Τιμή | Αιτιολόγηση |
 |---|---|---|
 | **Split Journal/Clip/Assistant/Experimental** | **DEFERRED** μέχρι soft-GO (πράσινο `swift test`) | Μεγάλο refactor · regression risk · Karpathy surgical. |
-| **Orphan holds** | **CLOSED** | Spatial/Metal/Watermark/FileWatcher **δεν** κρατιούνται στο AppState · μόνο READY engines + gated acoustic/IMU/mirror. |
-| **Gate** | `FeatureReadinessRegistry` | Μοναδική πηγή αλήθειας για wave-B/C UI surface. |
+| **Orphan holds** | **CLOSED** | Spatial/Metal/Watermark δεν κρατιούνται στο AppState. Ο FileWatcher κρατιέται μόνο για status hint στο Settings· παραμένει `ready=false` και δεν κάνει import/sync. |
+| **Gate** | `FeatureReadinessRegistry` | Πηγή αλήθειας για product actions· ένα `ready=false` feature μπορεί να έχει μόνο ρητό diagnostic/status surface. |

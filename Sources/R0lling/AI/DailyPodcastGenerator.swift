@@ -4,7 +4,7 @@ import AVFAudio
 /// Μηχανή παραγωγής ημερήσιου Audio Podcast Digest μέσω TTS
 public final class DailyPodcastGenerator: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable {
     private let synthesizer = AVSpeechSynthesizer()
-    private var pendingCompletion: (@Sendable () -> Void)?
+    private let completionRegistry = SpeechCompletionRegistry()
 
     public override init() {
         super.init()
@@ -20,24 +20,24 @@ public final class DailyPodcastGenerator: NSObject, AVSpeechSynthesizerDelegate,
         utterance.rate = 0.50 // Φυσικός ρυθμός ομιλίας
         utterance.pitchMultiplier = 1.0
 
-        pendingCompletion = completion
+        if let completion {
+            completionRegistry.register(completion, for: utterance)
+        }
         synthesizer.speak(utterance)
     }
 
     public func stopPodcast() {
+        completionRegistry.discardAll()
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
         }
-        pendingCompletion = nil
     }
 
     public func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        let done = pendingCompletion
-        pendingCompletion = nil
-        done?()
+        completionRegistry.take(for: utterance)?()
     }
 
     public func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        pendingCompletion = nil
+        completionRegistry.discard(for: utterance)
     }
 }

@@ -58,6 +58,7 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("R0lling_Backup_\(UUID().uuidString).r0backup", isDirectory: true)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        try R0llingFileProtection.apply(to: tempDir)
         var completed = false
         defer {
             if !completed { try? FileManager.default.removeItem(at: tempDir) }
@@ -65,6 +66,7 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
 
         let mediaBundleDir = tempDir.appendingPathComponent("Media", isDirectory: true)
         try FileManager.default.createDirectory(at: mediaBundleDir, withIntermediateDirectories: true)
+        try R0llingFileProtection.apply(to: mediaBundleDir)
         var backupEntries = entries
 
         for entryIndex in backupEntries.indices {
@@ -105,7 +107,9 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
                             NSLocalizedDescriptionKey: "Ο προορισμός media μέσα στο backup δεν είναι κανονικό αρχείο."
                         ])
                     }
+                    try Self.requireFreeSpace(for: sourceSize, using: mediaStorage)
                     try FileManager.default.copyItem(at: sourceURL, to: destURL)
+                    try R0llingFileProtection.apply(to: destURL)
                     guard try Self.regularFileSize(at: destURL) == sourceSize,
                           try Self.filesHaveEqualBytes(sourceURL, destURL) else {
                         throw NSError(domain: AppErrorTaxonomy.backupDomain, code: 6, userInfo: [
@@ -129,7 +133,9 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
                 message: "Το backup manifest υπερβαίνει το επιτρεπόμενο όριο των 16 MiB."
             )
         }
-        try manifestData.write(to: tempDir.appendingPathComponent("manifest.json"), options: .atomic)
+        let manifestURL = tempDir.appendingPathComponent("manifest.json")
+        try manifestData.write(to: manifestURL, options: R0llingFileProtection.atomicWriteOptions)
+        try R0llingFileProtection.apply(to: manifestURL)
 
         completed = true
         return tempDir
@@ -280,17 +286,28 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
                     continue
                 }
 
-                let requestedTargetURL = try mediaStorage.getMediaFileURL(relativePath: attachment.relativePath)
                 var outputRelativePath = attachment.relativePath
-                if FileManager.default.fileExists(atPath: requestedTargetURL.path) {
-                    if let existingTargetSize = try Self.regularFileSize(at: requestedTargetURL) {
-                        if existingTargetSize == bundledSize,
-                           try Self.filesHaveEqualBytes(requestedTargetURL, backupMediaURL) {
-                            mappedMediaPaths[originalAttachment.relativePath] = outputRelativePath
-                            restoredEntry.attachments.append(attachment)
-                            continue
+                do {
+                    let requestedTargetURL = try mediaStorage.getMediaFileURL(relativePath: attachment.relativePath)
+                    if FileManager.default.fileExists(atPath: requestedTargetURL.path) {
+                        if let existingTargetSize = try Self.regularFileSize(at: requestedTargetURL) {
+                            if existingTargetSize == bundledSize,
+                               try Self.filesHaveEqualBytes(requestedTargetURL, backupMediaURL) {
+                                mappedMediaPaths[originalAttachment.relativePath] = outputRelativePath
+                                restoredEntry.attachments.append(attachment)
+                                continue
+                            }
                         }
+                        outputRelativePath = try Self.uniqueRelativePath(
+                            for: attachment,
+                            avoiding: stagedPaths,
+                            mediaStorage: mediaStorage
+                        )
                     }
+                } catch MediaApothikeusiError.unsafeRelativePath {
+                    // Existing directories and special files are deliberately rejected by
+                    // MediaStorageService. Preserve them and restore the backup under a fresh
+                    // safe name instead of failing or weakening that path-validation boundary.
                     outputRelativePath = try Self.uniqueRelativePath(
                         for: attachment,
                         avoiding: stagedPaths,
@@ -315,6 +332,7 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
                 // file itself before it can be installed as a journal attachment.
                 try R0llingFileProtection.apply(to: mediaRootDirectory)
                 try R0llingFileProtection.apply(to: mediaTypeDirectory)
+                try Self.requireFreeSpace(for: bundledSize, using: mediaStorage)
                 let stagedURL = mediaTypeDirectory
                     .appendingPathComponent(".restore-\(UUID().uuidString)-\(targetMediaURL.lastPathComponent)")
                 stagedMedia.append((
@@ -442,6 +460,22 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
                     )
                 }
             }
+        }
+    }
+
+    /// Backup creation and restore both duplicate media bytes on the application's media volume.
+    /// Preserve the same free-space reserve required by ordinary media imports before each copy.
+    private static func requireFreeSpace(
+        for payloadBytes: Int64,
+        using mediaStorage: MediaStorageProtocol
+    ) throws {
+        let required = payloadBytes.addingReportingOverflow(ELAXISTOS_ELEUTHEROS_XOROS_BYTES)
+        let available = mediaStorage.availableFreeDiskSpace()
+        guard payloadBytes > 0, !required.overflow, available >= required.partialValue else {
+            throw MediaApothikeusiError.anepikisXoros(
+                diathesima: available,
+                apaitoumena: payloadBytes > 0 && !required.overflow ? required.partialValue : Int64.max
+            )
         }
     }
 

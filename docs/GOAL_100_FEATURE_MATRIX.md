@@ -1,18 +1,21 @@
-> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+> Snapshot updated 2026-10-10: this matrix preserves historical assertions and design targets; the rows below are not a verified report of the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md), [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md), and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md) for current evidence. Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
 
 # R0lling — GOAL 100% Feature Matrix (DoD)
 
 ```yaml
-Last_Modified: 2026-10-09T02:05:33+03:00
+Last_Modified: 2026-10-10
 role: integrator-orchestrator
 current_authority: [docs/IMPLEMENTATION_STATUS.md, docs/CAPABILITY_MATRIX.md, docs/FINDINGS_REMEDIATION.md]
 historical_audit_snapshot: docs/AUDIT_FINAL.md
 plan: R0lling-Project-Plan.md §12 A01–A16
 policy: source presence ≠ feature verification · no completion percentage without runtime evidence
-git_commit: NONE (local working tree)
+base_HEAD: 46fe0253a981071595fdcf9257791c9536b701e5
+remediation_commit: NONE (local working tree is uncommitted)
 ```
 
 **Σκοπός:** Acceptance checklist και source inventory. A listed implementation path is not a claim that its feature passed tests or works on a device.
+
+**Current UI follow-up (2026-10-10):** Today share is wired to a Bevel-inspired image composer (`TodayShareComposerView`) with ring-based cards, rotating coverage of all available HealthKit readings, customization, and PNG save/copy/share actions. The square preview respects available height; the second default Overview card uses the monochrome treatment in `IMG_0480`, and custom monochrome palette selection remains available. The source contract covers these rules; Apple build, export/share interaction, and rendered `IMG_0479`/`IMG_0480` comparison are still pending. This does not change any A-ID or readiness count.
 
 **Legend readiness**
 
@@ -23,6 +26,8 @@ git_commit: NONE (local working tree)
 | `DEV` | Απαιτεί iPhone / Gen2 / live credentials / Files picker / Watch |
 | `ORPHAN` | Wave-B/C χωρίς caller — DoD = wire **ή** Experimental/`#if` + honest docs |
 | `FREEZE` | Out-of-plan μέχρι A05/A10 device proof (wave D+) |
+
+`FeatureReadinessRegistry.ready` means the source path is wired and may be exposed. It does not mean the feature passed an Apple build, runtime, device, or release acceptance gate. A feature with pending `MAC` or `DEV` evidence remains incomplete for this 100% matrix even when its source flag is `true`.
 
 **Status snapshot** (integrator @ matrix create · re-scan ενημερώνει):
 
@@ -192,19 +197,19 @@ git_commit: NONE (local working tree)
 | B03 | Spatial audio | `Experimental/SpatialAudioProcessor` | Experimental orphan · P1-04 ✅ | Keep Experimental **ή** wire σε mux | `ORPHAN` ✅ |
 | B04 | Adaptive battery stream | `MetaGlassesAdapter` | sim battery path | Real battery telemetry → FPS/bitrate · Gen2 proof | `DEV` |
 | B05 | Earcons | `EarconFeedbackService` | iOS system sounds | Earcon on clip/error paths · optional glasses audio route proof | `SW`/`DEV` |
-| B06 | On-device Vision OCR | `OnDeviceVisionService` | held | Call από WhatAmISeeing prefilter · VN request PASS σε device | `DEV` |
-| B07 | Multi-frame vision | `AIRouter.askWhatAmISeeingMultiFrames` | method exists · UI path thin | Sample 3–4 keyframes από buffer · live vision | `DEV` |
+| B06 | On-device Vision OCR | `OnDeviceVisionService` + `OnDeviceVisionAnalysisPipeline` + `AppState.executeWhatAmISeeing` | Local OCR now runs before optional cloud description; isolated pipeline tests pass, but native Vision OCR and image recognition still need Apple-device verification | VN request PASS σε device | `SW source-tested` / `DEV` pending |
+| B07 | Multi-frame vision | `AIRouter.askWhatAmISeeingMultiFrames` + `AppState.executeWhatAmISeeing` | AppState submits available buffer keyframes when at least two exist; the live DAT H264→image feed is still unavailable and keyframe capture remains unverified | Produce 3–4 real keyframes from DAT buffer · live vision | `SW caller-wired` / `DEV` pending |
 | B08 | Proximity alerts | `ProximityAlertManager` | held · no feed | Vision loop feed + cooldown · **ή** Experimental | `ORPHAN`/`DEV` |
-| B09 | Voice emotion tags | `VoiceEmotionAnalyzer` | text heuristic in `addNote` | Prosody from audio **ή** rename to text-tag honesty + tests | `SW` |
-| B10 | PII scrubber | `LocalEntityRecognizer` | held | Call before AI send · redaction unit tests | `SW` |
+| B09 | Transcript keyword cues | `TranscriptKeywordTagger` via `AppState.addNote` | Greek/English keyword cues use word/phrase boundaries, are visibly labeled `κείμενο: …`, and pass 5/5 isolated regression tests; no acoustic emotion inference is claimed | Keep wording text-based; audio prosody analysis is outside current implementation | `SW source-tested` |
+| B10 | PII scrubber | `OutboundPIIRedactor` in shared chat request builder | Common email, mod-97-checksum-valid IBAN, Luhn-valid payment-card, US SSN, contextual Greek AFM, and phone patterns are scrubbed from outbound text; tests cover provider-bound requests | Best-effort only: image pixels, names, and free-form addresses are not inferred; Apple provider/device path validation remains pending | `SW` |
 | B11 | Obsidian Canvas | `ObsidianCanvasGenerator` | wired fail-closed G5-003 | Export opens in Obsidian · nodes match entries | `SW`/`DEV` |
-| B12 | File watcher | `Experimental/ObsidianFileWatcher` | Experimental orphan · P1-04 ✅ | Keep Experimental **ή** wire σε bridge | `ORPHAN` ✅ |
+| B12 | File watcher | `Experimental/ObsidianFileWatcher` + AppState + Settings | Debounced directory-entry hints for root and nested directories; reconciles new/removed directories and skips symlink subtrees; no content reads/sync or reliable file-content edit detection | Apple Files-provider/security-scope/device validation; keep readiness false meanwhile | `SW source-tested` / `DEV pending` |
 | B13 | Dataview YAML | `ObsidianVaultBridge` frontmatter | export path | Dataview query sample in docs + export sample file | `SW` |
 | B14 | Daily podcast | `DailyPodcastGenerator` | wired · G5-005/P2-020 | Summarize→speech completion-at-end · device hear | `SW`/`DEV` |
 | B15 | Scavenger streaks | `ScavengerHuntStreakManager` | wired G5-002/P2-024 | Persist survives restart · badge unlock proof | `SW`/`MAC` |
 | B16 | Time Capsule | `TimeCapsuleEngine` | wired TodayView | TZ-aware anniversary entries on device | `SW`/`DEV` |
-| B17 | Highlight reel | `HighlightReelMuxer` | AVComposition G5-001 | `AVAsset.isPlayable` reel σε Mac · ≥2 clips | `MAC`/`DEV` |
-| B18 | Watermark export | `Experimental/ClipWatermarkExporter` | Experimental orphan · P1-04 ✅ | Keep Experimental **ή** wire σε share | `ORPHAN` ✅ |
+| B17 | Highlight reel | `HighlightReelMuxer` + `HighlightReelJournalCommitter` | AVComposition G5-001; verified video is attached to a journal entry for in-app playback | `AVAsset.isPlayable` reel σε Mac · ≥2 clips · journal reference + attachment playback | `MAC`/`DEV` |
+| B18 | Watermark export | `Experimental/ClipWatermarkExporter` + `MediaViewerSheet` | AVFoundation/Core Animation overlay exporter and gated share action implemented; `ready=false` pending Apple validation | Run Apple build and fixture render/playability test, compare result in Simulator/device, then reassess readiness | `SW pending` / `MAC` / `DEV` |
 | B19 | Metal frame pool | `Experimental/MetalFrameBufferPool` | Experimental orphan · P1-04 ✅ | Keep Experimental **ή** real Metal | `ORPHAN` ✅ |
 | B20 | Watch companion | `WatchConnectivityCoordinator` | schema SEC-003 · no Watch target | watchOS target + clip/note E2E **ή** document latent + hide UI | `DEV` |
 
@@ -218,7 +223,7 @@ git_commit: NONE (local working tree)
 | C02 | Turn-taking | `TurnTakingGuard` | no VAD | VAD/mic gate στο speech · **ή** Experimental | `ORPHAN`/`DEV` |
 | C03 | Remote mirror | `RemoteMirrorStreamServer` | AUTH + Release kill · ready=false | TLS identity πριν ready=true · frames από buffer | `SW` harden ✅ · `DEV` frames |
 | C04 | Knowledge graph | `AssociativeKnowledgeGraphEngine` | heuristic Mermaid | Export non-empty · Obsidian opens · no fake success | `SW` (partial ready) |
-| C05 | Hyperlapse | `HyperlapseTripCompressor` | GPS math · no mux | AV mux output playable **ή** Experimental | `ORPHAN`/`DEV` |
+| C05 | Hyperlapse | `HyperlapseTripCompressor` | Validated GPS-sample frame selection only; no location capture, video mux, or UI; registry remains not ready | AV mux output playable **ή** keep explicitly experimental/readiness-gated | `ORPHAN`/`DEV` |
 | C06 | Whisper offline | `LocalWhisperOfflineService` | stub fail-closed | Real model **ή** keep stub + UI never claims offline STT | `SW` honesty / `DEV` model |
 | C07 | Meal nutrition | `MealNutritionVisionLogger` | heuristic tokens | Label always «estimate» · optional HealthKit later backlog | `SW` honesty OK if labeled |
 
@@ -228,13 +233,13 @@ git_commit: NONE (local working tree)
 
 | ID | DoD CLOSED | Touches |
 |---|---|---|
-| **SEC-001 AUTH** | ✅ CLOSED stub (pairing + AUTH before pool) | Mirror |
-| **SEC-001-TLS** | ✅ kill-in-Release · TLS identity πριν `mirror.ready=true` | Mirror · AppState |
+| **SEC-001 AUTH** | DEBUG-only authenticated listener; production pairing/provisioning is incomplete | Mirror |
+| **SEC-001-TLS** | Release listener fails closed; TLS identity and secure frame delivery are absent; `mirror.ready=false` | Mirror · AppState |
 | **SEC-002** | ✅ PathAsfaleia | Media/Backup/Obsidian |
 | **SEC-003** | ✅ schema (latent χωρίς Watch) | WatchConnectivity |
 | **SEC-004** | ✅ Hermes rejects non-HTTPS except LAN allowlist | HermesConnector · Settings |
 | **SEC-005** | ✅ status-only errors | Hermes/Direct |
-| **SEC-007** | ✅ URL allowlist localhost + RFC1918 (+ optional VPN CIDR) | HermesConnector · Settings |
+| **SEC-007** | Fixed allowlist: localhost, RFC1918, IPv4 link-local, Tailscale `100.64/10`, and `.local`; no configurable VPN CIDR | HermesConnector · Settings |
 
 ---
 
@@ -308,25 +313,25 @@ Progress rollup docs/GOAL_100_PROGRESS.md   (integrator updates after re-scan)
 
 ### Plan A-IDs — source inventory (not completion status)
 
-The rows below identify code paths and outstanding proof. Their labels are not pass marks. No Swift XCTest, Apple build, iPhone, or Gen 2 verification ran in this checkout.
+The rows below identify code paths and outstanding proof. Their labels are not pass marks. Selected isolated Linux SwiftPM suites have run (including 15 journal cases and, in the latest continuation, 12 Hyperlapse cases); the complete Apple XCTest target, Apple build, iPhone, and Gen 2 verification have not run.
 
 | ID | Source path / current scope | Verification status |
 |---|---|---|
-| A01 | Journal persistence and restart path | XCTest/build not run |
-| A02 | Edit/search/date filtering | XCTest and UI smoke not run |
+| A01 | Journal persistence and restart path | 15 isolated Linux XCTest cases passed across journal storage and protocol compatibility; full Apple target remains unrun |
+| A02 | Edit/search/date filtering | Some date/search logic has isolated coverage; full Apple XCTest and UI smoke remain unrun |
 | A03 | Photos/Files media import, sandbox storage and preview | XCTest/device picker smoke not run |
 | A04 | Speech transcription and command parsing | XCTest/device microphone check not run |
 | A05 | Simulation clip path; live DAT capture/remux remains unavailable | XCTest/AVFoundation/device checks not run |
 | A06 | Buffer warm-up and disconnect handling | XCTest/device concurrency check not run |
 | A07 | Background/lock pause policy | Device lifecycle check not run |
-| A08 | Obsidian vault export and scoped access | XCTest/Files provider check not run |
-| A09 | Obsidian conflict sidecars | XCTest/Files provider check not run |
+| A08 | Obsidian vault export and scoped access | Obsidian bridge/path harness passes 35/35 Linux-applicable tests; Apple coordination, bookmarks, and Files-provider validation remain open |
+| A09 | Obsidian conflict sidecars | Hash persistence and root-level sidecar reuse pass in the 35/35 isolated harness; Apple coordination and Files-provider behavior remain open |
 | A10 | Direct API/Hermes adapters and settings | XCTest/live endpoint check not run |
-| A11 | Photos vision/OCR fallback; DAT multi-frame path unavailable | XCTest/live reply check not run |
+| A11 | Photos vision/OCR fallback; DAT multi-frame path unavailable | Local-first OCR orchestration passes 5/5 Linux-applicable tests; native Vision, Apple build, live provider reply, and DAT multi-frame capture remain unverified |
 | A12 | Keyword recall; semantic embeddings unavailable | XCTest/live AI polish not run |
-| A13 | Agent memory folder and preferences | XCTest/device export check not run |
+| A13 | Agent memory folder and preferences | Agent transaction, symlink, and size tests are included in the 35/35 Obsidian harness; Apple Files-provider export remains unverified |
 | A14 | Observation game and fail-closed evaluation | XCTest/device flow not run |
-| A15 | Plain JSON backup bundle, Files export/restore | XCTest/Files export and restore not run |
+| A15 | Plain JSON backup bundle, Files export/restore | BackupRestoreTests pass 15/15 in isolated Linux SwiftPM harness (iOS protection case excluded); Files-provider export and full Apple target remain unrun |
 | A16 | Error taxonomy and privacy declarations | XCTest/Apple build not run |
 
 **Device-proven:** ακόμα **0 / 16**.

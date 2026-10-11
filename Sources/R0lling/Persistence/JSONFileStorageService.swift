@@ -2,7 +2,10 @@ import Foundation
 
 /// Τοπική ασφαλής αποθήκευση καταγραφών σε Sandboxed JSON με Schema Versioning v1
 public actor JSONFileStorageService: JournalStorageProtocol {
+    public static let maximumJournalFileBytes = 64 * 1024 * 1024
+
     private let storageURL: URL
+    private let maximumFileBytes: Int
     private var entriesCache: [UUID: JournalEntry] = [:]
     private var isLoaded = false
 
@@ -21,15 +24,22 @@ public actor JSONFileStorageService: JournalStorageProtocol {
     }
 
     public init(storageURL: URL? = nil) {
-        if let url = storageURL {
-            self.storageURL = url
-        } else {
-            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-                ?? FileManager.default.temporaryDirectory
-            let r0llingDir = appSupport.appendingPathComponent("R0lling", isDirectory: true)
-            try? FileManager.default.createDirectory(at: r0llingDir, withIntermediateDirectories: true)
-            self.storageURL = r0llingDir.appendingPathComponent("journal_v1.json")
-        }
+        self.storageURL = Self.resolvedStorageURL(storageURL)
+        self.maximumFileBytes = Self.maximumJournalFileBytes
+    }
+
+    init(storageURL: URL? = nil, testingMaximumFileBytes: Int) {
+        self.storageURL = Self.resolvedStorageURL(storageURL)
+        self.maximumFileBytes = max(1, min(testingMaximumFileBytes, Self.maximumJournalFileBytes))
+    }
+
+    private static func resolvedStorageURL(_ storageURL: URL?) -> URL {
+        if let storageURL { return storageURL }
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        let r0llingDir = appSupport.appendingPathComponent("R0lling", isDirectory: true)
+        try? FileManager.default.createDirectory(at: r0llingDir, withIntermediateDirectories: true)
+        return r0llingDir.appendingPathComponent("journal_v1.json")
     }
 
     private func ensureLoaded() throws {
@@ -43,7 +53,10 @@ public actor JSONFileStorageService: JournalStorageProtocol {
 
         do {
             try R0llingFileProtection.apply(to: storageURL)
-            let data = try Data(contentsOf: storageURL)
+            let data = try BoundedRegularFileReader.readData(
+                at: storageURL,
+                maximumBytes: maximumFileBytes
+            )
             let decoder = JSONDecoder()
             // R3-001: encode χρησιμοποιεί .iso8601 — το decode πρέπει να ταιριάζει αλλιώς χάνεται το journal στο restart.
             decoder.dateDecodingStrategy = .iso8601
@@ -65,16 +78,74 @@ public actor JSONFileStorageService: JournalStorageProtocol {
     }
 
     private func flushToDisk(entries: [UUID: JournalEntry]) throws {
+        try enforceSerializedSizeUpperBound(entries: entries)
         let container = StorageContainer(entries: Array(entries.values))
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(container)
+        guard data.count <= maximumFileBytes else {
+            throw journalSizeExceededError()
+        }
 
         // Ατομική εγγραφή για προστασία από διακοπές ρεύματος / crashes
         try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try R0llingFileProtection.apply(to: storageURL.deletingLastPathComponent())
         try data.write(to: storageURL, options: R0llingFileProtection.atomicWriteOptions)
+    }
+
+    /// Rejects huge string/collection payloads before JSONEncoder allocates the full document.
+    private func enforceSerializedSizeUpperBound(entries: [UUID: JournalEntry]) throws {
+        var estimatedBytes = 1_024 // Container keys, metadata, and formatting.
+
+        func add(_ byteCount: Int) throws {
+            let (next, overflow) = estimatedBytes.addingReportingOverflow(byteCount)
+            guard !overflow, next <= maximumFileBytes else {
+                throw journalSizeExceededError()
+            }
+            estimatedBytes = next
+        }
+
+        func addString(_ value: String?) throws {
+            guard let value else { return }
+            try add(2) // JSON string delimiters.
+            for scalar in value.unicodeScalars {
+                let encodedByteCount: Int
+                switch scalar.value {
+                case 0x22, 0x2F, 0x5C: // Quote, slash, and backslash.
+                    encodedByteCount = 2
+                case 0x00...0x1F:
+                    encodedByteCount = 6 // Conservative upper bound for a JSON control escape.
+                default:
+                    encodedByteCount = scalar.utf8.count
+                }
+                try add(encodedByteCount)
+            }
+        }
+
+        for entry in entries.values {
+            try add(512) // Keys, dates, UUID, flags, separators, and number fields.
+            try addString(entry.timeZoneIdentifier)
+            try addString(entry.title)
+            try addString(entry.content)
+            try addString(entry.source.rawValue)
+            try addString(entry.locationName)
+            try add(entry.tags.count) // Array separators.
+            for tag in entry.tags { try addString(tag) }
+
+            for attachment in entry.attachments {
+                try add(512) // Attachment keys and fixed metadata.
+                try addString(attachment.relativePath)
+                try addString(attachment.originalFilename)
+                try addString(attachment.mediaType.rawValue)
+            }
+        }
+    }
+
+    private func journalSizeExceededError() -> NSError {
+        NSError(domain: "R0lling.Journal", code: 4, userInfo: [
+            NSLocalizedDescriptionKey: "Το journal υπερβαίνει το όριο των \(maximumFileBytes) bytes. Η προηγούμενη εγγραφή διατηρήθηκε."
+        ])
     }
 
     public func saveEntry(_ entry: JournalEntry) throws {
@@ -83,6 +154,31 @@ public actor JSONFileStorageService: JournalStorageProtocol {
         updated[entry.id] = entry
         try flushToDisk(entries: updated)
         entriesCache = updated
+    }
+
+    public func updateEntryIfPresent(_ entry: JournalEntry) async throws -> Bool {
+        try ensureLoaded()
+        guard entriesCache[entry.id] != nil else { return false }
+        var updated = entriesCache
+        updated[entry.id] = entry
+        try flushToDisk(entries: updated)
+        entriesCache = updated
+        return true
+    }
+
+    public func appendAttachmentIfPresent(
+        _ attachment: MediaAttachment,
+        toEntryID id: UUID
+    ) async throws -> JournalEntry? {
+        try ensureLoaded()
+        guard var entry = entriesCache[id] else { return nil }
+        entry.attachments.append(attachment)
+        entry.lastModified = Date()
+        var updated = entriesCache
+        updated[id] = entry
+        try flushToDisk(entries: updated)
+        entriesCache = updated
+        return entry
     }
 
     public func insertEntriesIfAbsentAtomically(_ entries: [JournalEntry]) throws -> Set<UUID> {

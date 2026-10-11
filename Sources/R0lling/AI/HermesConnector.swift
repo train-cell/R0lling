@@ -29,15 +29,11 @@ public final class HermesConnector: AIConnectorProtocol, @unchecked Sendable {
 
         try Task.checkCancellation()
 
-        let messages = OpenAIChatRequestBuilder.buildMessages(
+        let body = try OpenAIChatRequestBuilder.buildBoundedRequestBody(
             payload: payload,
             defaultSystemPrompt: "Είσαι ο Hermes, ο προσωπικός AI Jarvis βοηθός του R0lling που εκτελείται στο Home PC. Απαντάς στα Ελληνικά με εξαιρετική ακρίβεια.",
-            memoryHeader: "Μνήμη & Σημειώσεις Agent:"
-        )
-
-        let body = try OpenAIChatRequestBuilder.buildRequestBody(
+            memoryHeader: "Μνήμη & Σημειώσεις Agent:",
             model: "hermes-agent",
-            messages: messages,
             temperature: 0.6
         )
 
@@ -83,6 +79,7 @@ public final class HermesConnector: AIConnectorProtocol, @unchecked Sendable {
     }
 
     public func describeImage(imageData: Data, question: String?) async throws -> String {
+        try OpenAIChatRequestBuilder.addingVisionFrameBytes(imageData.count)
         let b64 = imageData.base64EncodedString()
         let promptText = question ?? "Hermes, τι βλέπω στα Meta Glasses μου αυτή τη στιγμή;"
         let payload = AIRequestPayload(prompt: promptText, imageBase64: b64)

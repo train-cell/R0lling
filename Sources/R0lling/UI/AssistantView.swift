@@ -17,6 +17,12 @@ public struct AssistantView: View {
             // Quick Action Toolbar
             quickActionsBar
 
+            if let estimate = appState.pendingNutritionEstimate {
+                mealNutritionReview(estimate)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+            }
+
             // Chat Messages Stream
             ScrollViewReader { proxy in
                 ScrollView {
@@ -373,6 +379,86 @@ public struct AssistantView: View {
         .background(R0llingTheme.bgSurface.opacity(0.8))
     }
 
+    private func mealNutritionReview(_ estimate: MealNutritionVisionLogger.NutritionSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Ενδεικτική εκτίμηση γεύματος")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(R0llingTheme.textPrimary)
+                Spacer()
+                Text("~\(Int(estimate.totalCalories)) kcal")
+                    .font(.system(.subheadline, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(R0llingTheme.accentCyan)
+            }
+            Text("\(estimate.mealType.rawValue) · \(estimate.timestamp.formatted(date: .abbreviated, time: .shortened))")
+                .font(.caption2)
+                .foregroundStyle(R0llingTheme.textMuted)
+
+            ForEach(estimate.items) { item in
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text(item.name)
+                        Spacer(minLength: 8)
+                        Text("~\(Int(item.estimatedGrams)) g · ~\(Int(item.calories)) kcal")
+                            .monospacedDigit()
+                    }
+                    Text("Πρ. ~\(String(format: "%.1f", item.proteinGrams)) g · Υδ. ~\(String(format: "%.1f", item.carbsGrams)) g · Λιπ. ~\(String(format: "%.1f", item.fatGrams)) g")
+                        .font(.caption2)
+                }
+                .font(.caption)
+                .foregroundStyle(R0llingTheme.textSecondary)
+            }
+
+            Text("Σύνολο: Πρ. ~\(String(format: "%.1f", estimate.totalProtein)) g · Υδ. ~\(String(format: "%.1f", estimate.totalCarbs)) g · Λιπ. ~\(String(format: "%.1f", estimate.totalFat)) g")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(R0llingTheme.textSecondary)
+
+            Text("Βασίζεται σε αναγνωρισμένους όρους OCR και σταθερές ευρετικές τιμές. Δεν είναι μέτρηση· έλεγξέ την πριν την αποθήκευση.")
+                .font(.caption2)
+                .foregroundStyle(R0llingTheme.textMuted)
+
+            HStack(spacing: 10) {
+                Button {
+                    Task { await appState.savePendingNutritionEstimate() }
+                } label: {
+                    Label(
+                        appState.pendingNutritionEstimateIsSaved ? "Αποθηκεύτηκε" : "Αποθήκευση εκτίμησης",
+                        systemImage: appState.pendingNutritionEstimateIsSaved ? "checkmark" : "square.and.arrow.down"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(R0llingTheme.textPrimary)
+                    .frame(minHeight: 44)
+                    .padding(.horizontal, 12)
+                    .background(R0llingTheme.bgElevated)
+                    .clipShape(Capsule())
+                    .r0llingBevelCapsule()
+                }
+                .buttonStyle(.plain)
+                .disabled(appState.isSavingNutritionEstimate || appState.pendingNutritionEstimateIsSaved)
+                .accessibilityLabel("Αποθήκευση ενδεικτικής εκτίμησης γεύματος στο ημερολόγιο")
+                .accessibilityHint("Η αποθήκευση γίνεται μόνο μετά από αυτή την επιβεβαίωση.")
+
+                Button {
+                    appState.discardPendingNutritionEstimate()
+                } label: {
+                    Text(appState.pendingNutritionEstimateIsSaved ? "Κλείσιμο" : "Απόρριψη")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(R0llingTheme.textSecondary)
+                        .frame(minHeight: 44)
+                        .padding(.horizontal, 12)
+                }
+                .buttonStyle(.plain)
+                .disabled(appState.isSavingNutritionEstimate)
+                .accessibilityLabel(appState.pendingNutritionEstimateIsSaved ? "Κλείσιμο εκτίμησης γεύματος" : "Απόρριψη εκτίμησης γεύματος")
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .r0llingBevelSurface(cornerRadius: 18)
+        .accessibilityElement(children: .contain)
+    }
+
     private var chatComposer: some View {
         HStack(spacing: 10) {
             TextField("Ρώτησε κάτι τον βοηθό...", text: $inputPrompt)
@@ -467,26 +553,58 @@ public struct ChatMessageBubble: View {
 }
 
 public struct AgentMemorySheet: View {
+    private enum LoadState: Equatable {
+        case idle
+        case loading
+        case loaded
+        case failed
+    }
+
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var memoryNotes: String = ""
     @State private var userPreferences: String = ""
     @State private var openLoops: String = ""
+    @State private var loadState: LoadState = .idle
+    @State private var loadErrorMessage: String?
 
     public var body: some View {
         NavigationView {
             Form {
+                if loadState == .loading {
+                    Section {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text("Φόρτωση μνήμης…")
+                                .foregroundColor(R0llingTheme.textSecondary)
+                        }
+                    }
+                } else if loadState == .failed {
+                    Section {
+                        Label(
+                            loadErrorMessage ?? "Η μνήμη δεν φορτώθηκε.",
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .foregroundColor(R0llingTheme.statusWarning)
+                        Button("Δοκιμή ξανά", systemImage: "arrow.clockwise") {
+                            loadMemory()
+                        }
+                    }
+                }
                 Section(header: Text("Μνήμη Βοηθού (Memory.md)")) {
                     TextEditor(text: $memoryNotes)
                         .frame(height: 120)
+                        .disabled(loadState != .loaded)
                 }
                 Section(header: Text("Προτιμήσεις Χρήστη (Preferences.md)")) {
                     TextEditor(text: $userPreferences)
                         .frame(height: 100)
+                        .disabled(loadState != .loaded)
                 }
                 Section(header: Text("Εκκρεμότητες (Open-loops.md)")) {
                     TextEditor(text: $openLoops)
                         .frame(height: 100)
+                        .disabled(loadState != .loaded)
                 }
             }
             .r0llingFormSurface()
@@ -513,16 +631,28 @@ public struct AgentMemorySheet: View {
                             }
                         }
                     }
+                    .disabled(loadState != .loaded)
                 }
             }
             .onAppear {
-                Task {
-                    if let loaded = try? await appState.agentManager.loadAgentMemory() {
-                        memoryNotes = loaded.memoryNotes
-                        userPreferences = loaded.userPreferences
-                        openLoops = loaded.openLoops
-                    }
-                }
+                if loadState == .idle { loadMemory() }
+            }
+        }
+    }
+
+    private func loadMemory() {
+        loadState = .loading
+        loadErrorMessage = nil
+        Task {
+            do {
+                let loaded = try await appState.agentManager.loadAgentMemory()
+                memoryNotes = loaded.memoryNotes
+                userPreferences = loaded.userPreferences
+                openLoops = loaded.openLoops
+                loadState = .loaded
+            } catch {
+                loadErrorMessage = error.localizedDescription
+                loadState = .failed
             }
         }
     }
@@ -626,21 +756,36 @@ public struct ObservationGameSheet: View {
                 Spacer()
 
                 VStack(spacing: 12) {
+                    if appState.isSimulationMode {
+                        Label(
+                            "Η κάμερα γυαλιών δεν είναι διαθέσιμη σε Simulation. Επίλεξε φωτογραφία.",
+                            systemImage: "eyeglasses"
+                        )
+                        .font(.footnote.weight(.medium))
+                        .foregroundColor(R0llingTheme.statusWarning)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(R0llingTheme.bgElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .accessibilityAddTraits(.isStaticText)
+                    }
+
                     Button(action: {
                         Task { await trexeAxiologisiGyalion() }
                     }) {
                         HStack {
                             Image(systemName: "camera.fill")
-                            Text("Έλεγχος με Κάμερα Γυαλιών")
+                            Text(appState.isSimulationMode ? "Κάμερα μη διαθέσιμη (Simulation)" : "Έλεγχος με Κάμερα Γυαλιών")
                         }
                         .font(.headline.weight(.bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(appState.isSimulationMode ? R0llingTheme.textSecondary : .white)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(isEvaluating ? R0llingTheme.bgElevated : R0llingTheme.accentPurple)
+                        .background(isEvaluating || appState.isSimulationMode ? R0llingTheme.bgElevated : R0llingTheme.accentPurple)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
-                    .disabled(isEvaluating || appState.currentMission?.isCompleted == true)
+                    .disabled(isEvaluating || appState.isSimulationMode || appState.currentMission?.isCompleted == true)
+                    .accessibilityLabel(appState.isSimulationMode ? "Κάμερα γυαλιών μη διαθέσιμη σε Simulation" : "Έλεγχος αποστολής με κάμερα γυαλιών")
 
                     // A14 fallback χωρίς γυαλιά: Photos picker → ίδια fail-closed αξιολόγηση.
                     PhotosPicker(

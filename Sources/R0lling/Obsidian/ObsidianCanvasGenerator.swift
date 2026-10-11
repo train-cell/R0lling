@@ -44,7 +44,7 @@ public struct ObsidianCanvasGenerator: Sendable {
             y: 0,
             width: 300,
             height: 140,
-            color: "4" // Purple
+            color: "6" // Purple preset in JSON Canvas 1.0
         ))
 
         // Τοποθέτηση των entries γύρω από το κέντρο σε κυκλική διάταξη
@@ -66,7 +66,7 @@ public struct ObsidianCanvasGenerator: Sendable {
                 y: y,
                 width: 260,
                 height: 160,
-                color: entry.attachments.isEmpty ? "1" : "5" // Gray or Cyan
+                color: entry.attachments.isEmpty ? "#7D8597" : "5" // Custom gray or Cyan preset
             ))
 
             edges.append(CanvasEdge(

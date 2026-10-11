@@ -1,21 +1,67 @@
 import Foundation
 
+/// Bounds the two file copies used by Photos import before creating its temporary copy.
+enum MediaImportPreflight {
+    static func requiredFreeSpace(payloadBytes: Int64, totalCopies: Int64 = 2) -> Int64? {
+        guard payloadBytes > 0, totalCopies > 0 else { return nil }
+        let copies = payloadBytes.multipliedReportingOverflow(by: totalCopies)
+        guard !copies.overflow else { return nil }
+        let required = copies.partialValue.addingReportingOverflow(ELAXISTOS_ELEUTHEROS_XOROS_BYTES)
+        return required.overflow ? nil : required.partialValue
+    }
+
+    /// Rejects special files and insufficient capacity before Photos copies an asset into temp.
+    static func validatePhotosStagingSource(at sourceURL: URL, availableBytes: Int64) throws -> Int64 {
+        let attributes = try FileManager.default.attributesOfItem(atPath: sourceURL.path)
+        guard attributes[.type] as? FileAttributeType == .typeRegular,
+              let sourceSize = attributes[.size] as? NSNumber,
+              sourceSize.int64Value > 0 else {
+            throw MediaApothikeusiError.kenoDedomena
+        }
+        let payloadBytes = sourceSize.int64Value
+        guard let required = requiredFreeSpace(payloadBytes: payloadBytes) else {
+            throw MediaApothikeusiError.anepikisXoros(diathesima: availableBytes, apaitoumena: Int64.max)
+        }
+        guard availableBytes >= required else {
+            throw MediaApothikeusiError.anepikisXoros(diathesima: availableBytes, apaitoumena: required)
+        }
+        return payloadBytes
+    }
+}
+
 /// Διαχείριση αποθήκευσης αρχείων πολυμέσων (Photos, Videos, Clips, Audio)
 public actor MediaStorageService: MediaStorageProtocol {
     private let baseMediaDirectory: URL
     /// Αν `true`, αγνοεί τον έλεγχο δίσκου (μόνο unit tests).
     private let paradekampseElegxoXorou: Bool
+    private let availableFreeDiskSpaceProvider: @Sendable () -> Int64
 
-    public init(baseDirectory: URL? = nil, paradekampseElegxoXorou: Bool = false) {
+    public init(
+        baseDirectory: URL? = nil,
+        paradekampseElegxoXorou: Bool = false,
+        availableFreeDiskSpaceProvider: (@Sendable () -> Int64)? = nil
+    ) {
         self.paradekampseElegxoXorou = paradekampseElegxoXorou
+        let resolvedBaseDirectory: URL
         if let dir = baseDirectory {
-            self.baseMediaDirectory = dir
+            resolvedBaseDirectory = dir
         } else if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            self.baseMediaDirectory = docs.appendingPathComponent("R0lling/Media", isDirectory: true)
+            resolvedBaseDirectory = docs.appendingPathComponent("R0lling/Media", isDirectory: true)
         } else {
             // Fail-soft: χωρίς Documents (σπάνιο) → temp, όχι force-unwrap crash.
-            self.baseMediaDirectory = FileManager.default.temporaryDirectory
+            resolvedBaseDirectory = FileManager.default.temporaryDirectory
                 .appendingPathComponent("R0lling/Media", isDirectory: true)
+        }
+        self.baseMediaDirectory = resolvedBaseDirectory
+        self.availableFreeDiskSpaceProvider = availableFreeDiskSpaceProvider ?? {
+            do {
+                let values = try resolvedBaseDirectory.resourceValues(
+                    forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+                )
+                return values.volumeAvailableCapacityForImportantUsage ?? 0
+            } catch {
+                return 0
+            }
         }
     }
 
@@ -28,10 +74,11 @@ public actor MediaStorageService: MediaStorageProtocol {
 
         if !paradekampseElegxoXorou {
             let diathesima = availableFreeDiskSpace()
-            guard diathesima > ELAXISTOS_ELEUTHEROS_XOROS_BYTES else {
+            let requiredSpace = requiredFreeSpace(forPayloadBytes: Int64(data.count))
+            guard let requiredSpace, diathesima >= requiredSpace else {
                 throw MediaApothikeusiError.anepikisXoros(
                     diathesima: diathesima,
-                    apaitoumena: ELAXISTOS_ELEUTHEROS_XOROS_BYTES
+                    apaitoumena: requiredSpace ?? Int64.max
                 )
             }
         }
@@ -56,6 +103,7 @@ public actor MediaStorageService: MediaStorageProtocol {
         let attachment = MediaAttachment(
             id: id,
             relativePath: relativePath,
+            originalFilename: displayFilename(for: originalFilename, fallback: filename),
             mediaType: mediaType,
             byteSize: Int64(data.count),
             durationSeconds: nil,
@@ -79,12 +127,12 @@ public actor MediaStorageService: MediaStorageProtocol {
 
         let mediaDirectory = try ensureMediaDirectory(for: mediaType)
         if !paradekampseElegxoXorou {
-            let requiredSpace = Int64(sourceSize).addingReportingOverflow(ELAXISTOS_ELEUTHEROS_XOROS_BYTES)
+            let requiredSpace = requiredFreeSpace(forPayloadBytes: Int64(sourceSize))
             let available = availableFreeDiskSpace()
-            guard !requiredSpace.overflow, available >= requiredSpace.partialValue else {
+            guard let requiredSpace, available >= requiredSpace else {
                 throw MediaApothikeusiError.anepikisXoros(
                     diathesima: available,
-                    apaitoumena: requiredSpace.overflow ? Int64.max : requiredSpace.partialValue
+                    apaitoumena: requiredSpace ?? Int64.max
                 )
             }
         }
@@ -113,6 +161,7 @@ public actor MediaStorageService: MediaStorageProtocol {
         return MediaAttachment(
             id: id,
             relativePath: relativePath,
+            originalFilename: displayFilename(for: originalFilename, fallback: "\(id.uuidString).\(safeExtension)"),
             mediaType: mediaType,
             byteSize: Int64(sourceSize),
             durationSeconds: nil,
@@ -132,6 +181,17 @@ public actor MediaStorageService: MediaStorageProtocol {
                 (byte >= 48 && byte <= 57) || (byte >= 97 && byte <= 122)
             }
         return isSafeExtension ? fileExtension : defaultExtension(for: mediaType)
+    }
+
+    /// Keeps the user-facing source name without storing a caller-supplied path in the journal.
+    private func displayFilename(for originalFilename: String, fallback: String) -> String {
+        let normalized = originalFilename.replacingOccurrences(of: "\\", with: "/")
+        let basename = normalized.split(separator: "/", omittingEmptySubsequences: false).last.map(String.init) ?? ""
+        let cleanBasename = String(basename.trimmingCharacters(in: .whitespacesAndNewlines).prefix(255))
+        guard !cleanBasename.isEmpty, cleanBasename != ".", cleanBasename != ".." else {
+            return fallback
+        }
+        return cleanBasename
     }
 
     private nonisolated func validatedMediaDirectory(for mediaType: MediaType) throws -> URL {
@@ -239,12 +299,13 @@ public actor MediaStorageService: MediaStorageProtocol {
     }
 
     public nonisolated func availableFreeDiskSpace() -> Int64 {
-        do {
-            let values = try baseMediaDirectory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            return values.volumeAvailableCapacityForImportantUsage ?? 0
-        } catch {
-            return 0 // Unknown capacity must fail closed for media writes.
-        }
+        availableFreeDiskSpaceProvider()
+    }
+
+    private nonisolated func requiredFreeSpace(forPayloadBytes payloadBytes: Int64) -> Int64? {
+        guard payloadBytes >= 0 else { return nil }
+        let result = payloadBytes.addingReportingOverflow(ELAXISTOS_ELEUTHEROS_XOROS_BYTES)
+        return result.overflow ? nil : result.partialValue
     }
 
     public func cleanupOrphanedFiles(activeRelativePaths: Set<String>) throws -> Int {

@@ -8,6 +8,7 @@ import AppKit
 
 #if canImport(AVKit)
 import AVKit
+import Combine
 #endif
 
 #if canImport(ImageIO)
@@ -927,10 +928,15 @@ public struct MediaViewerSheet: View {
     public let url: URL
     public let attachment: MediaAttachment
     @Environment(\.dismiss) private var dismiss
+    @State private var isPreparingWatermarkedClip = false
+    @State private var shareableWatermarkedClipURL: URL?
+    @State private var watermarkErrorMessage: String?
+    @State private var watermarkExportTask: Task<Void, Never>?
 
     #if canImport(AVKit)
     @State private var player: AVPlayer?
     @State private var isPlayingAudio: Bool = true
+    @State private var playbackErrorMessage: String?
     #endif
 
     public init(url: URL, attachment: MediaAttachment) {
@@ -966,20 +972,55 @@ public struct MediaViewerSheet: View {
                     }
                     .foregroundColor(R0llingTheme.accentLavender)
                 }
-            }
-            .onAppear {
                 #if canImport(AVKit)
-                if attachment.mediaType == .video || attachment.mediaType == .clip || attachment.mediaType == .audio {
-                    player = AVPlayer(url: url)
-                    player?.play()
+                ToolbarItem(placement: .primaryAction) {
+                    if isVideoAttachment && FeatureReadinessRegistry.watermark.ready {
+                        if let shareableWatermarkedClipURL {
+                            ShareLink(item: shareableWatermarkedClipURL) {
+                                Label("Κοινή χρήση", systemImage: "square.and.arrow.up")
+                            }
+                            .tint(R0llingTheme.accentLavender)
+                        } else {
+                            Button {
+                                watermarkExportTask = Task { await prepareWatermarkedClip() }
+                            } label: {
+                                if isPreparingWatermarkedClip {
+                                    ProgressView().tint(R0llingTheme.accentLavender)
+                                } else {
+                                    Label("Watermark", systemImage: "sparkles")
+                                }
+                            }
+                            .disabled(isPreparingWatermarkedClip)
+                            .tint(R0llingTheme.accentLavender)
+                        }
+                    }
                 }
                 #endif
             }
+            .task(id: url) { await preparePlayback() }
+            #if canImport(AVKit)
+            .onReceive(NotificationCenter.default.publisher(for: AVPlayerItem.failedToPlayToEndTimeNotification)
+                .receive(on: DispatchQueue.main)) { notification in
+                guard let failedItem = notification.object as? AVPlayerItem,
+                      failedItem === player?.currentItem else { return }
+                let playbackError = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
+                playbackErrorMessage = playbackError?.localizedDescription
+                    ?? failedItem.error?.localizedDescription
+                    ?? "Η μορφή ή ο codec του αρχείου δεν υποστηρίζεται από τη συσκευή."
+                player?.pause()
+            }
+            #endif
             .onDisappear {
+                watermarkExportTask?.cancel()
+                watermarkExportTask = nil
                 #if canImport(AVKit)
                 player?.pause()
                 player = nil
+                playbackErrorMessage = nil
                 #endif
+                if let shareableWatermarkedClipURL {
+                    try? FileManager.default.removeItem(at: shareableWatermarkedClipURL)
+                }
             }
         }
     }
@@ -1004,11 +1045,11 @@ public struct MediaViewerSheet: View {
     private var videoView: some View {
         VStack {
             #if canImport(AVKit)
-            if let player {
+            if let player, playbackErrorMessage == nil {
                 VideoPlayer(player: player)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .padding()
-            } else {
+            } else if playbackErrorMessage == nil {
                 ProgressView()
                     .tint(R0llingTheme.accentLavender)
             }
@@ -1016,6 +1057,77 @@ public struct MediaViewerSheet: View {
             Text("Video playback μη διαθέσιμο σε αυτή την πλατφόρμα")
                 .foregroundColor(R0llingTheme.textMuted)
             #endif
+
+            #if canImport(AVKit)
+            if let playbackErrorMessage {
+                Text(playbackErrorMessage)
+                    .font(.caption)
+                    .foregroundColor(R0llingTheme.textMuted)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+            #endif
+
+            if let watermarkErrorMessage {
+                Text(watermarkErrorMessage)
+                    .font(.caption)
+                    .foregroundColor(R0llingTheme.accentLavender)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+        }
+    }
+
+    private var isVideoAttachment: Bool {
+        attachment.mediaType == .video || attachment.mediaType == .clip
+    }
+
+    @MainActor
+    private func preparePlayback() async {
+        #if canImport(AVKit)
+        guard attachment.mediaType == .video
+            || attachment.mediaType == .clip
+            || attachment.mediaType == .audio else { return }
+        playbackErrorMessage = nil
+        let asset = AVURLAsset(url: url)
+        do {
+            guard try await asset.load(.isPlayable) else {
+                playbackErrorMessage = "Η μορφή ή ο codec του αρχείου δεν υποστηρίζεται από τη συσκευή."
+                return
+            }
+            guard !Task.isCancelled else { return }
+            let item = AVPlayerItem(asset: asset)
+            player = AVPlayer(playerItem: item)
+            player?.play()
+        } catch {
+            guard !Task.isCancelled else { return }
+            playbackErrorMessage = "Αδυναμία αναπαραγωγής: \(error.localizedDescription)"
+        }
+        #endif
+    }
+
+    @MainActor
+    private func prepareWatermarkedClip() async {
+        guard FeatureReadinessRegistry.watermark.ready, isVideoAttachment else { return }
+        isPreparingWatermarkedClip = true
+        watermarkErrorMessage = nil
+        defer { isPreparingWatermarkedClip = false }
+
+        do {
+            let timestamp = attachment.captureTimestamp.formatted(date: .abbreviated, time: .shortened)
+            let outputURL = try await ClipWatermarkExporter().prepareShareableClipURL(
+                sourceClipURL: url,
+                options: .init(dateString: timestamp)
+            )
+            guard !Task.isCancelled else {
+                try? FileManager.default.removeItem(at: outputURL)
+                return
+            }
+            shareableWatermarkedClipURL = outputURL
+        } catch {
+            if !Task.isCancelled {
+                watermarkErrorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -1044,6 +1156,11 @@ public struct MediaViewerSheet: View {
                         .font(.system(size: 54))
                         .foregroundColor(R0llingTheme.accentPurple)
                 }
+            } else if let playbackErrorMessage {
+                Text(playbackErrorMessage)
+                    .font(.caption)
+                    .foregroundColor(R0llingTheme.textMuted)
+                    .multilineTextAlignment(.center)
             }
             #endif
         }
