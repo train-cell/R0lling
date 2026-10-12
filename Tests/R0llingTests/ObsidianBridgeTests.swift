@@ -1,6 +1,29 @@
 import XCTest
 @testable import R0lling
 
+private actor ObsidianExportBarrier {
+    private var isPaused = false
+    private var pauseContinuation: CheckedContinuation<Void, Never>?
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+    func pause() async {
+        isPaused = true
+        pauseContinuation?.resume()
+        pauseContinuation = nil
+        await withCheckedContinuation { releaseContinuation = $0 }
+    }
+
+    func waitUntilPaused() async {
+        guard !isPaused else { return }
+        await withCheckedContinuation { pauseContinuation = $0 }
+    }
+
+    func release() {
+        releaseContinuation?.resume()
+        releaseContinuation = nil
+    }
+}
+
 final class ObsidianBridgeTests: XCTestCase {
     var tempDirectory: URL!
     var bridge: ObsidianVaultBridge!
@@ -46,6 +69,44 @@ final class ObsidianBridgeTests: XCTestCase {
         let content = try String(contentsOf: outcome.noteURL, encoding: .utf8)
         XCTAssertTrue(content.contains("Πρώτη δοκιμή εξαγωγής στο Obsidian Vault."))
         XCTAssertTrue(content.contains("#obsidian"))
+    }
+
+    func testExportStopsWithoutWritingWhenSelectedVaultChanges() async throws {
+        let attachment = try await mediaStorage.saveMediaFile(
+            data: Data("attachment bytes".utf8),
+            originalFilename: "race.jpg",
+            mediaType: .photo
+        )
+        let entry = JournalEntry(content: "vault switch during export", attachments: [attachment])
+        let firstVault = tempDirectory.appendingPathComponent("FirstVault", isDirectory: true)
+        let secondVault = tempDirectory.appendingPathComponent("SecondVault", isDirectory: true)
+        let switchingBridge = ObsidianVaultBridge(vaultURL: firstVault)
+        let barrier = ObsidianExportBarrier()
+        await switchingBridge.setAttachmentExportBarrierForTesting {
+            await barrier.pause()
+        }
+
+        let exportTask = Task {
+            try await switchingBridge.exportEntry(entry, mediaStorage: mediaStorage)
+        }
+        await barrier.waitUntilPaused()
+        await switchingBridge.setVaultURL(secondVault, requiresScopedAccess: false)
+        await barrier.release()
+
+        do {
+            _ = try await exportTask.value
+            XCTFail("An export must stop when its selected vault changes while suspended")
+        } catch let error as NSError {
+            XCTAssertEqual(error.domain, "R0lling.Obsidian")
+            XCTAssertEqual(error.code, 6014)
+        }
+
+        let notePath = relativeNotePath(for: entry)
+        for vault in [firstVault, secondVault] {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: vault.appendingPathComponent(notePath).path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: vault.appendingPathComponent("Attachments/\(attachment.relativePath)").path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: vault.appendingPathComponent("R0llingMeta/export-hashes.json").path))
+        }
     }
 
     func testIdempotentExportDoesNotDuplicate() async throws {

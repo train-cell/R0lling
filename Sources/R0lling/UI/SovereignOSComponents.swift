@@ -235,8 +235,8 @@ public struct BevelConcentricTelemetryCard: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Ημερήσιοι δείκτες")
-                    .font(.headline.weight(.semibold))
-                    .foregroundColor(R0llingTheme.textPrimary)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(R0llingTheme.textSecondary)
                 Spacer()
             }
 
@@ -313,19 +313,25 @@ public struct BevelConcentricTelemetryCard: View {
         return Group {
             if compact {
                 VStack(spacing: 8) {
-                    compactMetric(title: "Νοητική επιβάρυνση", value: strain, detail: "ευρετική κλίμακα · αναφορά 21", progress: displayedScore.cognitiveStrain / 21, color: R0llingTheme.accentAmber)
-                    compactMetric(title: "Εστίαση", value: focus, detail: "αναφορά: 120λ", progress: Double(displayedScore.focusMinutes) / 120, color: R0llingTheme.accentLime)
-                    compactMetric(title: "Ημερήσια βαθμολογία", value: readiness, detail: readinessDetail, progress: readinessProgress, color: R0llingTheme.accentCyan)
+                    compactMetric(title: "Νοητική επιβάρυνση", value: strain, detail: "ευρετική κλίμακα · αναφορά 21", progress: displayedScore.cognitiveStrain / 21, color: R0llingTheme.todayCognitiveLoadRingEnd)
+                    compactMetric(title: "Εστίαση", value: focus, detail: "αναφορά: 120λ", progress: Double(displayedScore.focusMinutes) / 120, color: R0llingTheme.todayFocusRingEnd)
+                    compactMetric(title: "Ημερήσια βαθμολογία", value: readiness, detail: readinessDetail, progress: readinessProgress, color: R0llingTheme.todayReadinessRingEnd)
                 }
             } else {
                 HStack(spacing: 4) {
-                    BevelMetricRingGauge(title: "Νοητική επιβάρυνση", value: strain, detail: "ευρετική κλίμακα · αναφορά 21", progress: displayedScore.cognitiveStrain / 21, color: R0llingTheme.accentAmber)
+                    BevelMetricRingGauge(title: "Νοητική επιβάρυνση", value: strain, detail: "ευρετική κλίμακα · αναφορά 21", progress: displayedScore.cognitiveStrain / 21, startColor: R0llingTheme.todayCognitiveLoadRingStart, endColor: R0llingTheme.todayCognitiveLoadRingEnd)
                     metricDivider
-                    BevelMetricRingGauge(title: "Εστίαση", value: focus, detail: "αναφορά: 120λ", progress: Double(displayedScore.focusMinutes) / 120, color: R0llingTheme.accentLime)
+                    BevelMetricRingGauge(title: "Εστίαση", value: focus, detail: "αναφορά: 120λ", progress: Double(displayedScore.focusMinutes) / 120, startColor: R0llingTheme.todayFocusRingStart, endColor: R0llingTheme.todayFocusRingEnd)
                     metricDivider
-                    BevelMetricRingGauge(title: "Ημερήσια βαθμολογία", value: readiness, detail: readinessDetail, progress: readinessProgress, color: R0llingTheme.accentCyan)
+                    BevelMetricRingGauge(title: "Ημερήσια βαθμολογία", value: readiness, detail: readinessDetail, progress: readinessProgress, startColor: R0llingTheme.todayReadinessRingStart, endColor: R0llingTheme.todayReadinessRingEnd)
                 }
             }
+        }
+        .padding(.vertical, 12)
+        .background {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(R0llingTheme.bgElevated)
+                .padding(.horizontal, -18)
         }
     }
 
@@ -374,7 +380,8 @@ private struct BevelMetricRingGauge: View {
     let value: String
     let detail: String
     let progress: Double
-    let color: Color
+    let startColor: Color
+    let endColor: Color
 
     private var boundedProgress: Double {
         guard progress.isFinite else { return 0 }
@@ -393,7 +400,7 @@ private struct BevelMetricRingGauge: View {
                             endRadius: 42
                         )
                     )
-                    .shadow(color: Color.black.opacity(0.45), radius: 3, x: 0, y: 2)
+                    .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
                     .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 0.8))
                 Circle()
                     .stroke(Color.black.opacity(0.42), lineWidth: 10)
@@ -405,7 +412,7 @@ private struct BevelMetricRingGauge: View {
                     .trim(from: 0, to: boundedProgress)
                     .stroke(
                         AngularGradient(
-                            gradient: Gradient(colors: [color.opacity(0.76), color]),
+                            gradient: Gradient(colors: [startColor.opacity(0.76), endColor]),
                             center: .center
                         ),
                         style: StrokeStyle(lineWidth: 8, lineCap: .round)
@@ -413,7 +420,7 @@ private struct BevelMetricRingGauge: View {
                     .rotationEffect(.degrees(-90))
                     .padding(5)
                 Text(value)
-                    .font(.system(.body, design: .rounded).weight(.semibold))
+                    .font(.system(.title3, design: .rounded).weight(.semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
@@ -427,7 +434,7 @@ private struct BevelMetricRingGauge: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             Text(detail)
-                .font(.caption2)
+                .font(.caption)
                 .foregroundColor(R0llingTheme.textSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -729,11 +736,13 @@ public struct HealthKitTelemetryCardView: View {
             didCompleteRequest: didCompleteAuthorizationRequest
         )
 
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label("Μετρήσεις Apple Health", systemImage: "heart.text.square.fill")
-                    .font(.subheadline.weight(.bold))
+                Text("Μετρήσεις Apple Health")
+                    .font(.title3.weight(.semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Spacer()
                 if accessPresentation == .measurementsAvailable {
                     Text(accessPresentation.statusText)
@@ -791,8 +800,7 @@ public struct HealthKitTelemetryCardView: View {
                 .font(.caption2)
                 .foregroundColor(R0llingTheme.textMuted)
         }
-        .padding(14)
-        .r0llingBevelSurface(cornerRadius: 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .sheet(isPresented: $isSleepReportPresented) {
             if let report = snapshot.sleepReport {
                 SleepReportView(report: report)
@@ -819,13 +827,13 @@ public struct HealthKitTelemetryCardView: View {
         ) {
             metricTile(
                 abbrev: "RR",
-                systemImage: "wind",
+                systemImage: "lungs.fill",
                 value: formattedMeasurement(snapshot.respiratoryRate, format: "%.1f"),
                 unit: "rpm",
                 metadata: snapshot.respiratoryRateMetadata,
                 hasValue: hasValidMeasurement(snapshot.respiratoryRate),
                 gaugeProgress: HealthMetricDisplayScale.progress(for: snapshot.respiratoryRate, within: 0...60),
-                color: R0llingTheme.accentCyan,
+                color: R0llingTheme.healthMonitorGaugeGreen,
                 spokenMetricName: "Αναπνευστικός ρυθμός",
                 minimumWidth: minimumTileWidth
             )
@@ -837,7 +845,7 @@ public struct HealthKitTelemetryCardView: View {
                 metadata: snapshot.restingHRMetadata,
                 hasValue: snapshot.restingHRBpm != nil,
                 gaugeProgress: HealthMetricDisplayScale.progress(for: snapshot.restingHRBpm.map { Double($0) }, within: 0...220),
-                color: R0llingTheme.accentLavender,
+                color: R0llingTheme.healthMonitorGaugeGreen,
                 spokenMetricName: "Καρδιακός ρυθμός ηρεμίας",
                 minimumWidth: minimumTileWidth
             )
@@ -849,43 +857,43 @@ public struct HealthKitTelemetryCardView: View {
                 metadata: snapshot.hrvMetadata,
                 hasValue: hasValidMeasurement(snapshot.hrvMs),
                 gaugeProgress: HealthMetricDisplayScale.progress(for: snapshot.hrvMs, within: 0...200),
-                color: R0llingTheme.accentCyan,
+                color: R0llingTheme.healthMonitorGaugeGreen,
                 spokenMetricName: "Μεταβλητότητα καρδιακού ρυθμού",
                 minimumWidth: minimumTileWidth
             )
             metricTile(
                 abbrev: "SpO2",
-                systemImage: "lungs.fill",
+                systemImage: "drop.fill",
                 value: formattedMeasurement(snapshot.bloodOxygenPercent, format: "%.1f"),
                 unit: "%",
                 metadata: snapshot.bloodOxygenMetadata,
                 hasValue: hasValidMeasurement(snapshot.bloodOxygenPercent),
                 gaugeProgress: HealthMetricDisplayScale.progress(for: snapshot.bloodOxygenPercent, within: 0...100),
-                color: R0llingTheme.statusSuccess,
+                color: R0llingTheme.healthMonitorGaugeBlue,
                 spokenMetricName: "Κορεσμός οξυγόνου στο αίμα",
                 minimumWidth: minimumTileWidth
             )
             metricTile(
-                abbrev: "TEMP",
+                abbrev: "Temp",
                 systemImage: "thermometer.medium",
                 value: formattedMeasurement(snapshot.bodyTemperatureCelsius, format: "%.1f"),
                 unit: "°C",
                 metadata: snapshot.bodyTemperatureMetadata,
                 hasValue: hasValidMeasurement(snapshot.bodyTemperatureCelsius),
                 gaugeProgress: HealthMetricDisplayScale.progress(for: snapshot.bodyTemperatureCelsius, within: 30...43),
-                color: R0llingTheme.accentAmber,
+                color: R0llingTheme.healthMonitorGaugeGreen,
                 spokenMetricName: "Θερμοκρασία σώματος",
                 minimumWidth: minimumTileWidth
             )
             metricTile(
-                abbrev: "SLEEP",
-                systemImage: "moon.zzz.fill",
+                abbrev: "Sleep",
+                systemImage: "bed.double.fill",
                 value: sleepDisplay.value,
                 unit: sleepDisplay.unit,
                 metadata: snapshot.sleepMetadata,
                 hasValue: snapshot.sleepHours.map { $0.isFinite && $0 >= 0 && $0 <= Double(Int.max / 60) } == true,
                 gaugeProgress: HealthMetricDisplayScale.progress(for: snapshot.sleepHours, within: 0...12),
-                color: R0llingTheme.accentPurple,
+                color: R0llingTheme.healthMonitorGaugeGreen,
                 spokenMetricName: "Διάρκεια ύπνου",
                 minimumWidth: minimumTileWidth,
                 action: snapshot.sleepReport == nil ? nil : { isSleepReportPresented = true }
@@ -995,11 +1003,12 @@ public struct TodayHealthSummaryCard: View {
             didCompleteRequest: didCompleteAuthorizationRequest
         )
 
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label("Health monitor", systemImage: "heart.text.square.fill")
-                    .font(.subheadline.weight(.bold))
+                Text("Health Monitor")
+                    .font(.headline.weight(.semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 8)
                 Button("Όλες οι μετρήσεις", action: { onOpenHealth?() })
                     .font(.caption.weight(.semibold))
@@ -1008,32 +1017,34 @@ public struct TodayHealthSummaryCard: View {
                     .accessibilityHint("Ανοίγει τις λεπτομερείς μετρήσεις Apple Health.")
             }
 
-            metricGrid
+            VStack(alignment: .leading, spacing: 12) {
+                metricGrid
 
-            Text("Πρόσφατες μετρήσεις Apple Health · όχι κλινική αξιολόγηση")
-                .font(.caption2)
-                .foregroundColor(R0llingTheme.textMuted)
+                Text("Πρόσφατες μετρήσεις Apple Health · όχι κλινική αξιολόγηση")
+                    .font(.caption2)
+                    .foregroundColor(R0llingTheme.textMuted)
 
-            if !snapshot.hasReadings {
-                if access.shouldShowRequestButton {
-                    Button(action: { onRequestAuth?() }) {
-                        Text("ΑΙΤΗΜΑ ΠΡΟΣΒΑΣΗΣ")
-                            .font(.system(.caption, design: .monospaced).weight(.bold))
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .foregroundColor(R0llingTheme.textPrimary)
-                            .r0llingBevelCapsule()
+                if !snapshot.hasReadings {
+                    if access.shouldShowRequestButton {
+                        Button(action: { onRequestAuth?() }) {
+                            Text("ΑΙΤΗΜΑ ΠΡΟΣΒΑΣΗΣ")
+                                .font(.system(.caption, design: .monospaced).weight(.bold))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .foregroundColor(R0llingTheme.textPrimary)
+                                .r0llingBevelCapsule()
+                        }
+                        .buttonStyle(.plain)
+                    } else if let explanation = access.explanation {
+                        Text(explanation)
+                            .font(.caption)
+                            .foregroundColor(R0llingTheme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .buttonStyle(.plain)
-                } else if let explanation = access.explanation {
-                    Text(explanation)
-                        .font(.caption)
-                        .foregroundColor(R0llingTheme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            .padding(14)
+            .r0llingBevelSurface(cornerRadius: 18)
         }
-        .padding(14)
-        .r0llingBevelSurface(cornerRadius: 18)
     }
 
     @ViewBuilder
@@ -1042,28 +1053,31 @@ public struct TodayHealthSummaryCard: View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: columns), spacing: 8) {
             metricTile(
                 abbrev: "HRV",
+                systemImage: "waveform.path.ecg",
                 value: formatted(snapshot.hrvMs, format: "%.0f"),
                 unit: "ms",
                 metadata: snapshot.hrvMetadata,
-                color: R0llingTheme.accentCyan,
+                color: R0llingTheme.healthMonitorGaugeGreen,
                 scale: HealthMetricDisplayScale.progress(for: snapshot.hrvMs, within: 0...200),
                 spokenName: "Μεταβλητότητα καρδιακού ρυθμού"
             )
             metricTile(
                 abbrev: "RHR",
+                systemImage: "heart.fill",
                 value: snapshot.restingHRBpm.map { String($0) } ?? "—",
                 unit: "bpm",
                 metadata: snapshot.restingHRMetadata,
-                color: R0llingTheme.accentLavender,
+                color: R0llingTheme.healthMonitorGaugeGreen,
                 scale: HealthMetricDisplayScale.progress(for: snapshot.restingHRBpm.map { Double($0) }, within: 0...220),
                 spokenName: "Καρδιακός ρυθμός ηρεμίας"
             )
             metricTile(
                 abbrev: "SLEEP",
+                systemImage: "bed.double.fill",
                 value: sleepText,
                 unit: "",
                 metadata: snapshot.sleepMetadata,
-                color: R0llingTheme.accentPurple,
+                color: R0llingTheme.healthMonitorGaugeGreen,
                 scale: HealthMetricDisplayScale.progress(for: snapshot.sleepHours, within: 0...12),
                 spokenName: "Διάρκεια ύπνου"
             )
@@ -1072,6 +1086,7 @@ public struct TodayHealthSummaryCard: View {
 
     private func metricTile(
         abbrev: String,
+        systemImage: String,
         value: String,
         unit: String,
         metadata: HealthKitReadingMetadata?,
@@ -1082,6 +1097,7 @@ public struct TodayHealthSummaryCard: View {
         let hasValue = value != "—"
         return BevelMetricTile(
             abbrev: abbrev,
+            systemImage: systemImage,
             value: value,
             unit: unit,
             status: readingStatus(metadata, hasValue: hasValue),
@@ -1151,7 +1167,7 @@ public struct BevelMetricTile: View {
                     if let systemImage {
                         Image(systemName: systemImage)
                             .font(.caption.weight(.semibold))
-                            .foregroundColor(color)
+                            .foregroundColor(R0llingTheme.textMuted)
                     }
                     Text(abbrev)
                         .font(.caption.weight(.semibold))
@@ -1171,7 +1187,7 @@ public struct BevelMetricTile: View {
                 }
                 Text(status)
                     .font(.caption2.weight(.semibold))
-                    .foregroundColor(color)
+                    .foregroundColor(R0llingTheme.textSecondary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1180,7 +1196,7 @@ public struct BevelMetricTile: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 92, alignment: .center)
-        .r0llingBevelSurface(cornerRadius: 14)
+        .r0llingBevelSurface(cornerRadius: 14, fillColor: R0llingTheme.healthMonitorTileSurface)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilitySummary)
     }
@@ -1208,14 +1224,14 @@ private struct BevelMetricRangeGauge: View {
         GeometryReader { geometry in
             ZStack {
                 Capsule()
-                    .fill(R0llingTheme.bgElevated)
+                    .fill(R0llingTheme.healthMonitorGaugeTrack)
                     .frame(width: 7, height: geometry.size.height)
 
                 if let progress = boundedProgress {
                     let inset: CGFloat = 6
                     let trackHeight = max(0, geometry.size.height - inset * 2)
                     Capsule()
-                        .fill(color.opacity(0.72))
+                        .fill(color)
                         .frame(width: 5, height: trackHeight)
 
                     Capsule()
@@ -1240,7 +1256,7 @@ private struct BevelMetricRangeGauge: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 16, height: 50)
+        .frame(width: 16, height: 64)
         .accessibilityHidden(true)
     }
 }

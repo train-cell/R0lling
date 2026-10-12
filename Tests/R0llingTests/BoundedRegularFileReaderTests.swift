@@ -64,6 +64,37 @@ final class BoundedRegularFileReaderTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: sentinel, encoding: .utf8), "outside sentinel")
     }
 
+    func testCopiesFromOpenedParentWhenBundlePathIsSwappedForSymlink() throws {
+        let bundle = tempDirectory.appendingPathComponent("SelectedBundle", isDirectory: true)
+        let photos = bundle.appendingPathComponent("Media/Photos", isDirectory: true)
+        let heldPhotos = bundle.appendingPathComponent("Media/Photos-held", isDirectory: true)
+        let outside = tempDirectory.appendingPathComponent("Outside", isDirectory: true)
+        let source = photos.appendingPathComponent("selected.jpg")
+        let sentinel = outside.appendingPathComponent("selected.jpg")
+        let destination = tempDirectory.appendingPathComponent("restored.jpg")
+        let selectedBytes = Data(repeating: 0x41, count: 64)
+        let outsideBytes = Data(repeating: 0x42, count: 64)
+        try FileManager.default.createDirectory(at: photos, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try selectedBytes.write(to: source)
+        try outsideBytes.write(to: sentinel)
+
+        try BoundedRegularFileReader.copyRegularFile(
+            relativePath: "Media/Photos/selected.jpg",
+            relativeTo: bundle,
+            to: destination,
+            expectedSize: Int64(selectedBytes.count),
+            beforeLeafOpen: {
+                try? FileManager.default.moveItem(at: photos, to: heldPhotos)
+                try? FileManager.default.createSymbolicLink(at: photos, withDestinationURL: outside)
+            }
+        )
+
+        XCTAssertEqual(try Data(contentsOf: destination), selectedBytes)
+        XCTAssertEqual(try Data(contentsOf: sentinel), outsideBytes)
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: photos.path), outside.path)
+    }
+
     func testReadsManagedFileWhenSelectedVaultRootIsASymlink() throws {
         let actualVault = tempDirectory.appendingPathComponent("ActualVault", isDirectory: true)
         let linkedVault = tempDirectory.appendingPathComponent("VaultShortcut", isDirectory: true)

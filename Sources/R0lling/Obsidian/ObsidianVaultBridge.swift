@@ -43,12 +43,20 @@ public actor ObsidianVaultBridge {
     private var vaultRequiresScopedAccess: Bool = false
     private var lastKnownHashes: [String: String] = [:]
     private var hashesFortomenoi: Bool = false
+    private var vaultConfigurationVersion: UInt64 = 0
+    var attachmentExportBarrierForTesting: (@Sendable () async -> Void)?
 
     private func activeVaultFilesystemRoot() throws -> URL {
         guard let vaultFilesystemRootURL else {
             throw obsidianError(6001, "Δεν έχει οριστεί filesystem root για το Obsidian vault.")
         }
         return vaultFilesystemRootURL
+    }
+
+    private func requireVaultConfigurationVersion(_ expectedVersion: UInt64) throws {
+        guard vaultConfigurationVersion == expectedVersion else {
+            throw obsidianError(6014, "Το επιλεγμένο Obsidian vault άλλαξε κατά το export· επανάλαβε την εξαγωγή.")
+        }
     }
 
     public init(vaultURL: URL? = nil) {
@@ -72,11 +80,16 @@ public actor ObsidianVaultBridge {
 
     /// Ορισμός vault URL (default Documents ή security-scoped από Files picker).
     public func setVaultURL(_ url: URL, requiresScopedAccess: Bool = false) async {
+        vaultConfigurationVersion &+= 1
         self.vaultDirectoryURL = url
         self.vaultFilesystemRootURL = url.resolvingSymlinksInPath().standardizedFileURL
         self.vaultRequiresScopedAccess = requiresScopedAccess
         self.hashesFortomenoi = false
         self.lastKnownHashes = [:]
+    }
+
+    func setAttachmentExportBarrierForTesting(_ barrier: (@Sendable () async -> Void)?) {
+        attachmentExportBarrierForTesting = barrier
     }
 
     public var currentVaultURL: URL? {
@@ -209,8 +222,13 @@ public actor ObsidianVaultBridge {
     /// R3-005 / A09: hash mismatch → sidecar `.r0lling-conflict.md`, χωρίς overwrite.
     @discardableResult
     public func exportEntry(_ entry: JournalEntry, mediaStorage: MediaStorageProtocol) async throws -> ObsidianSingleExportResult {
-        try await me_prosbasi_vault {
-            try await exportEntryLocked(entry, mediaStorage: mediaStorage)
+        let expectedVaultConfigurationVersion = vaultConfigurationVersion
+        return try await me_prosbasi_vault {
+            try await exportEntryLocked(
+                entry,
+                mediaStorage: mediaStorage,
+                expectedVaultConfigurationVersion: expectedVaultConfigurationVersion
+            )
         }
     }
 
@@ -221,14 +239,25 @@ public actor ObsidianVaultBridge {
         to updatedEntry: JournalEntry,
         mediaStorage: MediaStorageProtocol
     ) async throws -> ObsidianSingleExportResult {
-        try await me_prosbasi_vault {
+        let expectedVaultConfigurationVersion = vaultConfigurationVersion
+        return try await me_prosbasi_vault {
+            try requireVaultConfigurationVersion(expectedVaultConfigurationVersion)
             guard previousEntry.dateKey != updatedEntry.dateKey else {
-                return try await exportEntryLocked(updatedEntry, mediaStorage: mediaStorage)
+                return try await exportEntryLocked(
+                    updatedEntry,
+                    mediaStorage: mediaStorage,
+                    expectedVaultConfigurationVersion: expectedVaultConfigurationVersion
+                )
             }
 
             // Write the destination first, so a destination conflict cannot leave the
             // old managed block removed without a replacement.
-            let destinationResult = try await exportEntryLocked(updatedEntry, mediaStorage: mediaStorage)
+            let destinationResult = try await exportEntryLocked(
+                updatedEntry,
+                mediaStorage: mediaStorage,
+                expectedVaultConfigurationVersion: expectedVaultConfigurationVersion
+            )
+            try requireVaultConfigurationVersion(expectedVaultConfigurationVersion)
             guard !destinationResult.hadConflict else { return destinationResult }
 
             if let conflictPath = try removeMovedEntryFromPreviousNote(
@@ -247,7 +276,9 @@ public actor ObsidianVaultBridge {
 
     /// Εξαγωγή συνόλου εγγραφών (Batch Export — A08).
     public func exportBatch(entries: [JournalEntry], mediaStorage: MediaStorageProtocol) async throws -> ObsidianExportResult {
-        try await me_prosbasi_vault {
+        let expectedVaultConfigurationVersion = vaultConfigurationVersion
+        return try await me_prosbasi_vault {
+            try requireVaultConfigurationVersion(expectedVaultConfigurationVersion)
             var exportedPaths = Set<String>()
             var modifiedList: [String] = []
             var conflictsList: [String] = []
@@ -256,7 +287,12 @@ public actor ObsidianVaultBridge {
 
             for (_, dayEntries) in grouped {
                 for entry in dayEntries {
-                    let outcome = try await exportEntryLocked(entry, mediaStorage: mediaStorage)
+                    let outcome = try await exportEntryLocked(
+                        entry,
+                        mediaStorage: mediaStorage,
+                        expectedVaultConfigurationVersion: expectedVaultConfigurationVersion
+                    )
+                    try requireVaultConfigurationVersion(expectedVaultConfigurationVersion)
                     if outcome.hadConflict {
                         if let sidecar = outcome.conflictSidecarRelativePath, !conflictsList.contains(sidecar) {
                             conflictsList.append(sidecar)
@@ -282,8 +318,10 @@ public actor ObsidianVaultBridge {
 
     private func exportEntryLocked(
         _ entry: JournalEntry,
-        mediaStorage: MediaStorageProtocol
+        mediaStorage: MediaStorageProtocol,
+        expectedVaultConfigurationVersion: UInt64
     ) async throws -> ObsidianSingleExportResult {
+        try requireVaultConfigurationVersion(expectedVaultConfigurationVersion)
         guard let vaultURL = vaultDirectoryURL else {
             throw obsidianError(6001, "Δεν έχει οριστεί φάκελος Obsidian Vault.")
         }
@@ -341,12 +379,21 @@ public actor ObsidianVaultBridge {
                 }
                 // Πρώτη επαφή μετά restart χωρίς hash: seed baseline (χωρίς conflict ψευδώς).
                 lastKnownHashes[relativeNotePath] = existingHash
-                try apothikeusi_hashes_sto_disk(vaultURL: vaultURL)
+                try apothikeusi_hashes_sto_disk(vaultRootURL: vaultRootURL)
             }
             existingContent = decodedContent
         }
 
-        try await antigrafi_attachments(entry: entry, mediaStorage: mediaStorage, vaultURL: vaultURL)
+        if let barrier = attachmentExportBarrierForTesting {
+            await barrier()
+        }
+        try requireVaultConfigurationVersion(expectedVaultConfigurationVersion)
+        try await antigrafi_attachments(
+            entry: entry,
+            mediaStorage: mediaStorage,
+            vaultRootURL: vaultRootURL
+        )
+        try requireVaultConfigurationVersion(expectedVaultConfigurationVersion)
 
         let updatedContent = mergeEntryIntoMarkdown(
             existingContent: existingContent,
@@ -372,7 +419,7 @@ public actor ObsidianVaultBridge {
         }
 
         lastKnownHashes[relativeNotePath] = updatedContent.sha256Hash
-        try apothikeusi_hashes_sto_disk(vaultURL: vaultURL)
+        try apothikeusi_hashes_sto_disk(vaultRootURL: vaultRootURL)
         return ObsidianSingleExportResult(
             noteURL: noteURL,
             hadConflict: false,
@@ -464,7 +511,7 @@ public actor ObsidianVaultBridge {
         }
 
         lastKnownHashes[relativeNotePath] = updatedContent.sha256Hash
-        try apothikeusi_hashes_sto_disk(vaultURL: vaultURL)
+        try apothikeusi_hashes_sto_disk(vaultRootURL: vaultRootURL)
         return nil
     }
 
@@ -666,9 +713,8 @@ public actor ObsidianVaultBridge {
     private func antigrafi_attachments(
         entry: JournalEntry,
         mediaStorage: MediaStorageProtocol,
-        vaultURL: URL
+        vaultRootURL: URL
     ) async throws {
-        let vaultRootURL = try activeVaultFilesystemRoot()
         try VaultDirectoryFileAccess.ensureDirectory(rootURL: vaultRootURL, relativePath: Self.attachmentsFolderName)
 
         for attachment in entry.attachments {
@@ -798,8 +844,7 @@ public actor ObsidianVaultBridge {
         hashesFortomenoi = true
     }
 
-    private func apothikeusi_hashes_sto_disk(vaultURL: URL) throws {
-        let vaultRootURL = try activeVaultFilesystemRoot()
+    private func apothikeusi_hashes_sto_disk(vaultRootURL: URL) throws {
         try VaultDirectoryFileAccess.ensureDirectory(rootURL: vaultRootURL, relativePath: "R0llingMeta")
         let data = try JSONEncoder().encode(lastKnownHashes)
         let oldData = try VaultDirectoryFileAccess.readData(

@@ -87,13 +87,7 @@ public struct PhotosMediaPickerButton: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(isDisabled ? R0llingTheme.textMuted : R0llingTheme.bevelCyan)
                     .frame(width: 44, height: 44)
-                    .background(R0llingTheme.bgElevated)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(R0llingTheme.borderSubtle, lineWidth: 1)
-                    )
-                    .r0llingBevelCapsule()
+                    .r0llingBevelCapsule(fillColor: R0llingTheme.bgElevated)
             }
             .disabled(isDisabled)
             .onChange(of: photoSelection) { _, neoSelection in
@@ -109,13 +103,7 @@ public struct PhotosMediaPickerButton: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(isDisabled ? R0llingTheme.textMuted : R0llingTheme.accentPurple)
                     .frame(width: 44, height: 44)
-                    .background(R0llingTheme.bgElevated)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(R0llingTheme.borderSubtle, lineWidth: 1)
-                    )
-                    .r0llingBevelCapsule()
+                    .r0llingBevelCapsule(fillColor: R0llingTheme.bgElevated)
             }
             .disabled(isDisabled)
             .accessibilityLabel("Εισαγωγή αρχείου media")

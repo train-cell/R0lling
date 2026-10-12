@@ -13,7 +13,24 @@ public struct FitnessView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let onOpenQuickActions {
+                        HStack {
+                            Spacer(minLength: 0)
+                            Button(action: onOpenQuickActions) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 21, weight: .medium))
+                                    .foregroundColor(R0llingTheme.textPrimary)
+                                    .frame(width: 44, height: 44)
+                                    .r0llingToolbarCircle()
+                                    .frame(width: 58, height: 58)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Περισσότερες λειτουργίες")
+                            .accessibilityHint("Ανοίγει το μενού γρήγορων ενεργειών.")
+                        }
+                    }
+
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Fitness")
                             .font(.largeTitle.weight(.bold))
@@ -24,33 +41,6 @@ public struct FitnessView: View {
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityAddTraits(.isHeader)
-
-                    Spacer(minLength: 4)
-
-                    if let onOpenQuickActions {
-                        Button(action: onOpenQuickActions) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 21, weight: .medium))
-                                .foregroundColor(R0llingTheme.textPrimary)
-                                .frame(width: 54, height: 54)
-                                .background {
-                                    Circle().fill(
-                                        LinearGradient(
-                                            colors: [R0llingTheme.bgElevated, R0llingTheme.bgSurface],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                }
-                                .overlay {
-                                    Circle().stroke(R0llingTheme.borderSubtle, lineWidth: 1)
-                                }
-                                .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 3)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Περισσότερες λειτουργίες")
-                        .accessibilityHint("Ανοίγει το μενού γρήγορων ενεργειών.")
-                    }
                 }
 
                 FitnessActivityCalendarCard(snapshot: appState.fitnessActivitySnapshot)
@@ -70,7 +60,7 @@ public struct FitnessView: View {
 
     private var noWorkoutDataCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Activity Summary", systemImage: "chart.xyaxis.line")
+            Label("Activity Summary", systemImage: "chart.bar.fill")
                 .font(.headline.weight(.semibold))
                 .foregroundColor(R0llingTheme.textPrimary)
 
@@ -105,17 +95,27 @@ public struct FitnessView: View {
 }
 
 private struct FitnessActivityCalendarCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let snapshot: FitnessActivitySnapshot
     private let weekdays = FitnessActivityWeekdayLabels.greekMondayFirst
-    private let dayTargetSize: CGFloat = 44
     @State private var selectedDate: Date? = FitnessActivityCalendar.athensCalendar.startOfDay(for: .now)
 
-    private var monthGridWidth: CGFloat { dayTargetSize * 7 }
+    private var usesCompactMonthGrid: Bool {
+        switch dynamicTypeSize {
+        case .xSmall, .small, .medium, .large, .xLarge: true
+        default: false
+        }
+    }
+
+    private var dayCellSize: CGFloat { usesCompactMonthGrid ? 20.5 : 44 }
+    private var monthGridSpacing: CGFloat { usesCompactMonthGrid ? 10 : 14 }
+    private var activityPillHeight: CGFloat { usesCompactMonthGrid ? 8 : 13 }
+    private var monthGridWidth: CGFloat { dayCellSize * 7 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 14) {
+                HStack(alignment: .top, spacing: monthGridSpacing) {
                     ForEach(monthBuckets) { month in
                         monthGrid(month)
                     }
@@ -123,7 +123,7 @@ private struct FitnessActivityCalendarCard: View {
                 .fixedSize(horizontal: true, vertical: false)
 
                 ScrollView(.horizontal, showsIndicators: true) {
-                    HStack(alignment: .top, spacing: 14) {
+                    HStack(alignment: .top, spacing: monthGridSpacing) {
                         ForEach(monthBuckets) { month in
                             monthGrid(month)
                         }
@@ -172,15 +172,13 @@ private struct FitnessActivityCalendarCard: View {
                         .accessibilityLabel("\(workout.activityName), ώρα \(FitnessActivityCalendar.formatted(workout.startedAt, template: "HH:mm")), διάρκεια \(FitnessActivitySummaryCard.durationText(workout.durationSeconds))")
                     }
                 }
-                .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .r0llingBevelInsetSurface(cornerRadius: 12)
             }
 
             HStack(spacing: 10) {
-                legend(color: R0llingTheme.accentLime, title: "1")
+                legend(color: R0llingTheme.fitnessSingleActivity, title: "1")
                 legend(color: R0llingTheme.statusSuccess, title: "2")
-                legend(color: R0llingTheme.accentCyan, title: "3+")
+                legend(color: R0llingTheme.fitnessMultipleActivities, title: "3+")
                 Spacer(minLength: 0)
                 Text("προπονήσεις / ημέρα")
                     .font(.caption2)
@@ -207,12 +205,12 @@ private struct FitnessActivityCalendarCard: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(dayTargetSize), spacing: 0), count: 7), spacing: 0) {
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(dayCellSize), spacing: 0), count: 7), spacing: 0) {
                 ForEach(weekdays.indices, id: \.self) { index in
                     Text(weekdays[index])
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.caption2.weight(.medium))
                         .foregroundColor(R0llingTheme.textMuted)
-                        .frame(width: dayTargetSize, height: dayTargetSize)
+                        .frame(width: dayCellSize, height: dayCellSize)
                         .accessibilityHidden(true)
                 }
 
@@ -221,7 +219,7 @@ private struct FitnessActivityCalendarCard: View {
                         dayButton(day)
                     } else {
                         Color.clear
-                            .frame(width: dayTargetSize, height: dayTargetSize)
+                            .frame(width: dayCellSize, height: dayCellSize)
                             .accessibilityHidden(true)
                     }
                 }
@@ -238,16 +236,26 @@ private struct FitnessActivityCalendarCard: View {
         } label: {
             RoundedRectangle(cornerRadius: 4, style: .continuous)
                 .fill(activityColor(for: day.workoutCount))
-                .frame(height: 13)
+                .frame(width: dayCellSize * 0.72, height: activityPillHeight)
                 .overlay {
                     if isSelected {
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .stroke(R0llingTheme.accentCyan, lineWidth: 1.5)
+                            .stroke(R0llingTheme.fitnessSelectedDayAccent, lineWidth: 1.5)
                             .padding(-2)
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .frame(width: dayTargetSize, height: dayTargetSize)
+                .overlay(alignment: .topTrailing) {
+                    if isSelected {
+                        Circle()
+                            .fill(R0llingTheme.fitnessSelectedDayAccent)
+                            .frame(width: 6, height: 6)
+                            .overlay {
+                                Circle().stroke(R0llingTheme.bgSurface, lineWidth: 1)
+                            }
+                            .offset(x: 2, y: -2)
+                    }
+                }
+                .frame(width: dayCellSize, height: dayCellSize)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -270,10 +278,10 @@ private struct FitnessActivityCalendarCard: View {
 
     private func activityColor(for count: Int) -> Color {
         switch count {
-        case 1: R0llingTheme.accentLime
+        case 1: R0llingTheme.fitnessSingleActivity
         case 2: R0llingTheme.statusSuccess
-        case 3...: R0llingTheme.accentCyan
-        default: R0llingTheme.bgElevated.opacity(0.72)
+        case 3...: R0llingTheme.fitnessMultipleActivities
+        default: R0llingTheme.fitnessNoActivity
         }
     }
 
@@ -301,7 +309,7 @@ private struct FitnessActivitySummaryCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label("Activity Summary", systemImage: "chart.xyaxis.line")
+                Label("Activity Summary", systemImage: "chart.bar.fill")
                     .font(.headline.weight(.semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                 Spacer()
@@ -339,13 +347,13 @@ private struct FitnessActivitySummaryCard: View {
 
             FitnessActivityTrendChart(
                 snapshot: snapshot,
-                plotHeight: isTrendExpanded ? 190 : 100
+                plotHeight: isTrendExpanded ? 132 : 100
             )
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(chartAccessibilityLabel)
 
             HStack(spacing: 16) {
-                trendLegend(color: R0llingTheme.accentAmber, title: "Τρέχον διάστημα")
+                trendLegend(color: R0llingTheme.fitnessTrendStart, title: "Τρέχον διάστημα")
                 trendLegend(color: R0llingTheme.textMuted, title: "Προηγούμενο διάστημα")
             }
 
@@ -404,6 +412,9 @@ private struct FitnessActivityTrendChart: View {
     let snapshot: FitnessActivitySnapshot
     let plotHeight: CGFloat
 
+    private var chartPlotHeight: CGFloat { max(plotHeight - 4, 1) }
+    private let dayTickRowHeight: CGFloat = 4
+
     var body: some View {
         VStack(spacing: 4) {
             HStack {
@@ -417,49 +428,88 @@ private struct FitnessActivityTrendChart: View {
             }
 
             HStack(alignment: .top, spacing: 6) {
-                GeometryReader { geometry in
-                    let current = FitnessActivitySnapshot.cumulativeDurationHours(for: snapshot.currentDays)
-                    let previous = FitnessActivitySnapshot.cumulativeDurationHours(for: snapshot.previousDays)
-                    let maximum = trendScaleMaximumHours
-                    let size = geometry.size
+                VStack(spacing: 0) {
+                    GeometryReader { geometry in
+                        let current = FitnessActivitySnapshot.cumulativeDurationHours(for: snapshot.currentDays)
+                        let previous = FitnessActivitySnapshot.cumulativeDurationHours(for: snapshot.previousDays)
+                        let maximum = trendScaleMaximumHours
+                        let size = geometry.size
 
-                    ZStack {
-                        Path { path in
-                            path.move(to: CGPoint(x: 0, y: size.height * 0.25))
-                            path.addLine(to: CGPoint(x: size.width, y: size.height * 0.25))
-                            path.move(to: CGPoint(x: 0, y: size.height * 0.75))
-                            path.addLine(to: CGPoint(x: size.width, y: size.height * 0.75))
-                        }
-                        .stroke(R0llingTheme.borderSubtle.opacity(0.55), style: StrokeStyle(lineWidth: 1, dash: [2, 5]))
-
-                        trendArea(current, size: size, maximum: maximum)
-                            .fill(
-                                LinearGradient(
-                                    colors: [R0llingTheme.accentAmber.opacity(0.18), R0llingTheme.stravaFlame.opacity(0.025)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
+                        ZStack {
+                            trendArea(current, size: size, maximum: maximum)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [R0llingTheme.fitnessTrendStart.opacity(0.18), R0llingTheme.fitnessTrendEnd.opacity(0.025)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
                                 )
-                            )
-                        trendPath(previous, size: size, maximum: maximum)
-                            .stroke(R0llingTheme.textMuted.opacity(0.65), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                        trendPath(current, size: size, maximum: maximum)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [R0llingTheme.accentAmber, R0llingTheme.stravaFlame],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ),
-                                style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
-                            )
-                        ForEach(snapshot.currentDays.indices.filter { snapshot.currentDays[$0].durationSeconds > 0 }, id: \.self) { index in
-                            Circle()
-                                .fill(R0llingTheme.stravaFlame)
-                                .frame(width: 5, height: 5)
-                                .position(point(at: index, value: current[index], size: size, maximum: maximum, count: current.count))
+                            trendPath(previous, size: size, maximum: maximum)
+                                .stroke(R0llingTheme.textMuted.opacity(0.65), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                            trendPath(current, size: size, maximum: maximum)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [R0llingTheme.fitnessTrendStart, R0llingTheme.fitnessTrendEnd],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ),
+                                    style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+                                )
+                            let activityIndices = snapshot.currentDays.indices.filter {
+                                snapshot.currentDays[$0].durationSeconds > 0
+                            }
+                            let finalIndex = current.indices.last
+                            ForEach(activityIndices.filter { $0 != finalIndex }, id: \.self) { index in
+                                let progress = Double(index) / Double(max(current.count - 1, 1))
+                                let markerColor = R0llingTheme.fitnessTrendColor(at: progress)
+                                Circle()
+                                    .fill(R0llingTheme.bgSurface)
+                                    .overlay {
+                                        Circle().stroke(markerColor, lineWidth: 1.5)
+                                    }
+                                    .frame(width: 6, height: 6)
+                                    .position(point(at: index, value: current[index], size: size, maximum: maximum, count: current.count))
+                            }
+                            if let finalIndex {
+                                Circle()
+                                    .fill(R0llingTheme.bgSurface)
+                                    .overlay {
+                                        Circle().stroke(R0llingTheme.fitnessTrendEnd, lineWidth: 2)
+                                    }
+                                    .frame(width: 8, height: 8)
+                                    .shadow(color: R0llingTheme.fitnessTrendEnd.opacity(0.72), radius: 5)
+                                    .position(point(at: finalIndex, value: current[finalIndex], size: size, maximum: maximum, count: current.count))
+                            }
                         }
                     }
+                    .frame(height: chartPlotHeight)
+
+                    Canvas { context, size in
+                        let dayCount = snapshot.currentDays.count
+                        guard dayCount > 0 else { return }
+
+                        var ticks = Path()
+                        for index in snapshot.currentDays.indices {
+                            let x = size.width * CGFloat(index) / CGFloat(max(dayCount - 1, 1))
+                            ticks.move(to: CGPoint(x: x, y: 0))
+                            ticks.addLine(to: CGPoint(x: x, y: size.height))
+                        }
+                        context.stroke(ticks, with: .color(R0llingTheme.borderSubtle.opacity(0.65)), lineWidth: 1)
+                    }
+                    .frame(height: dayTickRowHeight)
+                    .accessibilityHidden(true)
+
+                    HStack {
+                        Text(axisDate(snapshot.currentDays.first?.date))
+                        Spacer(minLength: 8)
+                        Text(axisDate(snapshot.currentDays.dropFirst(14).first?.date))
+                        Spacer(minLength: 8)
+                        Text(axisDate(snapshot.referenceDate))
+                    }
+                    .font(.caption2)
+                    .foregroundColor(R0llingTheme.textMuted)
+                    .padding(.top, 4)
                 }
-                .frame(height: plotHeight)
 
                 VStack(alignment: .trailing) {
                     Text("\(Int(ceil(trendScaleMaximumHours)))ω")
@@ -468,18 +518,8 @@ private struct FitnessActivityTrendChart: View {
                 }
                 .font(.caption2)
                 .foregroundColor(R0llingTheme.textMuted)
-                .frame(height: plotHeight)
+                .frame(height: chartPlotHeight)
             }
-
-            HStack {
-                Text(axisDate(snapshot.currentDays.first?.date))
-                Spacer(minLength: 8)
-                Text(axisDate(snapshot.currentDays.dropFirst(14).first?.date))
-                Spacer(minLength: 8)
-                Text(axisDate(snapshot.referenceDate))
-            }
-            .font(.caption2)
-            .foregroundColor(R0llingTheme.textMuted)
         }
         .accessibilityHidden(true)
     }

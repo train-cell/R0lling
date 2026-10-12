@@ -299,7 +299,7 @@ Remediation     docs/FINDINGS_REMEDIATION.md
 Historical audit snapshot  docs/AUDIT_FINAL.md
 Status A-IDs    docs/IMPLEMENTATION_STATUS.md
 Device protocol docs/DEVICE_TESTS.md
-Handoff         docs/HANDOFF.md
+Handoff         docs/HANDOFF_R0lling_2026-10-11.md
 Progress rollup docs/GOAL_100_PROGRESS.md   (integrator updates after re-scan)
 ```
 

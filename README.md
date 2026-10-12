@@ -40,9 +40,9 @@ AI actions send data to a provider. Hermes is a configurable gateway, not an enf
 
 See [implementation status](docs/IMPLEMENTATION_STATUS.md), [capability map](docs/CAPABILITY_MATRIX.md), and [findings remediation](docs/FINDINGS_REMEDIATION.md).
 
-The Python scripts contain independent model examples and source/config checks. Passing them does not prove Swift behavior, visual fidelity, platform compliance, or hardware support. The GitHub Actions workflow contains separate macOS Swift build/tests and iOS host builds. No claim is made that the current uncommitted changes have passed those jobs.
+The Python scripts contain independent model examples and source/config checks. Passing them does not prove Swift behavior, visual fidelity, platform compliance, or hardware support. Current local evidence and remaining gaps are recorded in [the audit verification matrix](docs/AUDIT_VERIFICATION.md). The GitHub Actions workflow contains separate macOS Swift build/tests and iOS host builds; it has not run for this checkout.
 
-The UI direction follows the Bevel screens in the external `ui understanding` folder: charcoal/slate cards with a subtle raised bevel edge, inset metric rings, and floating capsule navigation. The primary destinations are Today, Journal, Fitness, and Health. Fitness has a 30-day HealthKit workout calendar and duration comparison; Today keeps the summary prominent and collapses secondary tools by default. Static code was updated across these screens, but rendered iPhone/Simulator comparison remains pending.
+The UI direction follows the Bevel screens in the external `ui understanding` folder: a charcoal canvas, flat slate cards with quiet outlines and restrained shadows, a deeper blue sleep-detail surface, clear system typography, and floating capsule navigation. The primary destinations are Today, Journal, Fitness, and Health. Fitness has a 30-day HealthKit workout calendar and duration comparison; Today keeps the summary prominent and collapses secondary tools by default. Styling source changes were made across existing screens; rendered iPhone/Simulator comparison remains pending.
 
 ## Build
 

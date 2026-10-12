@@ -3,7 +3,7 @@ import XCTest
 
 final class OpenAIChatRequestBuilderTests: XCTestCase {
     func testOutboundPIIRedactorScrubsCommonIdentifiersAndPreservesOrdinaryText() {
-        let source = "Email alex@example.com, card 4111 1111 1111 1111, invalid card 4111 1111 1111 1112, SSN 123-45-6789, ΑΦΜ: 123456789, phone +30 210 123 4567, IBANs GR12 0110 1250 0000 0001 2345 678 and GB82 WEST 1234 5698 7654 32, invalid IBAN GB83 WEST 1234 5698 7654 32. Delivery 12345 on 2026-10-10."
+        let source = "Email alex@example.com, card 4111 1111 1111 1111, invalid card 4111 1111 1111 1112, SSN 123-45-6789, ΑΦΜ: 123456789, phone +30 210 123 4567, IBANs GR12 0110 1250 0000 0001 2345 678, GR12-0110-1250-0000-0001-2345-678, and GB82 WEST 1234 5698 7654 32, invalid IBAN GB83 WEST 1234 5698 7654 32. Delivery 12345 on 2026-10-10."
         let redacted = OutboundPIIRedactor.redact(source)
 
         for identifier in [
@@ -13,6 +13,7 @@ final class OpenAIChatRequestBuilderTests: XCTestCase {
             "123456789",
             "+30 210 123 4567",
             "GR12 0110 1250 0000 0001 2345 678",
+            "GR12-0110-1250-0000-0001-2345-678",
             "GB82 WEST 1234 5698 7654 32"
         ] {
             XCTAssertFalse(redacted.contains(identifier), "Expected identifier to be removed: \(identifier)")
@@ -25,7 +26,7 @@ final class OpenAIChatRequestBuilderTests: XCTestCase {
 
     func testProviderBoundTextIsRedactedAcrossPromptMemoryJournalAndLocation() throws {
         let journal = JournalEntry(
-            content: "Use card 4111 1111 1111 1111, AFM: 123456789, and IBAN GR12 0110 1250 0000 0001 2345 678",
+            content: "Use card 4111 1111 1111 1111, AFM: 123456789, and IBAN GR12-0110-1250-0000-0001-2345-678",
             locationName: "Call +30 210 123 4567"
         )
         let payload = AIRequestPayload(
@@ -57,7 +58,7 @@ final class OpenAIChatRequestBuilderTests: XCTestCase {
             "123-45-6789",
             "123456789",
             "+30 210 123 4567",
-            "GR12 0110 1250 0000 0001 2345 678"
+            "GR12-0110-1250-0000-0001-2345-678"
         ] {
             XCTAssertFalse(providerText.contains(identifier), "Provider text leaked: \(identifier)")
         }

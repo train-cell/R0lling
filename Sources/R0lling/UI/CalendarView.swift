@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Οθόνη ιστορικού και αναζήτησης ημερολογίου (Calendar & Archive) σε στυλ Strava Activity Log
+/// Οθόνη ιστορικού και αναζήτησης ημερολογίου.
 public struct CalendarView: View {
     @EnvironmentObject private var appState: AppState
     @State private var searchQuery: String = ""
@@ -15,23 +15,22 @@ public struct CalendarView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Αρχείο & Δραστηριότητα")
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(.title2.weight(.semibold))
                         .foregroundColor(R0llingTheme.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
 
-                    Text("ARCHIVE & TELEMETRY LOGS")
-                        .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                        .foregroundColor(R0llingTheme.textMuted)
-                        .tracking(1.0)
+                    Text("Σημειώσεις και δραστηριότητες")
+                        .font(.subheadline)
+                        .foregroundColor(R0llingTheme.textSecondary)
                 }
+                .accessibilityElement(children: .combine)
                 Spacer()
 
-                Text("\(displayedEntries.count) LOGS")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(R0llingTheme.accentPurple)
+                Text("\(displayedEntries.count) καταγραφές")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(R0llingTheme.textSecondary)
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(R0llingTheme.accentPurple.opacity(0.15))
-                    .clipShape(Capsule())
+                    .frame(minHeight: 32)
                     .r0llingBevelCapsule()
             }
             .padding(.horizontal, 16)
@@ -45,7 +44,7 @@ public struct CalendarView: View {
                     .accessibilityHidden(true)
 
                 TextField("Αναζήτηση σημειώσεων, #tags, δραστηριοτήτων...", text: $searchQuery)
-                    .font(.system(size: 14))
+                    .font(.subheadline)
                     .foregroundColor(R0llingTheme.textPrimary)
                     .accessibilityLabel("Αναζήτηση στο ημερολόγιο")
                     .accessibilityHint("Αναζήτησε σε κείμενο, τίτλους, tags και δραστηριότητες.")
@@ -199,19 +198,16 @@ public struct FilterChip: View {
             onTap()
         }) {
             Text(title)
-                .font(.system(size: 12, weight: isSelected ? .heavy : .semibold, design: .rounded))
-                .foregroundColor(isSelected ? .white : R0llingTheme.textSecondary)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(isSelected ? R0llingTheme.textPrimary : R0llingTheme.textSecondary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
                 .frame(minHeight: 44)
                 .contentShape(Capsule())
-                .background(isSelected ? R0llingTheme.accentPurple : R0llingTheme.bgElevated)
-                .clipShape(Capsule())
-                .overlay(
+                .background {
                     Capsule()
-                        .stroke(isSelected ? R0llingTheme.accentLavender : R0llingTheme.borderSubtle, lineWidth: 1)
-                )
-                .r0llingBevelCapsule()
+                        .fill(isSelected ? R0llingTheme.bgSelectedControl : R0llingTheme.bgUnselectedControl)
+                }
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])

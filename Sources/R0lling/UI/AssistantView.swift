@@ -122,10 +122,7 @@ public struct AssistantView: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .frame(minHeight: 44)
-                        .background(R0llingTheme.bgElevated)
-                        .clipShape(Capsule())
-                        .r0llingBevelCapsule()
-                        .overlay(Capsule().stroke(R0llingTheme.borderSubtle, lineWidth: 1))
+                        .r0llingBevelCapsule(fillColor: R0llingTheme.bgElevated)
                     }
                     .onChange(of: selectedVisionPhoto) { _, item in
                         guard let item else { return }
@@ -146,10 +143,7 @@ public struct AssistantView: View {
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                                 .frame(minHeight: 44)
-                                .background(R0llingTheme.bgElevated)
-                                .clipShape(Capsule())
-                                .r0llingBevelCapsule()
-                                .overlay(Capsule().stroke(R0llingTheme.borderSubtle, lineWidth: 1))
+                                .r0llingBevelCapsule(fillColor: R0llingTheme.bgElevated)
                         }
                         .accessibilityLabel("Αποθήκευση αποτελέσματος Vision στο ημερολόγιο")
                         .disabled(appState.isSavingVisionNote || appState.pendingVisionNoteIsSaved)
@@ -161,10 +155,7 @@ public struct AssistantView: View {
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                                 .frame(minHeight: 44)
-                                .background(R0llingTheme.bgElevated)
-                                .clipShape(Capsule())
-                                .r0llingBevelCapsule()
-                                .overlay(Capsule().stroke(R0llingTheme.borderSubtle, lineWidth: 1))
+                                .r0llingBevelCapsule(fillColor: R0llingTheme.bgElevated)
                         }
                         .accessibilityLabel("Εκφώνηση αποτελέσματος Vision")
                         .disabled(appState.isSavingVisionNote)
@@ -175,9 +166,7 @@ public struct AssistantView: View {
                                 .foregroundColor(R0llingTheme.textMuted)
                                 .padding(10)
                                 .frame(width: 44, height: 44)
-                                .background(R0llingTheme.bgElevated)
-                                .clipShape(Circle())
-                                .r0llingBevelCapsule()
+                                .r0llingBevelCapsule(fillColor: R0llingTheme.bgElevated)
                         }
                         .accessibilityLabel("Απόρριψη αποτελέσματος Vision")
                         .disabled(appState.isSavingVisionNote)

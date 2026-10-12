@@ -33,6 +33,60 @@ private final class OversizedAIResponseURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+private final class AIRetryAttemptCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+
+    func reset() {
+        lock.lock()
+        value = 0
+        lock.unlock()
+    }
+
+    func advance() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        value += 1
+        return value
+    }
+
+    func currentValue() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+}
+
+private final class RetryingThenHangingAIResponseURLProtocol: URLProtocol {
+    static let attempts = AIRetryAttemptCounter()
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.url?.host == "cancel-final-attempt.test"
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let attempt = Self.attempts.advance()
+        guard attempt < 3,
+              let url = request.url,
+              let response = HTTPURLResponse(
+                url: url,
+                statusCode: 503,
+                httpVersion: "HTTP/1.1",
+                headerFields: nil
+              ) else {
+            // The final attempt intentionally stays in flight until the test cancels it.
+            return
+        }
+
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 #if !os(Linux)
 private final class RedirectingAIResponseURLProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool {
@@ -116,6 +170,47 @@ final class AIHTTPClientTests: XCTestCase {
             XCTFail("An over-limit body must be rejected")
         } catch let error as AIHTTPResponseTooLarge {
             XCTAssertEqual(error.maximumBytes, 32)
+        }
+    }
+
+    func testCancellationOfFinalRetryPropagatesCancellationError() async throws {
+        RetryingThenHangingAIResponseURLProtocol.attempts.reset()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RetryingThenHangingAIResponseURLProtocol.self]
+        let loader = BoundedURLSessionDataLoader(configuration: configuration)
+        defer { loader.invalidate() }
+        let config = AIHTTPClient.RequestConfig(
+            url: URL(string: "https://cancel-final-attempt.test/completions")!,
+            bearerToken: "test-token",
+            body: Data("{}".utf8),
+            timeout: 20,
+            errorDomain: AIErrorTaxonomy.directDomain,
+            httpRejectedCode: AIErrorTaxonomy.directHTTPRejected,
+            responseTooLargeCode: AIErrorTaxonomy.directResponseTooLarge,
+            transportCode: AIErrorTaxonomy.directTransport,
+            retryExhaustedCode: AIErrorTaxonomy.directRetryExhausted,
+            httpRejectedMessagePrefix: "Rejected",
+            transportMessage: "Transport failed"
+        )
+
+        let requestTask = Task {
+            try await AIHTTPClient.postJSON(config, using: loader)
+        }
+        for _ in 0..<800 {
+            if RetryingThenHangingAIResponseURLProtocol.attempts.currentValue() >= 3 { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        let attempts = RetryingThenHangingAIResponseURLProtocol.attempts.currentValue()
+        requestTask.cancel()
+
+        XCTAssertEqual(attempts, 3, "The test must cancel while the final HTTP retry is in flight")
+        do {
+            _ = try await requestTask.value
+            XCTFail("A canceled final request must not be reported as retry exhaustion")
+        } catch is CancellationError {
+            // Expected: cancellation takes precedence over the retry-exhausted transport error.
+        } catch {
+            XCTFail("Expected CancellationError, received \(error)")
         }
     }
 

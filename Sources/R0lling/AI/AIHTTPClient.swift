@@ -245,6 +245,10 @@ public enum AIHTTPClient {
 
     /// Εκτελεί POST με Bearer auth, retries σε transient failures, σεβασμό cancelation.
     public static func postJSON(_ config: RequestConfig) async throws -> Data {
+        try await postJSON(config, using: Self.responseLoader)
+    }
+
+    static func postJSON(_ config: RequestConfig, using responseLoader: BoundedURLSessionDataLoader) async throws -> Data {
         guard config.body.count <= config.maximumRequestBytes else {
             throw AIRequestBodyTooLarge(maximumBytes: config.maximumRequestBytes)
         }
@@ -263,7 +267,7 @@ public enum AIHTTPClient {
 
             do {
                 try Task.checkCancellation()
-                let (data, response) = try await Self.responseLoader.data(
+                let (data, response) = try await responseLoader.data(
                     for: request,
                     maximumBytes: config.maximumResponseBytes
                 )
@@ -318,6 +322,9 @@ public enum AIHTTPClient {
                 }
                 throw typed
             } catch {
+                if Task.isCancelled || (error as? URLError)?.code == .cancelled {
+                    throw CancellationError()
+                }
                 lastError = error
                 if attempt < maxRetryCount {
                     try await sleepBackoff(attempt: attempt)

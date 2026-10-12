@@ -5,7 +5,7 @@ import Foundation
 public enum OutboundPIIRedactor {
     private static let emailPattern =
         #"(?<![\p{L}\p{N}._%+-])[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+(?![\p{L}\p{N}.-])"#
-    private static let ibanPattern = #"(?<![A-Z0-9])[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})(?![A-Z0-9])"#
+    private static let ibanPattern = #"(?<![A-Z0-9])[A-Z]{2}\d{2}(?:[ -]?[A-Z0-9]{4}){2,7}(?:[ -]?[A-Z0-9]{1,4})(?![A-Z0-9])"#
     private static let paymentCardPattern = #"(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)"#
     private static let usSocialSecurityPattern = #"(?<!\d)\d{3}[- ]\d{2}[- ]\d{4}(?!\d)"#
     private static let greekTaxIDPattern =
@@ -79,7 +79,7 @@ public enum OutboundPIIRedactor {
         var normalized: [UInt8] = []
         normalized.reserveCapacity(candidate.utf8.count)
         for byte in candidate.uppercased().utf8 {
-            if byte == 0x20 { continue }
+            if byte == 0x20 || byte == 0x2D { continue }
             guard (48...57).contains(byte) || (65...90).contains(byte) else { return false }
             normalized.append(byte)
         }

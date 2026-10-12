@@ -250,10 +250,11 @@ public struct TodayView: View {
 
                     Button(action: onOpenSettings) {
                         Image(systemName: "gearshape.fill")
-                            .font(.system(size: 17, weight: .semibold, design: .rounded))
-                            .foregroundColor(R0llingTheme.bgPrimary)
-                            .frame(width: 32, height: 32)
-                            .background(R0llingTheme.accentLavender, in: Circle())
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(R0llingTheme.textPrimary)
+                            .frame(width: 36, height: 36)
+                            .background(R0llingTheme.bgElevated, in: Circle())
+                            .overlay(Circle().stroke(R0llingTheme.borderSubtle, lineWidth: 0.8))
                             .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
@@ -270,23 +271,12 @@ public struct TodayView: View {
         .background(R0llingTheme.bgPrimary)
     }
 
-    @ViewBuilder
     private var dateAndGlassesRow: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 10) {
-                datePickerButton(font: .largeTitle.weight(.bold), lineLimit: 1, fixedWidth: true)
-
-                Spacer(minLength: 0)
-                glassesStatusControls
-            }
-
-            HStack(alignment: .top, spacing: 10) {
-                datePickerButton(font: .title2.weight(.bold), lineLimit: 2, fixedWidth: false)
-
-                Spacer(minLength: 0)
-                glassesStatusControls
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            datePickerButton(font: .largeTitle.weight(.bold), lineLimit: 2, fixedWidth: false)
+            glassesStatusControls
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var glassesPrimaryActionButton: some View {

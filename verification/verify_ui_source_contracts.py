@@ -84,11 +84,19 @@ def main() -> None:
         raise SystemExit("QuickAction grid must use three columns except at accessibility text sizes")
 
     fitness = (SOURCE_ROOT / "UI" / "FitnessView.swift").read_text(encoding="utf-8")
-    if (
-        "dayTargetSize: CGFloat = 44" not in fitness
-        or "ScrollView(.horizontal, showsIndicators: true) {\n                    HStack(alignment: .top, spacing: 14)" not in fitness
-    ):
-        raise SystemExit("Narrow Fitness month grids must preserve 44pt targets and scroll months horizontally with an indicator")
+    fitness_grid_contract = (
+        "case .xSmall, .small, .medium, .large, .xLarge: true",
+        "private var dayCellSize: CGFloat { usesCompactMonthGrid ? 20.5 : 44 }",
+        "private var monthGridSpacing: CGFloat { usesCompactMonthGrid ? 10 : 14 }",
+        "private var monthGridWidth: CGFloat { dayCellSize * 7 }",
+        "ScrollView(.horizontal, showsIndicators: true)",
+    )
+    missing_fitness_grid_contract = [item for item in fitness_grid_contract if item not in fitness]
+    if missing_fitness_grid_contract:
+        raise SystemExit(
+            "Fitness must fit two compact months at standard text sizes, expand cells for XXL/accessibility text, "
+            f"and retain a narrow-width horizontal fallback: {missing_fitness_grid_contract}"
+        )
 
     today = (SOURCE_ROOT / "UI" / "TodayView.swift").read_text(encoding="utf-8")
     composer = (SOURCE_ROOT / "UI" / "TodayShareComposerView.swift").read_text(encoding="utf-8")

@@ -12,6 +12,7 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
     private let mediaStorage: MediaStorageProtocol
     private let agentManager: AgentFolderManager?
     private let mediaReferenceMutationGate: MediaReferenceMutationGate
+    var beforeBundleMediaLeafOpenForTesting: (@Sendable () -> Void)?
 
     public struct BackupManifest: Codable {
         public let schemaVersion: Int
@@ -41,6 +42,10 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
         self.mediaStorage = mediaStorage
         self.agentManager = agentManager
         self.mediaReferenceMutationGate = mediaReferenceMutationGate
+    }
+
+    func setBeforeBundleMediaLeafOpenForTesting(_ hook: (@Sendable () -> Void)?) {
+        beforeBundleMediaLeafOpenForTesting = hook
     }
 
     /// Δημιουργεί bundle με manifest.json + Media/ + προαιρετικό Agent memory.
@@ -163,7 +168,10 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
                 underlying: error
             )
         }
-        guard let manifestSize = try? Self.regularFileSize(at: manifestURL) else {
+        guard let manifestSize = try? BoundedRegularFileReader.fileSize(
+            relativePath: "manifest.json",
+            relativeTo: bundleURL
+        ) else {
             throw AppErrorTaxonomy.makeError(
                 domain: AppErrorTaxonomy.backupDomain,
                 code: AppErrorTaxonomy.backupMissingManifest,
@@ -180,7 +188,11 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
 
         let manifestData: Data
         do {
-            manifestData = try Self.readData(at: manifestURL, maximumBytes: Self.maximumManifestBytes)
+            manifestData = try BoundedRegularFileReader.readData(
+                at: manifestURL,
+                relativeTo: bundleURL,
+                maximumBytes: Self.maximumManifestBytes
+            )
         } catch {
             throw AppErrorTaxonomy.makeError(
                 domain: AppErrorTaxonomy.backupDomain,
@@ -256,11 +268,11 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
             // journal row without its referenced media would create a partial restore.
             for originalAttachment in entry.attachments {
                 var attachment = originalAttachment
-                let backupMediaURL: URL
+                let backupRelativePath = "Media/\(attachment.relativePath)"
                 do {
                     try Self.validateAttachmentPath(attachment)
-                    backupMediaURL = try PathAsfaleia.asfalhs_resolved_url(
-                        relativePath: "Media/\(attachment.relativePath)",
+                    _ = try PathAsfaleia.asfalhs_resolved_url(
+                        relativePath: backupRelativePath,
                         baseDirectory: bundleURL
                     )
                 } catch {
@@ -272,7 +284,10 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
                     )
                 }
 
-                guard let bundledSize = try Self.regularFileSize(at: backupMediaURL),
+                guard let bundledSize = try BoundedRegularFileReader.fileSize(
+                    relativePath: backupRelativePath,
+                    relativeTo: bundleURL
+                ),
                       bundledSize > 0,
                       attachment.byteSize == bundledSize else {
                     throw NSError(domain: AppErrorTaxonomy.backupDomain, code: 5, userInfo: [
@@ -292,7 +307,11 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
                     if FileManager.default.fileExists(atPath: requestedTargetURL.path) {
                         if let existingTargetSize = try Self.regularFileSize(at: requestedTargetURL) {
                             if existingTargetSize == bundledSize,
-                               try Self.filesHaveEqualBytes(requestedTargetURL, backupMediaURL) {
+                               try BoundedRegularFileReader.filesHaveEqualBytes(
+                                   relativePath: backupRelativePath,
+                                   relativeTo: bundleURL,
+                                   andAt: requestedTargetURL
+                               ) {
                                 mappedMediaPaths[originalAttachment.relativePath] = outputRelativePath
                                 restoredEntry.attachments.append(attachment)
                                 continue
@@ -340,10 +359,15 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
                     stagedURL: stagedURL,
                     targetURL: targetMediaURL
                 ))
-                try FileManager.default.copyItem(at: backupMediaURL, to: stagedURL)
+                try BoundedRegularFileReader.copyRegularFile(
+                    relativePath: backupRelativePath,
+                    relativeTo: bundleURL,
+                    to: stagedURL,
+                    expectedSize: bundledSize,
+                    beforeLeafOpen: beforeBundleMediaLeafOpenForTesting
+                )
                 try R0llingFileProtection.apply(to: stagedURL)
-                guard try Self.regularFileSize(at: stagedURL) == bundledSize,
-                      try Self.filesHaveEqualBytes(stagedURL, backupMediaURL) else {
+                guard try Self.regularFileSize(at: stagedURL) == bundledSize else {
                     throw NSError(domain: AppErrorTaxonomy.backupDomain, code: 5, userInfo: [
                         NSLocalizedDescriptionKey: "Το συνημμένο δεν επαληθεύτηκε κατά την αντιγραφή."
                     ])
@@ -504,27 +528,6 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
         let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
         guard values.isRegularFile == true, let fileSize = values.fileSize else { return nil }
         return Int64(fileSize)
-    }
-
-    private static func readData(at url: URL, maximumBytes: Int) throws -> Data {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-        var data = Data()
-        while data.count <= maximumBytes {
-            let remainingIncludingOverflowByte = maximumBytes + 1 - data.count
-            let chunkSize = min(64 * 1024, remainingIncludingOverflowByte)
-            let chunk = try handle.read(upToCount: chunkSize) ?? Data()
-            guard !chunk.isEmpty else { return data }
-            data.append(chunk)
-            guard data.count <= maximumBytes else {
-                throw AppErrorTaxonomy.makeError(
-                    domain: AppErrorTaxonomy.backupDomain,
-                    code: AppErrorTaxonomy.backupInvalidManifest,
-                    message: "Το backup manifest είναι μεγαλύτερο από το επιτρεπόμενο όριο των 16 MiB."
-                )
-            }
-        }
-        return data
     }
 
     private static func filesHaveEqualBytes(_ lhs: URL, _ rhs: URL) throws -> Bool {

@@ -37,6 +37,7 @@ swiftc -strict-concurrency=complete \
 "$tmp_dir/ai-request-size"
 
 swiftc -strict-concurrency=complete \
+  Sources/R0lling/Core/BoundedRegularFileReader.swift \
   Sources/R0lling/Persistence/BackupRestoreEngine.swift \
   Sources/R0lling/Persistence/MediaStorageService.swift \
   verification/backup_restore_capacity_probe.swift \

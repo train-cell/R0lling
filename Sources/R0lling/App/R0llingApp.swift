@@ -105,26 +105,7 @@ public struct MainTabView: View {
                 }
             }
             .padding(4)
-            .background {
-                Capsule().fill(
-                    LinearGradient(
-                        colors: [R0llingTheme.bgElevated.opacity(0.98), R0llingTheme.bgSurface.opacity(0.98)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            }
-            .overlay {
-                Capsule().stroke(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.09), R0llingTheme.borderSubtle.opacity(0.68), Color.black.opacity(0.24)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-            }
-            .shadow(color: .black.opacity(0.24), radius: 12, x: 0, y: 4)
+            .r0llingBevelCapsule(fillColor: R0llingTheme.bgSurface.opacity(0.82))
 
             Button {
                 if isQuickActionsPresented {
@@ -137,26 +118,7 @@ public struct MainTabView: View {
                     .font(.system(size: 22, weight: .medium))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .frame(width: 58, height: 58)
-                    .background {
-                        Circle().fill(
-                            LinearGradient(
-                                colors: [R0llingTheme.bgElevated, R0llingTheme.bgSurface],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    }
-                    .overlay {
-                        Circle().stroke(
-                            LinearGradient(
-                            colors: [Color.white.opacity(0.10), R0llingTheme.borderSubtle.opacity(0.72), Color.black.opacity(0.24)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                    }
-                    .shadow(color: .black.opacity(0.24), radius: 12, x: 0, y: 4)
+                    .r0llingBevelSurface(cornerRadius: 29)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isQuickActionsPresented ? "Κλείσιμο γρήγορων ενεργειών" : "Περισσότερες λειτουργίες")
@@ -216,21 +178,15 @@ public struct MainTabView: View {
                 Image(systemName: destination.symbol)
                     .font(.system(size: 18, weight: .semibold))
                 Text(destination.title)
-                    .font(.caption2.weight(.medium))
+                    .font(.caption.weight(.medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
-            .foregroundColor(isSelected ? R0llingTheme.textPrimary : R0llingTheme.textSecondary)
+            .foregroundColor(R0llingTheme.textPrimary)
             .frame(maxWidth: .infinity, minHeight: 54)
             .background {
                 if isSelected {
-                    Capsule().fill(
-                        LinearGradient(
-                            colors: [Color.white.opacity(0.13), Color.white.opacity(0.055)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+                    Capsule().fill(Color.white.opacity(0.12))
                 }
             }
             .contentShape(Capsule())
@@ -269,7 +225,16 @@ public struct MainTabView: View {
             }
         }
         .padding(20)
-        .r0llingBevelSurface(cornerRadius: 24)
+        .background {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(R0llingTheme.bgPrimary.opacity(0.88))
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(R0llingTheme.borderSubtle.opacity(0.82), lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(0.26), radius: 10, x: 0, y: 5)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Γρήγορες ενέργειες")
     }
@@ -288,7 +253,7 @@ public struct MainTabView: View {
                     .font(.system(size: 21, weight: .semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .frame(width: 56, height: 56)
-                    .r0llingBevelCapsule()
+                    .r0llingBevelInsetSurface(cornerRadius: 28)
                 Text(action.title)
                     .font(.caption.weight(.medium))
                     .multilineTextAlignment(.center)

@@ -25,7 +25,7 @@
 | **DEV-09: Hermes Connection** | Σύνδεση με ελεγχόμενο endpoint μέσω LAN/VPN. | Επιτυχής απάντηση και σωστό payload/error policy. | Connector source/schema υπάρχουν· δεν έγινε live request. | ⏳ Εκκρεμεί σε endpoint |
 | **DEV-10: Observation Game** | Έναρξη αποστολής, λήψη ή εισαγωγή φωτογραφίας, αξιολόγηση. | AI result, fail-closed errors, success-only streak. | Engine/XCTest source υπάρχει· actual provider/device run δεν έγινε. | ⏳ Εκκρεμεί σε Mac/iPhone |
 | **DEV-UI-01: Glasses primary control** | In Simulation Mode, start, stop, start again; background/lock to pause and tap to resume; activate VoiceOver and inspect action plus value. | A stopped stream remains connected and restarts; paused session can resume; connecting state prevents duplicate taps; no screen-reader announcement promises real camera data in simulation. | State-level XCTest/probe passed; AppState/SwiftUI/lifecycle interaction not rendered or exercised. | ⏳ Εκκρεμεί σε iPhone |
-| **DEV-UI-02: Fitness calendar labels** | Render Fitness at compact width and inspect weekday order, label distinction, 44pt day targets and month fallback. | Seven distinct Monday-first Greek labels; targets do not overlap or clip at supported text sizes. | Source/probe confirms unique labels and 44pt frames; rendered geometry/touch still unverified. | ⏳ Εκκρεμεί σε Simulator/iPhone |
+| **DEV-UI-02: Fitness calendar layout** | Render Fitness at 375pt, 320pt, XXL, and accessibility text sizes; inspect two-month composition, weekday order, touch precision, and month fallback. | At common width both months fit with distinct Monday-first Greek labels; XXL/accessibility uses 44pt cells; narrow layouts scroll without clipping. | Source uses compact 20.5pt cells through XL and 44pt cells at XXL/accessibility sizes. Rendered geometry, touch precision, and VoiceOver are unverified. | ⏳ Εκκρεμεί σε Simulator/iPhone |
 | **DEV-UI-03: Journal search ordering/accessibility** | In Archive, type a query that returns slowly, then quickly replace it with a different query; inspect and use search/clear with VoiceOver. | Only results for the latest query remain; VoiceOver identifies the search field, clear action, and active-search status in Greek. | Generation-gate probe passes and explicit source labels are present; async storage timing, layout, and VoiceOver still need Simulator/iPhone validation. | ⏳ Εκκρεμεί σε Simulator/iPhone |
 | **DEV-UI-04: Sleep overnight metrics** | Open a sleep report with Health samples and select HR, HRV, RR, and SpO₂. Repeat with missing/denied channels and a HealthKit query failure; inspect chart labels and VoiceOver summary. | Only real measurements inside the primary sleep episode appear; normalized values have the expected units, larger gaps stay visually blank, absent channels show an empty state without interpolation, and a failed stage/vital query is disclosed separately from no samples. | Foundation aggregation tests pass 12/12; HealthKit query, layout, touch, and VoiceOver have not run on Apple hardware. | ⏳ Εκκρεμεί σε Mac/iPhone |
 | **DEV-UI-05: Simulation camera affordance** | In Simulation Mode, open Observation Game. Inspect glasses camera action, photo picker, and manual confirmation. If a live SDK build is available, change the setting and revisit the screen. | Simulation explains and disables glasses capture; photo/manual alternatives remain usable. Published state follows the Settings change. | Source contract passes; AppState/SwiftUI rendered behavior is not exercised here. Live mode is not implemented in this build. | ⏳ Εκκρεμεί σε Simulator/iPhone |
@@ -51,7 +51,7 @@ Project checkpoint ή build: [v1.0.0-rc1]
 ## 3. Mac / `swift test` checklist (P0-01 — honest blocker)
 
 > **Status:** 🚫 Εκκρεμεί Apple build/test. WSL Swift parse περνά, αλλά Linux SwiftPM build σταματά επειδή δεν παρέχεται Apple `ImageIO`. Δεν υπάρχει fake PASS.
-> Proof artifact: πράσινο GHA log **ή** τοπικό `swift-test.log` → γραμμή στο `docs/HANDOFF.md`.
+> Proof artifact: πράσινο GHA log **ή** τοπικό `swift-test.log` → γραμμή στο `docs/HANDOFF_R0lling_2026-10-11.md`.
 
 ### 3.1 GitHub Actions (προτιμητέο)
 
@@ -61,7 +61,7 @@ Project checkpoint ή build: [v1.0.0-rc1]
 | 2 | Job `python-verify` = πράσινο (`verify_all_subsystems.py` + `verify_theme_apple_meta_compliance.py`) | Actions run | ☐ |
 | 3 | Job `build-and-test` = πράσινο (`swift build` + `swift test`) | Actions run | ☐ |
 | 4 | Κατέβασε artifact `swift-build-and-test-logs` (`swift-test.log` + `swift-build.log`) | Actions → Artifacts | ☐ |
-| 5 | Επικόλλησε στο HANDOFF: `GHA run <URL> · swift test PASS · <timestamp>` | `docs/HANDOFF.md` | ☐ |
+| 5 | Επικόλλησε στο HANDOFF: `GHA run <URL> · swift test PASS · <timestamp>` | `docs/HANDOFF_R0lling_2026-10-11.md` | ☐ |
 | 6 | Επιβεβαίωσε ότι `package-ios-app` ολοκληρώθηκε· απαιτεί επιτυχία και των `build-and-test` και `python-verify`, και παράγει unsigned IPA artifact | Actions run / Artifacts | ☐ |
 | 7 | (Optional) `AVAsset.isPlayable` smoke για placeholder clip — DEV-05 | Mac XCTest / device | ☐ |
 

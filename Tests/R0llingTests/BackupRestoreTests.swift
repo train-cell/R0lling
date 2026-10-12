@@ -267,6 +267,51 @@ final class BackupRestoreTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: collidingURL.appendingPathComponent("unrelated.txt").path))
     }
 
+    func testRestoreReadsBundleMediaFromOpenedDirectoryAfterParentSwap() async throws {
+        let selectedBytes = Data(repeating: 0x41, count: 64)
+        let outsideBytes = Data(repeating: 0x42, count: 64)
+        let attachment = try await mediaStorage.saveMediaFile(
+            data: selectedBytes,
+            originalFilename: "photo.jpg",
+            mediaType: .photo
+        )
+        let sourceEntry = JournalEntry(content: "descriptor-relative restore", attachments: [attachment])
+        try await storage.saveEntry(sourceEntry)
+        let bundleURL = try await backupEngine.createBackupBundle()
+
+        let photosFolder = bundleURL.appendingPathComponent("Media/Photos", isDirectory: true)
+        let heldPhotosFolder = bundleURL.appendingPathComponent("Media/Photos-held", isDirectory: true)
+        let outsideFolder = tempDirectory.appendingPathComponent("OutsideBundle", isDirectory: true)
+        try FileManager.default.createDirectory(at: outsideFolder, withIntermediateDirectories: true)
+        try outsideBytes.write(to: outsideFolder.appendingPathComponent(URL(fileURLWithPath: attachment.relativePath).lastPathComponent))
+
+        let targetRoot = tempDirectory.appendingPathComponent("DescriptorRestoreTarget", isDirectory: true)
+        let targetStorage = JSONFileStorageService(storageURL: targetRoot.appendingPathComponent("journal.json"))
+        let targetMedia = MediaStorageService(
+            baseDirectory: targetRoot.appendingPathComponent("Media"),
+            paradekampseElegxoXorou: true
+        )
+        let targetEngine = BackupRestoreEngine(
+            storage: targetStorage,
+            mediaStorage: targetMedia,
+            agentManager: AgentFolderManager(vaultURL: targetRoot.appendingPathComponent("Vault"))
+        )
+        await targetEngine.setBeforeBundleMediaLeafOpenForTesting {
+            try? FileManager.default.moveItem(at: photosFolder, to: heldPhotosFolder)
+            try? FileManager.default.createSymbolicLink(at: photosFolder, withDestinationURL: outsideFolder)
+        }
+
+        let result = try await targetEngine.restoreFromBackupBundle(bundleURL: bundleURL)
+        XCTAssertEqual(result.restoredEntries, 1)
+        let maybeRestoredEntry = try await targetStorage.getEntry(id: sourceEntry.id)
+        let restoredEntry = try XCTUnwrap(maybeRestoredEntry)
+        let restoredAttachment = try XCTUnwrap(restoredEntry.attachments.first)
+        let restoredURL = try targetMedia.getMediaFileURL(relativePath: restoredAttachment.relativePath)
+        XCTAssertEqual(try Data(contentsOf: restoredURL), selectedBytes)
+        XCTAssertEqual(try Data(contentsOf: outsideFolder.appendingPathComponent(URL(fileURLWithPath: attachment.relativePath).lastPathComponent)), outsideBytes)
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: photosFolder.path), outsideFolder.path)
+    }
+
     func testRestoreRejectsMissingBundleMediaEvenWhenTargetAlreadyHasAFile() async throws {
         let bytes = Data("expected bytes".utf8)
         let attachment = try await mediaStorage.saveMediaFile(

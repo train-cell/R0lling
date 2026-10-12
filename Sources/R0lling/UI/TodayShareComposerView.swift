@@ -18,6 +18,7 @@ struct TodayShareComposerView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedCategory: ShareComposerCategory = .overview
     @State private var selectedPage = 0
     @State private var showingCustomize = false
@@ -43,7 +44,7 @@ struct TodayShareComposerView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 16)
             }
-            .background(R0llingTheme.bgPrimary)
+            .background(R0llingTheme.bgSurface.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 actionBar
@@ -89,7 +90,7 @@ struct TodayShareComposerView: View {
                     .font(.system(size: 21, weight: .semibold))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .frame(width: 56, height: 56)
-                    .r0llingBevelSurface(cornerRadius: 28)
+                    .r0llingBevelInsetSurface(cornerRadius: 28)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Κλείσιμο κοινοποίησης")
@@ -148,21 +149,8 @@ struct TodayShareComposerView: View {
                 .frame(height: 44)
                 .background {
                     Capsule()
-                        .fill(category == selectedCategory ? R0llingTheme.bgElevated : R0llingTheme.bgSurface)
+                        .fill(category == selectedCategory ? R0llingTheme.bgSelectedControl : R0llingTheme.bgUnselectedControl)
                 }
-                .overlay {
-                    Capsule().stroke(
-                        LinearGradient(
-                            colors: category == selectedCategory
-                                ? [Color.white.opacity(0.11), R0llingTheme.borderFocus, Color.black.opacity(0.25)]
-                                : [Color.white.opacity(0.055), R0llingTheme.borderSubtle.opacity(0.55), Color.black.opacity(0.2)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: category == selectedCategory ? 1 : 0.7
-                    )
-                }
-                .shadow(color: Color.black.opacity(category == selectedCategory ? 0.2 : 0.12), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(.plain)
         .fixedSize(horizontal: true, vertical: false)
@@ -174,12 +162,13 @@ struct TodayShareComposerView: View {
     private var previewCarousel: some View {
         GeometryReader { geometry in
             let cardWidth = min(
-                max(geometry.size.width * 0.80, 220),
+                max(geometry.size.width * 0.625, 220),
                 min(UIScreenSharePreview.maximumHeight, geometry.size.height)
             )
-            let cardStride = cardWidth + 14
+            let cardSpacing = cardWidth * 0.14
+            let cardStride = cardWidth + cardSpacing
 
-            HStack(spacing: 14) {
+            HStack(spacing: cardSpacing) {
                 ForEach(0..<6, id: \.self) { page in
                     ZStack {
                         ShareComposerCheckerboard()
@@ -209,6 +198,7 @@ struct TodayShareComposerView: View {
             }
             .offset(x: (geometry.size.width - cardWidth) / 2 - CGFloat(selectedPage) * cardStride)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .offset(y: 8)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 20)
@@ -228,12 +218,17 @@ struct TodayShareComposerView: View {
                 }
             }
         }
-        .frame(height: min(UIScreenSharePreview.maximumHeight, UIScreenSharePreview.preferredHeight))
+        .frame(height: min(
+            UIScreenSharePreview.maximumHeight,
+            horizontalSizeClass == .compact
+                ? UIScreenSharePreview.compactPreferredHeight
+                : UIScreenSharePreview.regularPreferredHeight
+        ))
         .clipped()
     }
 
     private var pageIndicators: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 0) {
             ForEach(0..<6, id: \.self) { page in
                 Button {
                     selectedPage = page
@@ -288,7 +283,7 @@ struct TodayShareComposerView: View {
             }
         }
         .padding(.horizontal, 18)
-        .background(R0llingTheme.bgPrimary)
+        .background(R0llingTheme.bgSurface)
     }
 
     @ViewBuilder
@@ -345,7 +340,7 @@ struct TodayShareComposerView: View {
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundColor(R0llingTheme.textPrimary)
                 .frame(width: compact ? 56 : 68, height: compact ? 56 : 68)
-                .r0llingBevelSurface(cornerRadius: compact ? 28 : 34)
+                .r0llingBevelInsetSurface(cornerRadius: compact ? 28 : 34)
             if compact {
                 Text(title)
                     .font(.caption2.weight(.medium))
@@ -546,17 +541,18 @@ private struct ShareComposerMetric: Identifiable {
 private struct ShareComposerCheckerboard: View {
     var body: some View {
         Canvas { context, size in
-            let tile: CGFloat = 18
+            let cellsAcross: CGFloat = 13
+            let tile = size.width / cellsAcross
             let rows = Int(ceil(size.height / tile))
             let columns = Int(ceil(size.width / tile))
             for row in 0..<rows {
                 for column in 0..<columns where (row + column).isMultiple(of: 2) {
                     let rect = CGRect(x: CGFloat(column) * tile, y: CGFloat(row) * tile, width: tile, height: tile)
-                    context.fill(Path(rect), with: .color(Color.white.opacity(0.13)))
+                    context.fill(Path(rect), with: .color(R0llingTheme.sharePreviewCheckerboardHighlight))
                 }
             }
         }
-        .background(Color(hex: 0x3B3C43))
+        .background(R0llingTheme.sharePreviewCheckerboardBase)
         .accessibilityHidden(true)
     }
 }
@@ -577,32 +573,45 @@ private struct ShareComposerCardArtwork: View {
         GeometryReader { geometry in
             let scale = geometry.size.width / 1080
             let accent = effectivePalette.accent(for: page)
+            let usesRaisedSurface = effectivePalette != .monochrome
             VStack(spacing: 0) {
-                HStack(spacing: 12 * scale) {
-                    if includeBrand {
-                        Text("R")
-                            .font(.system(size: 34 * scale, weight: .bold, design: .rounded))
-                            .foregroundColor(R0llingTheme.bgPrimary)
-                            .frame(width: 56 * scale, height: 56 * scale)
-                            .background(accent, in: Circle())
+                if usesRaisedSurface {
+                    VStack(alignment: .leading, spacing: 4 * scale) {
+                        Text(category.title.uppercased())
+                            .font(.system(size: 17 * scale, weight: .heavy, design: .monospaced))
+                            .tracking(1.2 * scale)
+                            .foregroundColor(R0llingTheme.textSecondary)
+                        HStack(spacing: 8 * scale) {
+                            Image(systemName: "waveform.path")
+                            Text("Προσωπική σύνοψη")
+                        }
+                        .font(.system(size: 15 * scale, weight: .medium))
+                        .foregroundColor(R0llingTheme.textMuted)
                     }
-                    VStack(alignment: .leading, spacing: 3 * scale) {
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    VStack(spacing: 8 * scale) {
                         if includeBrand {
-                            Text("R0lling")
-                                .font(.system(size: 28 * scale, weight: .bold, design: .rounded))
-                                .foregroundColor(R0llingTheme.textPrimary)
+                            HStack(spacing: 6 * scale) {
+                                Text("R")
+                                    .font(.system(size: 18 * scale, weight: .bold, design: .rounded))
+                                    .foregroundColor(R0llingTheme.bgPrimary)
+                                    .frame(width: 30 * scale, height: 30 * scale)
+                                    .background(accent, in: Circle())
+                                Text("R0lling")
+                                    .font(.system(size: 19 * scale, weight: .bold, design: .rounded))
+                                    .foregroundColor(R0llingTheme.textPrimary)
+                            }
+                            .padding(.horizontal, 10 * scale)
+                            .padding(.vertical, 5 * scale)
+                            .background(Color.white.opacity(0.10), in: Capsule())
                         }
                         Text(category.title.uppercased())
                             .font(.system(size: 17 * scale, weight: .heavy, design: .monospaced))
                             .tracking(1.2 * scale)
                             .foregroundColor(R0llingTheme.textSecondary)
                     }
-                    Spacer(minLength: 4 * scale)
-                    if includeDate {
-                        Text(greekDate(date))
-                            .font(.system(size: 20 * scale, weight: .semibold))
-                            .foregroundColor(R0llingTheme.textSecondary)
-                    }
+                    .frame(maxWidth: .infinity)
                 }
 
                 Spacer(minLength: 18 * scale)
@@ -610,30 +619,64 @@ private struct ShareComposerCardArtwork: View {
                 Spacer(minLength: 18 * scale)
 
                 HStack(spacing: 8 * scale) {
-                    Image(systemName: "waveform.path")
-                    Text("Προσωπική σύνοψη")
+                    if usesRaisedSurface {
+                        if includeDate {
+                            Text(greekDate(date))
+                                .font(.system(size: 17 * scale, weight: .medium))
+                                .foregroundColor(R0llingTheme.textSecondary)
+                        }
+                        Spacer(minLength: 4 * scale)
+                        if includeBrand {
+                            HStack(spacing: 6 * scale) {
+                                Text("R")
+                                    .font(.system(size: 20 * scale, weight: .bold, design: .rounded))
+                                    .foregroundColor(R0llingTheme.bgPrimary)
+                                    .frame(width: 30 * scale, height: 30 * scale)
+                                    .background(accent, in: Circle())
+                                Text("R0lling")
+                                    .font(.system(size: 20 * scale, weight: .bold, design: .rounded))
+                                    .foregroundColor(R0llingTheme.textPrimary)
+                            }
+                        }
+                    } else {
+                        Image(systemName: "waveform.path")
+                        Text("Προσωπική σύνοψη")
+                        Spacer(minLength: 4 * scale)
+                        if includeDate {
+                            Text(greekDate(date))
+                                .font(.system(size: 17 * scale, weight: .medium))
+                                .foregroundColor(R0llingTheme.textSecondary)
+                        }
+                    }
                 }
                 .font(.system(size: 15 * scale, weight: .medium))
                 .foregroundColor(R0llingTheme.textMuted)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(36 * scale)
-            .frame(width: geometry.size.width * 0.90, height: geometry.size.height * 0.48)
+            .frame(width: geometry.size.width * 0.80, height: geometry.size.height * 0.44)
             .background {
-                RoundedRectangle(cornerRadius: 32 * scale, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: effectivePalette == .monochrome
-                            ? [Color(hex: 0x17181C), Color(hex: 0x22232A)]
-                            : [Color(hex: 0x202128), Color(hex: 0x111216)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
+                if usesRaisedSurface {
+                    RoundedRectangle(cornerRadius: 32 * scale, style: .continuous)
+                        .fill(LinearGradient(
+                            colors: [Color(hex: 0x202128), Color(hex: 0x111216)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                }
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 32 * scale, style: .continuous)
-                    .stroke(Color.white.opacity(0.13), lineWidth: max(1, scale * 2))
+                if usesRaisedSurface {
+                    RoundedRectangle(cornerRadius: 32 * scale, style: .continuous)
+                        .stroke(Color.white.opacity(0.13), lineWidth: max(1, scale * 2))
+                }
             }
-            .shadow(color: Color.black.opacity(0.28), radius: 18 * scale, x: 0, y: 10 * scale)
+            .shadow(
+                color: usesRaisedSurface ? Color.black.opacity(0.28) : .clear,
+                radius: usesRaisedSurface ? 18 * scale : 0,
+                x: 0,
+                y: usesRaisedSurface ? 10 * scale : 0
+            )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -643,7 +686,7 @@ private struct ShareComposerCardArtwork: View {
         switch category {
         case .overview:
             if metrics.isEmpty {
-                emptyDataMessage("Δεν υπάρχουν διαθέσιμες μετρήσεις")
+                emptyDataMessage("Δεν υπάρχουν διαθέσιμες μετρήσεις", scale: scale)
             } else {
                 VStack(spacing: 18 * scale) {
                     HStack(spacing: 6 * scale) {
@@ -671,7 +714,7 @@ private struct ShareComposerCardArtwork: View {
             }
         case .nutrition:
             if nutritionCount == 0 {
-                emptyDataMessage("Δεν υπάρχουν καταγραφές διατροφής")
+                emptyDataMessage("Δεν υπάρχουν καταγραφές διατροφής", scale: scale)
             } else {
                 VStack(spacing: 10 * scale) {
                     Text("\(nutritionCount)")
@@ -706,7 +749,7 @@ private struct ShareComposerCardArtwork: View {
                 if includeJournalText { entryLines(scale: scale, limit: page == 4 ? 1 : 2) }
             }
         case .stress:
-            emptyDataMessage("Δεν υπάρχουν διαθέσιμες μετρήσεις στρες")
+            emptyDataMessage("Δεν υπάρχουν διαθέσιμες μετρήσεις στρες", scale: scale)
         }
     }
 
@@ -729,33 +772,33 @@ private struct ShareComposerCardArtwork: View {
 
     private func metricAccent(at index: Int) -> Color {
         guard effectivePalette != .monochrome else { return Color(hex: 0xE7E7EC) }
-        let colors = [R0llingTheme.accentAmber, R0llingTheme.accentLime, R0llingTheme.accentCyan, R0llingTheme.accentLavender]
+        let colors = [R0llingTheme.accentAmber, R0llingTheme.accentLime, R0llingTheme.accentLavender, R0llingTheme.accentCyan]
         return colors[index % colors.count]
     }
 
     private func metricView(_ metric: ShareComposerMetric, scale: CGFloat, accent: Color) -> some View {
-        VStack(spacing: 8 * scale) {
+        VStack(spacing: 10 * scale) {
             ZStack {
                 Circle()
                     .fill(Color(hex: 0x25262D))
                 Circle()
-                    .stroke(Color.white.opacity(0.13), lineWidth: 7 * scale)
+                    .stroke(Color.white.opacity(0.13), lineWidth: 9 * scale)
                 if let visualProgress = metric.visualProgress {
                     Circle()
                         .trim(from: 0, to: visualProgress)
-                        .stroke(accent, style: StrokeStyle(lineWidth: 7 * scale, lineCap: .round))
+                        .stroke(accent, style: StrokeStyle(lineWidth: 9 * scale, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
                 Text(metric.value)
-                    .font(.system(size: 29 * scale, weight: .bold, design: .rounded))
+                    .font(.system(size: 34 * scale, weight: .bold, design: .rounded))
                     .foregroundColor(R0llingTheme.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
                     .padding(.horizontal, 7 * scale)
             }
-            .frame(width: 132 * scale, height: 132 * scale)
+            .frame(width: 180 * scale, height: 180 * scale)
             Text(metric.title)
-                .font(.system(size: 17 * scale, weight: .semibold))
+                .font(.system(size: 19 * scale, weight: .semibold))
                 .foregroundColor(R0llingTheme.textSecondary)
         }
         .multilineTextAlignment(.center)
@@ -764,12 +807,14 @@ private struct ShareComposerCardArtwork: View {
         .accessibilityValue("Η κλίμακα είναι μόνο για απεικόνιση, όχι κλινικό εύρος.")
     }
 
-    private func emptyDataMessage(_ message: String) -> some View {
+    private func emptyDataMessage(_ message: String, scale: CGFloat) -> some View {
         Text(message)
-            .font(.system(size: 22, weight: .semibold))
+            .font(.system(size: max(12, 22 * scale), weight: .semibold))
             .foregroundColor(R0llingTheme.textSecondary)
             .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, minHeight: 90)
+            .lineLimit(3)
+            .minimumScaleFactor(0.8)
+            .frame(maxWidth: .infinity, minHeight: 90 * scale)
     }
 
     private func greekDate(_ date: Date) -> String {
@@ -803,7 +848,8 @@ private struct ShareComposerCardArtwork: View {
 }
 
 private enum UIScreenSharePreview {
-    static let preferredHeight: CGFloat = 380
+    static let compactPreferredHeight: CGFloat = 264
+    static let regularPreferredHeight: CGFloat = 380
     static let maximumHeight: CGFloat = 440
 }
 

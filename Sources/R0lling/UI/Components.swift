@@ -184,7 +184,7 @@ public struct BevelTelemetryCard: View {
                             .frame(width: 6, height: 6)
                         VStack(alignment: .leading, spacing: 1) {
                             Text("BUFFER CAPACITY")
-                                .font(.system(size: 9, weight: .heavy))
+                                .font(.caption.weight(.semibold))
                                 .foregroundColor(R0llingTheme.textMuted)
                             Text(String(format: "%.1fs / 10.0s", bufferDuration))
                                 .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -199,7 +199,7 @@ public struct BevelTelemetryCard: View {
                             .frame(width: 6, height: 6)
                         VStack(alignment: .leading, spacing: 1) {
                             Text("TODAY'S CLIPS")
-                                .font(.system(size: 9, weight: .heavy))
+                                .font(.caption.weight(.semibold))
                                 .foregroundColor(R0llingTheme.textMuted)
                             Text("\(todayClipsCount) CLIPS CAPTURED")
                                 .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -214,7 +214,7 @@ public struct BevelTelemetryCard: View {
                             .frame(width: 6, height: 6)
                         VStack(alignment: .leading, spacing: 1) {
                             Text("VIDEO STREAM")
-                                .font(.system(size: 9, weight: .heavy))
+                                .font(.caption.weight(.semibold))
                                 .foregroundColor(R0llingTheme.textMuted)
                             Text(isSimulation ? "SYNTHETIC BUFFER" : "FORMAT UNAVAILABLE")
                                 .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -241,13 +241,7 @@ public struct BevelTelemetryCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .padding(16)
-        .background(R0llingTheme.heroCardGradient)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(R0llingTheme.borderSubtle, lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.4), radius: 12, x: 0, y: 6)
+        .r0llingBevelSurface(cornerRadius: 20, fillColor: R0llingTheme.heroCardFill)
     }
 }
 
@@ -745,11 +739,11 @@ public struct FloatingClipBar: View {
                         LiveStreamBadge(isSimulation: isSimulation)
                     }
                     Text(String(format: "BUFFER: %.1fs", bufferDuration))
-                        .font(.system(size: 13, weight: .heavy, design: .monospaced))
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
                         .foregroundColor(R0llingTheme.textPrimary)
                 }
                 Text("Pre-roll circular cache ready in RAM")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.caption)
                     .foregroundColor(R0llingTheme.textSecondary)
             }
 
@@ -764,14 +758,14 @@ public struct FloatingClipBar: View {
                     Image(systemName: "scissors")
                         .font(.system(size: 15, weight: .black))
                     Text("CAPTURE 10s")
-                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .font(.subheadline.weight(.semibold))
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
                 .background(R0llingTheme.primaryButtonGradient)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadow(color: Color.black.opacity(0.32), radius: 4, x: 0, y: 3)
+                .shadow(color: Color.black.opacity(0.16), radius: 3, x: 0, y: 2)
             }
             .disabled(!isStreaming || bufferDuration < 0.5)
         }
@@ -781,7 +775,6 @@ public struct FloatingClipBar: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(R0llingTheme.borderFocus, lineWidth: 1.5)
         )
-        .shadow(color: Color.black.opacity(0.55), radius: 16, x: 0, y: 8)
     }
 }
 
