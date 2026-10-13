@@ -18,7 +18,7 @@ This current-state snapshot supersedes stale next-step and no-commit instruction
 
 **Environment.** Claude Code cloud container, clone of `train-cell/R0lling`. It started on branch `claude/beautiful-cannon-6bot68` at `b614db9`, which was clean. After `git fetch origin main` the branch was fast-forwarded (`--ff-only`, no reset or commit) to the pushed `main`, `b29429b6d24051ee2d4f4b52e793f9c5b0748932`. The full status was then clean: no modified, untracked, or ignored files, and no stash.
 
-**Uncommitted.** All edits from this continuation are uncommitted in that container's working tree; `git status --short` lists them, and `git diff --check` is clean. A safety patch of the full working-tree diff against `b29429b` was delivered to the user in the session, because the user has not yet authorized a commit. Following the standing instruction, no commit, push, reset, clean, or stash was made. The container is ephemeral, so the work persists only if the user asks for it to be committed and pushed, to this branch or to `main`.
+**Committed and pushed (superseding the earlier uncommitted state).** The user then authorized a commit. The work is on branch `claude/beautiful-cannon-6bot68` in draft PR train-cell/R0lling#1 to `main`: `f0431f0` (compile fixes and honesty gaps), `41c5f7b` (remaining documented software items), then checkpoint commits marked `[skip ci]`, which the user asked for so a dropped session loses nothing. Nothing was merged, reset, cleaned or stashed.
 
 **Evidence read (not re-run).**
 - Hosted run 38415047820 on `b29429b`:
@@ -90,12 +90,28 @@ Details and remaining recorded items are in [IMPLEMENTATION_STATUS.md](IMPLEMENT
 
 No test, build, Swift compile, or Apple render was run.
 
+**Fourth pass: first Apple build and test run.**
+- Hosted run 38434056716 on `f0431f0` compiled the package and the tests on `macos-26`, the first Apple compile since `82c4c0e`.
+- `swift test` then reported 122 passes and 19 failures, and hung until the 30-minute job timeout.
+- The failures are fixed in source:
+  - the Darwin `/var` symlink in the O_NOFOLLOW vault walks, which would also have broken iOS app-container vaults;
+  - inverted pixel rows in the watermark test, plus a banner capped to the bottom quarter;
+  - three stale test expectations.
+- The hanging test was hidden by xctest's 16 KB output buffering. The CI test step now runs under a pseudo-terminal with a 15-minute watchdog that names and samples a hang.
+
+Details are in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md), fourth pass. The iOS app job has not run yet, because it waits for the macOS tests.
+
 **Open and user-owned items:**
-- push/commit decision;
-- first green hosted CI on `macos-26`, and fixing whatever the first real Apple build reports;
-- Apple full XCTest;
-- device and rendered Bevel review;
-- answers to the decision questions: ADR 0001 stack, Dynamic Type pass on Vault/Decision Journal/shared components, two sub-44pt text buttons, `processing` background mode without BGTask identifiers, DECISIONS Light/System versus forced dark, Android OS-backup inclusion, Windows Health/Fitness visibility, porting of prototype cards; DAT analytics/crash-reporting opt-out (set to opt out); the 56pt clip button; video-only clips versus AAC and a visible no-audio indication; the orphan helper/UI types.
+- a green hosted run of all CI jobs, including the first iOS app build (`package-ios-app`);
+- device and rendered Bevel review (DEVICE_TESTS);
+- answers to the remaining decision questions:
+  - the ADR 0001 stack;
+  - a Dynamic Type pass on Vault, Decision Journal and the shared components;
+  - Android OS-backup inclusion;
+  - Windows Health/Fitness visibility;
+  - porting of the prototype cards.
+
+The third pass resolved the other questions: 44pt buttons, no `processing` mode, dark-only v1, DAT analytics/crash-reporting opt-out, the 56pt clip button, video-only clips with a «Χωρίς ήχο» indication, and orphans moved to `Experimental/`.
 
 ## Historical session log (pre-push `93f6833` worktree; superseded)
 
