@@ -85,7 +85,7 @@ cross_platform_gates: docs/MULTIPLATFORM_ROADMAP.md · docs/ADR_0001_ANDROID_WIN
 |---|---|
 | **Plan scenario** | Μία τελική σημείωση · όχι per-partial |
 | **Wired σήμερα** | `VoiceCommandParser` dedup R3-006 |
-| **DoD 100% ready** | (1) XCTest dedup PASS (2) device mic: μία note από «σημείωσε …» (3) optional `.m4a` setting documented |
+| **DoD 100% ready** | (1) XCTest dedup PASS (2) device mic: μία note από «σημείωσε …» (3) optional `.m4a` setting documented — implemented 2026-10-13 as an opt-in Settings toggle that attaches the AAC dictation audio to the note (`SoftwareCompletionTests` covers the writer; device recording unverified) |
 | **Layers** | `SW` ✅ · `DEV` mic · Hey Meta = separate backlog |
 
 ### A05 — Clip playable

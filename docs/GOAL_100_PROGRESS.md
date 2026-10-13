@@ -19,13 +19,10 @@ Updated: 2026-10-13. Current snapshot: base is pushed `main` = `origin/main` = `
   - Android and Windows client designs.
 
   No Android/Windows code, build, or release exists.
+- **Third pass (documented software items, PR train-cell/R0lling#1):** `python-verify` and `portable-harnesses` passed on GitHub Actions for checkpoint `f0431f0`. Implemented: the DECISIONS §1 voice-note `.m4a` option, the «Χωρίς ήχο» clip indication and 56pt clip button, removal of the unused `processing` background mode, 44pt hit areas and a non-color priority cue, orphan helpers/views moved unchanged to `Experimental/`, and `SoftwareCompletionTests`. Decided: v1 stays dark-only (Light/System to BACKLOG). See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 - **Remaining open:**
   - every Apple build/XCTest/device/render gate;
   - Dynamic Type for fixed-size text in Vault/Decision Journal/shared components;
-  - two sub-44pt text buttons in `ExecutiveUtilityViews`;
-  - the `processing` background mode without BGTask identifiers;
-  - the DECISIONS Light/System versus forced-dark mismatch;
-  - DECISIONS 56pt clip button and the AAC/no-audio indication;
   - the DAT runtime risks listed in [LANE_CLIP_META.md](LANE_CLIP_META.md) Step 2;
   - the ADR spikes;
   - every Android/Windows implementation and release gate.

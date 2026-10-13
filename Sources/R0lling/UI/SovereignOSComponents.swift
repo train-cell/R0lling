@@ -306,27 +306,6 @@ private struct BevelMetricRingGauge: View {
     }
 }
 
-public struct TelemetryMetricRow: View {
-    public let label: String
-    public let val: String
-    public let color: Color
-
-    public init(label: String, val: String, color: Color) {
-        self.label = label
-        self.val = val
-        self.color = color
-    }
-
-    public var body: some View {
-        HStack {
-            Circle().fill(color).frame(width: 6, height: 6)
-            Text(label).font(.system(size: 11)).foregroundColor(R0llingTheme.textMuted)
-            Spacer()
-            Text(val).font(.system(size: 13, weight: .bold, design: .monospaced)).foregroundColor(R0llingTheme.textPrimary)
-        }
-    }
-}
-
 // MARK: - [13] Deep Work Sentinel Card
 
 public struct DeepWorkSentinelCard: View {

@@ -79,6 +79,7 @@ public struct SovereignToDoListView: View {
                             .foregroundColor(R0llingTheme.textPrimary)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
+                            .frame(minHeight: 44)
                             .r0llingBevelCapsule()
                     }
                     .buttonStyle(.plain)
@@ -106,6 +107,7 @@ public struct SovereignToDoListView: View {
                                 .contentShape(Rectangle())
                         }
                         .accessibilityLabel(task.isCompleted ? "Σήμανση ως εκκρεμούς: \(task.title)" : "Ολοκλήρωση εργασίας: \(task.title)")
+                        .accessibilityValue("Προτεραιότητα \(priorityName(task.priority))")
 
                         Text(task.title)
                             .font(.footnote)
@@ -114,9 +116,11 @@ public struct SovereignToDoListView: View {
 
                         Spacer()
 
-                        Circle()
-                            .fill(priorityColor(task.priority))
-                            .frame(width: 6, height: 6)
+                        // Shape as well as color, so priority does not depend on color alone.
+                        Image(systemName: prioritySymbol(task.priority))
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(priorityColor(task.priority))
+                            .accessibilityHidden(true)
 
                         Button {
                             deleteTask(task)
@@ -198,6 +202,22 @@ public struct SovereignToDoListView: View {
         case .low: return R0llingTheme.accentLavender
         }
     }
+
+    private func prioritySymbol(_ priority: TaskPriority) -> String {
+        switch priority {
+        case .high: return "arrow.up"
+        case .medium: return "minus"
+        case .low: return "arrow.down"
+        }
+    }
+
+    private func priorityName(_ priority: TaskPriority) -> String {
+        switch priority {
+        case .high: return "υψηλή"
+        case .medium: return "μέτρια"
+        case .low: return "χαμηλή"
+        }
+    }
 }
 
 // MARK: - [EXECUTIVE 02] Σημειωματάριο (Quick Scratchpad)
@@ -253,6 +273,7 @@ public struct SovereignScratchpadView: View {
                     .font(.footnote.weight(.semibold))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
+                    .frame(minHeight: 44)
                     .foregroundColor(R0llingTheme.textPrimary)
                     .r0llingBevelCapsule()
                 }

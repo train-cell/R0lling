@@ -50,6 +50,8 @@ public final class AppState: ObservableObject {
     public let timeCapsuleEngine = TimeCapsuleEngine()
     public let streakManager = ScavengerHuntStreakManager()
     public let podcastGenerator = DailyPodcastGenerator()
+    /// UserDefaults key of the Settings toggle that keeps a dictated note's original `.m4a` audio.
+    nonisolated public static let voiceNoteAudioSettingKey = "r0lling.voiceNotes.keepAudio"
     @Published public private(set) var isDailyPodcastActive = false
     private var dailyPodcastGeneration: UInt64 = 0
     private var pendingVisionTags: [String] = []
@@ -478,7 +480,23 @@ public final class AppState: ObservableObject {
     // MARK: - Notes & Composer
     @discardableResult
     public func addNote(text: String, tags: [String] = [], source: EntrySource = .manual) async -> Bool {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        await addNote(text: text, tags: tags, source: source, voiceNoteAudio: nil)
+    }
+
+    /// Saves a note. With the original-audio option on (DECISIONS §1, A04), a dictated note also
+    /// stores its `.m4a` as an audio attachment; the text stays the primary record, so an audio
+    /// failure still saves the note and says so.
+    @discardableResult
+    private func addNote(
+        text: String,
+        tags: [String],
+        source: EntrySource,
+        voiceNoteAudio: VoiceNoteAudioRecording?
+    ) async -> Bool {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            if let voiceNoteAudio { try? FileManager.default.removeItem(at: voiceNoteAudio.fileURL) }
+            return false
+        }
 
         let detectedTextCues = transcriptKeywordTagger.detectCues(in: text)
         let detectedEntityTags = entityRecognizer.detectEntities(textClues: [text])
@@ -486,19 +504,51 @@ public final class AppState: ObservableObject {
         var seenTags = Set<String>()
         let mergedTags = (tags + detectedTextCues + detectedEntityTags).filter { seenTags.insert($0).inserted }
 
+        var attachments: [MediaAttachment] = []
+        var audioWarning: String?
+        if let voiceNoteAudio {
+            // The managed copy replaces the temporary recording.
+            defer { try? FileManager.default.removeItem(at: voiceNoteAudio.fileURL) }
+            do {
+                var attachment = try await mediaStorage.saveMediaFile(
+                    from: voiceNoteAudio.fileURL,
+                    originalFilename: "voice-note-\(Int(Date().timeIntervalSince1970)).m4a",
+                    mediaType: .audio
+                )
+                attachment.durationSeconds = voiceNoteAudio.durationSeconds
+                attachments = [attachment]
+            } catch {
+                audioWarning = "⚠️ Ο αρχικός ήχος δεν αποθηκεύτηκε: \(error.localizedDescription)"
+            }
+        }
+
         let entry = JournalEntry(
             content: text,
             source: source,
-            tags: mergedTags
+            tags: mergedTags,
+            attachments: attachments
         )
 
         do {
-            try await storage.saveEntry(entry)
+            if attachments.isEmpty {
+                try await storage.saveEntry(entry)
+            } else {
+                try await mediaReferenceMutationGate.withExclusiveAccess { [self] in
+                    try await storage.saveEntry(entry)
+                }
+            }
             await refreshEntries()
             let obsidianWarning = await exportEntryToObsidianIfConfigured(entry)
-            showToast("✅ Η σημείωση αποθηκεύτηκε.", obsidianWarning: obsidianWarning)
+            let warnings = [audioWarning, obsidianWarning].compactMap { $0 }
+            showToast(
+                "✅ Η σημείωση αποθηκεύτηκε.",
+                obsidianWarning: warnings.isEmpty ? nil : warnings.joined(separator: "\n")
+            )
             return true
         } catch {
+            if let attachment = attachments.first {
+                await removeUnreferencedMediaAfterFailedJournalCommit(attachment)
+            }
             showToast("Σφάλμα αποθήκευσης: \(error.localizedDescription)")
             return false
         }
@@ -512,16 +562,21 @@ public final class AppState: ObservableObject {
             isListeningSpeech = false
             switch stopResult {
             case .commandHandled:
+                // The command handler routes the command; `.note` claims the recorded audio there.
                 break
             case .dictation(let text):
+                let voiceNoteAudio = speechService.takeFinishedVoiceNoteAudio()
                 Task {
-                    await self.addNote(text: text, source: .voice)
+                    await self.addNote(text: text, tags: [], source: .voice, voiceNoteAudio: voiceNoteAudio)
                 }
             case .empty:
-                break
+                speechService.discardFinishedVoiceNoteAudio()
             }
         } else {
             do {
+                speechService.setKeepsVoiceNoteAudio(
+                    UserDefaults.standard.bool(forKey: Self.voiceNoteAudioSettingKey)
+                )
                 try speechService.startListening()
                 isListeningSpeech = true
             } catch {
@@ -542,10 +597,18 @@ public final class AppState: ObservableObject {
     /// Κεντρική δρομολόγηση φωνητικών εντολών (parser → AppState).
     public func routeVoiceCommand(_ command: VoiceCommandType) async {
         switch command {
+        case .note:
+            break
+        default:
+            // Only dictated notes keep their recorded audio.
+            speechService.discardFinishedVoiceNoteAudio()
+        }
+        switch command {
         case .clip(let seconds):
             await triggerClip(seconds: seconds)
         case .note(let text):
-            await addNote(text: text, source: .voice)
+            let voiceNoteAudio = speechService.takeFinishedVoiceNoteAudio()
+            await addNote(text: text, tags: [], source: .voice, voiceNoteAudio: voiceNoteAudio)
         case .whatAmISeeing:
             await executeWhatAmISeeing()
         case .startObservationGame:

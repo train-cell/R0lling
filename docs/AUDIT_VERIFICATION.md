@@ -36,9 +36,9 @@ Cross-platform design artifacts added (documentation only): exact v1 contract ru
 
 Open findings recorded without change:
 - **Dynamic Type:** fixed-size text remains on several existing screens (`StrategicVaultHubView` 50 `.font(.system(size:))` uses, `Components` 39, `DecisionJournalCardView` 22, `SovereignOSComponents` 12; `TodayShareComposerView` 23 is mostly export artwork scaled to its canvas).
-- **Touch targets:** two `ExecutiveUtilityViews` text buttons are about 32–34pt high.
-- **Background mode:** `UIBackgroundModes` includes `processing` with no `BGTaskSchedulerPermittedIdentifiers` and no BGTask usage; verify against App Store validation.
-- **Theme options:** `DECISIONS.md` Light/System options versus the forced dark scheme.
+- **Touch targets:** two `ExecutiveUtilityViews` text buttons are about 32–34pt high. Resolved (third pass): 44pt hit areas.
+- **Background mode:** `UIBackgroundModes` includes `processing` with no `BGTaskSchedulerPermittedIdentifiers` and no BGTask usage; verify against App Store validation. Resolved (third pass): `processing` removed.
+- **Theme options:** `DECISIONS.md` Light/System options versus the forced dark scheme. Decided (third pass): v1 dark-only; Light/System in BACKLOG.
 
 Each needs either rendered Apple review or a user decision.
 

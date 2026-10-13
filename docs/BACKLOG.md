@@ -34,3 +34,7 @@ P0/P1/P2 software defects R3-001..R3-012 κλειστά στον κώδικα (S
 Εκκρεμή εξωτερικά: DAT SDK / device proof / live AI · Stage 6 μόνο με πραγματικό failure report.  
 Gemini πρόσθεσε scavenger/time-capsule/acoustic scaffolding — παραμένει **μη** device-proven· δεν μεταφέρει backlog items σε «shipped».  
 Τα παραπάνω backlog features παραμένουν **εκτός** υποχρεωτικού scope μέχρι ρητή εντολή.
+
+## Εμφάνιση (2026-10-13)
+
+- Light / System θέμα: το DECISIONS §1 το ανέφερε, αλλά το [DESIGN.md](DESIGN.md) ορίζει μία σκοτεινή παλέτα ως πηγή αλήθειας. Χρειάζεται τεκμηριωμένη light παλέτα, ρύθμιση εμφάνισης και rendered review πριν από υλοποίηση.

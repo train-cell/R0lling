@@ -54,9 +54,9 @@ Neither change has been built or rendered.
 
 **Open findings recorded but not changed (need rendered review or a decision).**
 - **Fixed-size text.** Many `.font(.system(size:))` uses remain in existing screens: `StrategicVaultHubView` 50, `Components` 39, `TodayShareComposerView` 23 (mostly export artwork scaled to its 1080pt canvas), `DecisionJournalCardView` 22, `SovereignOSComponents` 12, and fewer elsewhere. Text there does not follow Dynamic Type.
-- **Small buttons.** Two `ExecutiveUtilityViews` text buttons are about 32–34pt high.
-- **Background mode.** `Info.plist` declares the `processing` background mode, but there is no `BGTaskSchedulerPermittedIdentifiers` key or BGTask registration. Verify this against App Store/TestFlight validation before release.
-- **Theme options.** `DECISIONS.md` lists Light/System appearance options, but the app forces dark mode.
+- **Small buttons.** Two `ExecutiveUtilityViews` text buttons are about 32–34pt high. *Resolved in the third pass: both have 44pt hit areas.*
+- **Background mode.** `Info.plist` declares the `processing` background mode, but there is no `BGTaskSchedulerPermittedIdentifiers` key or BGTask registration. Verify this against App Store/TestFlight validation before release. *Resolved in the third pass: `processing` was removed.*
+- **Theme options.** `DECISIONS.md` lists Light/System appearance options, but the app forces dark mode. *Decided in the third pass: v1 is dark-only per DESIGN.md; Light/System moved to BACKLOG.*
 
 ### Second pass after the full-repository review (2026-10-13; uncommitted, not compiled)
 
@@ -97,10 +97,27 @@ A heuristic scan for bodies whose last statement is a bare expression (it re-fin
 
 **Recorded, not changed.**
 - The clip button is about 48pt high, below the 56pt in DECISIONS §1, and there is no visible «no audio» indication for video-only clips.
-- No-caller UI types remain in place: `BevelTelemetryCard` (with a fixed «Rolling Target: 10s» caption), `TelemetryMetricRow`, `BufferConfig`; `DecisionRecordCardView` is used only by a test.
+- `DecisionRecordCardView` is used only by a test (it stays in `UI/` next to the Vault views).
 - `RemoteMirrorStreamServer` advertises `_r0lling-mirror._tcp`, which `NSBonjourServices` does not list (only DAT's `_bonjour._tcp`); the mirror is gated off, so add it before enabling the mirror.
 - B02 head-nod detection (gated): `lastTroughTime` also advances on noise-level troughs, which can shrink the peak search window and miss noisy real nods; needs device data before any threshold change.
 - Lower-confidence DAT runtime risks (all behind the closed live gate): a resolution drop ends the stream, a 2-frame queue with fatal drops, start-state ordering across separately spawned tasks, and start failures surfacing as cancellation. Details are in [LANE_CLIP_META.md](LANE_CLIP_META.md).
+
+### Third pass: documented software items (2026-10-13; on PR train-cell/R0lling#1)
+
+The user asked for every documented software item to be implemented, then committed. Scope follows the current authorities (GOAL_100 matrix, DECISIONS, DESIGN, CAPABILITY); the hyperanalysis, BACKLOG and retired feature notes are historical. The first checkpoint `f0431f0` passed `python-verify` and `portable-harnesses` on GitHub Actions (run 38434056716); the macOS build/test result is recorded below when it arrives.
+
+**Implemented.**
+- **Voice-note original audio (DECISIONS §1, A04).** Settings › «Φωνητικές σημειώσεις» › «Αποθήκευση αρχικού ήχου (.m4a)», off by default. When on, `SpeechTranscriptionService` also encodes the dictation input to AAC `.m4a` (`VoiceNoteAudioWriter`) and `AppState` stores it as an `.audio` attachment of the same note. The transcript stays the primary record; an encoder or storage failure keeps the note and reports it; audio from dictations that do not become notes is deleted. The microphone usage text now mentions the opt-in audio.
+- **Clip audio indication and 56pt button (DECISIONS §1).** Buffer clips (`hasAudio == false`) show «Χωρίς ήχο» on their card and in the VoiceOver label; imported videos are not labeled because their audio is not inspected. The «CAPTURE» button has `minHeight: 56`.
+- **Background mode.** The unused `processing` entry was removed from `UIBackgroundModes` (no BGTask code); the three DAT link modes remain.
+- **Touch targets and priority (DESIGN.md).** The two `ExecutiveUtilityViews` text buttons, the Archive clear-search button, and the Vault «Ακύρωση» action have 44pt hit areas; task priority shows an arrow/minus symbol and a VoiceOver value, not only a color.
+- **Orphans (GOAL §6).** `PersonalizedSovereignEngines.swift` (40 actors) and `SovereignExtendedEngines.swift` (39) moved unchanged to `Experimental/`; 16 helper actors and 8 value types were cut unchanged from `Core/SovereignOSServices.swift` into `Experimental/SovereignOSHelperEngines.swift`; `BevelConcentricRingsView`, `BevelTelemetryCard`, `TelemetryMetricRow`, and `BufferConfig` moved to `Experimental/`. Line-level integrity was verified; only unit tests use these types.
+- **Tests.** `SoftwareCompletionTests` covers A10 empty-key rejection, A12 no-match recall without a provider call, the 13/15 readiness split, whole-word entity tags, the 5s/10s buffer normalization, the mm:ss badge, and the `.m4a` writer.
+
+**Decided, not implemented.**
+- **Light/System appearance.** DECISIONS §1 lists it, but DESIGN.md (the styling source of truth) defines one dark palette. v1 stays dark; Light/System moved to BACKLOG until a documented palette and rendered review exist.
+- **Dynamic Type on existing fixed-size text.** DESIGN.md requires Dynamic Type for new surfaces; converting existing Bevel-matched screens changes layouts at large sizes and needs rendered review, so it stays a recorded review item.
+- **AAC clip audio.** No current stream (simulation or DAT) provides real audio, so DECISIONS' fallback (video-only MP4 with a clear indication) is what applies.
 
 ## Full-project source-gap review (2026-10-13)
 The official CameraAccess sample ends its DAT session when the app backgrounds and returns to idle. To preserve R0lling's A07 contract, live background/lock handling must stop stream and session, while foreground auto-resume starts a fresh session before reattaching the camera; continuous background capture remains unpromised.
