@@ -264,10 +264,11 @@ public actor MediaStorageService: MediaStorageProtocol {
             relativePath: relativePath,
             baseDirectory: baseMediaDirectory
         )
-        let expectedDirectory = baseMediaDirectory
-            .appendingPathComponent(mediaType.folderName, isDirectory: true)
-            .resolvingSymlinksInPath().standardizedFileURL
-        guard url.deletingLastPathComponent().standardizedFileURL == expectedDirectory,
+        // Compare canonical paths: a file that does not exist yet (a restore target) resolves to
+        // a different spelling of the same Darwin directory than its existing folder does.
+        let expectedDirectory = baseMediaDirectory.appendingPathComponent(mediaType.folderName, isDirectory: true)
+        guard PathAsfaleia.canonicalPath(of: url.deletingLastPathComponent())
+                == PathAsfaleia.canonicalPath(of: expectedDirectory),
               url.lastPathComponent == String(components[1]) else {
             throw MediaApothikeusiError.unsafeRelativePath(relativePath: relativePath)
         }

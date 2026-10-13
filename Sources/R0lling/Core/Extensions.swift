@@ -91,17 +91,27 @@ public enum PathAsfaleia {
             .appendingPathComponent(normalizedSeparators)
             .resolvingSymlinksInPath()
             .standardizedFileURL
-        let baseResolved = baseDirectory
-            .resolvingSymlinksInPath()
-            .standardizedFileURL
 
-        let basePath = baseResolved.path
-        let candidatePath = candidate.path
+        let basePath = canonicalPath(of: baseDirectory)
+        let candidatePath = canonicalPath(of: candidate)
         let prefix = basePath.hasSuffix("/") ? basePath : basePath + "/"
         guard candidatePath == basePath || candidatePath.hasPrefix(prefix) else {
             throw pathError("Το resolved path βγαίνει εκτός base directory.")
         }
         return candidate
+    }
+
+    /// One spelling per location for containment checks. Darwin's `resolvingSymlinksInPath()`
+    /// returns `/var/...` for an existing item but keeps `/private/var/...` for a missing one,
+    /// and a missing directory's URL loses its trailing slash, so callers compare these paths.
+    public static func canonicalPath(of url: URL) -> String {
+        let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+#if canImport(Darwin)
+        for alias in ["/var", "/tmp", "/etc"] where path == "/private" + alias || path.hasPrefix("/private" + alias + "/") {
+            return String(path.dropFirst("/private".count))
+        }
+#endif
+        return path
     }
 
     private static func pathError(_ message: String) -> NSError {

@@ -109,6 +109,11 @@ public actor HighlightReelMuxer {
             includedCount += 1
         }
 
+        // Buffer clips are video-only; an empty audio track must not reach the exporter.
+        if !includedAudio, let compositionAudio {
+            composition.removeTrack(compositionAudio)
+        }
+
         guard includedCount > 0, cursor.seconds > 0 else {
             throw NSError(
                 domain: "R0lling.HighlightReel",
