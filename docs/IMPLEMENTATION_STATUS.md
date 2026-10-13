@@ -1,6 +1,14 @@
 # Implementation status
 
-Updated: 2026-10-13. Current base: pushed `main` = `origin/main` = `b29429b6d24051ee2d4f4b52e793f9c5b0748932` ("Continue R0lling UI and platform handoff"), which contains the earlier `93f6833` checkpoint and its follow-ups. The latest continuation started from that base with a clean worktree on branch `claude/beautiful-cannon-6bot68` (fast-forwarded to `b29429b`); its edits are uncommitted until the user asks for a commit. This is source/test status, not release certification. No tests, builds, or Apple rendering were run in either 2026-10-13 session. See [the audit verification matrix](AUDIT_VERIFICATION.md) for current evidence and explicit UI gaps.
+Updated: 2026-10-13. Current base: pushed `main` = `origin/main` = `b29429b6d24051ee2d4f4b52e793f9c5b0748932` ("Continue R0lling UI and platform handoff"), which contains the earlier `93f6833` checkpoint and its follow-ups. The latest continuation started from that base with a clean worktree on branch `claude/beautiful-cannon-6bot68` (fast-forwarded to `b29429b`); with the user's authorization it is committed and pushed in PR train-cell/R0lling#1. This is source/test status, not release certification. No session ran tests or builds locally. Hosted CI did run them: see «Latest verified state» below. Nothing was rendered on an Apple device or Simulator. See [the audit verification matrix](AUDIT_VERIFICATION.md) for current evidence and explicit UI gaps.
+
+**Latest verified state (2026-10-13).** PR train-cell/R0lling#1 head `2b64aaf` passed every CI job in run 38446457099:
+- the Python guards;
+- the Linux harnesses;
+- the macOS build with 380/380 XCTest cases;
+- the iOS app build: device Release, Simulator Debug, unsigned `.ipa`.
+
+See the fourth pass below. The device, rendered, live-glasses and release gates remain open.
 
 **Final target clarified 2026-10-13:** complete both software and existing-screen styling, then launch R0lling on iOS, Android, and Windows PC. The user chose to keep native SwiftUI on iOS, build separate Android and Windows clients, and retain local-only data with explicit Obsidian/backup exchange instead of automatic sync. The current repository still has only the iOS host. See [MULTIPLATFORM_ROADMAP.md](MULTIPLATFORM_ROADMAP.md) for the source-backed platform assessment, recommended Android/Windows architecture, and release gates. No Android/Windows implementation or build is claimed.
 
@@ -119,25 +127,48 @@ The user asked for every documented software item to be implemented, then commit
 - **Dynamic Type on existing fixed-size text.** DESIGN.md requires Dynamic Type for new surfaces; converting existing Bevel-matched screens changes layouts at large sizes and needs rendered review, so it stays a recorded review item.
 - **AAC clip audio.** No current stream (simulation or DAT) provides real audio, so DECISIONS' fallback (video-only MP4 with a clear indication) is what applies.
 
-### Fourth pass: first Apple build and test run (2026-10-13; PR train-cell/R0lling#1)
+### Fourth pass: first Apple build and test runs (2026-10-13; PR train-cell/R0lling#1)
 
-- **Build.** Run 38434056716 on `f0431f0`: `swift build --build-tests` on `macos-26` with Xcode 26 passed. This is the first successful Apple compile since `82c4c0e`.
-- **Tests.** `swift test` then reported 141 test cases from 24 suites, 122 passed and 19 failed. After that its output stopped, and the job hit its 30-minute timeout. Run 38436071722 on `41c5f7b` timed out the same way.
-- **The 19 failures and their fixes** (source fixes, not yet re-run):
-  - **14 × `BackupRestoreTests`.** Agent memory rejected every macOS temporary vault with error 6104.
-    - `AgentFolderManager` and `VaultDirectoryFileAccess` walk the vault path from `/` with `O_NOFOLLOW`. Darwin's `/var` is a root-owned symlink to `/private/var`, and Foundation's `resolvingSymlinksInPath()` strips `/private` again.
-    - iOS app containers also live under `/var/mobile`, so device paths would have failed the same way.
-    - Both walkers now rewrite only that verified first component. Every later symlink is still rejected.
-  - **2 × `ClipWatermarkExporterTests`.** The frames showed the banner at the bottom edge, but the test read `CGBitmapContext` rows bottom-up. The memory starts with the top row, so the test now reads top-down.
-    - On the 240-pixel fixture, the 14 px margin plus the 48 px minimum banner reached 2 px into the center band.
-    - The exporter now keeps margin plus banner inside the bottom quarter; 1080p output is unchanged.
-  - **1 × `EncryptedDiaryStoreTests`.** Too many decision assumptions throws code 19, the vault-limit code. Code 10 means a missing decision or assumption. The test expected 10; both lines were added in `b614db9`.
-  - **2 × `MediaStorageTests`.**
-    - Traversal: a traversal path is rejected by the `<folder>/<file>` shape check before PathAsfaleia runs. That check throws the typed `.unsafeRelativePath` error, which BackupRestore depends on (added in `82c4c0e`).
-    - EXIF: ImageIO's JPEG encoder always writes ColorSpace and the pixel dimensions into `{Exif}`. The sanitizer test now checks that no source EXIF (the test's UserComment) and no GPS survives, instead of expecting no `{Exif}` at all.
-- **The hang.** xctest buffered its piped output in 16 KB blocks, so the last visible line, the start of `MetaGlassesComplianceTests.testUnsupportedBufferWindowFallsBackToTenSeconds`, is not the test that hung. The hanging test is one of the next ~70 (ObservationGameEngine, ObsidianBridge, ObsidianFileWatcher, maybe OnDeviceVisionAnalysisPipeline).
-  - The CI test step now runs under a pseudo-terminal with a 15-minute watchdog (`verification/run_with_pty_watchdog.py`). On a hang, the watchdog names the running test, samples xctest, and stops the run so the logs upload.
-- **Not yet run on Apple.** The 19 suites from ObservationGameEngineTests onward.
+**Result.** Hosted run 38446457099 on `2b64aaf` passed every job:
+- `python-verify`;
+- the Linux `portable-harnesses`;
+- `swift build --build-tests` and 380/380 XCTest cases on `macos-26` with Xcode 26 (0 failures, 32.6 s);
+- the iOS app build for a generic device (Release) and the Simulator (Debug), packaged as an unsigned `.ipa`.
+
+So P0-01 is met on the PR head; `main` changes only when the PR is merged. No device install, Simulator launch or rendered review was done. Those remain the user's DEVICE_TESTS checks.
+
+**How it got there.**
+1. Run 38434056716 on `f0431f0`: the first Apple compile since `82c4c0e` passed. `swift test` reported 122 passes and 19 failures, then hung until the 30-minute timeout. Run 38436071722 on `41c5f7b` timed out the same way.
+2. Run 38444579655, a manual dispatch on `066dda3` with the first fixes and a line-buffered test step: all 380 tests ran in 29 s with no hang, and 12 still failed.
+3. Run 38445736796 on `3b882c9`: macOS passed 380/380. One Linux probe failed to compile, because its PathAsfaleia shim lacked the new helper.
+4. Run 38446457099 on `2b64aaf`: all jobs green.
+
+**Causes and fixes.**
+- **Darwin `/var` symlink in the vault walks: 14 BackupRestore failures in run 1, and the hang.**
+  - `AgentFolderManager` and `VaultDirectoryFileAccess` walk the vault path from `/` with `O_NOFOLLOW`. Darwin's `/var` is a root-owned symlink to `/private/var`, and Foundation's `resolvingSymlinksInPath()` strips `/private` again.
+  - So every vault under `/var` was rejected with error 6104 or 6012. That covers macOS temporary folders and iOS app containers under `/var/mobile`.
+  - Both walkers now rewrite only that verified first component. Every later symlink is still rejected.
+  - The same error caused the hang. `ObsidianBridgeTests.testExportStopsWithoutWritingWhenSelectedVaultChanges` waited on a barrier continuation that only the export resumes, and the export threw before reaching it. The barrier now also wakes when the export ends, so an early error fails that test instead of hanging it.
+- **Media path comparison: 10 BackupRestore failures and the missing-clip reel test in run 2.**
+  - `getMediaFileURL` compared URLs. A type folder that does not exist yet resolves without its trailing slash, so `URL ==` rejected every first restore target and missing clip as unsafe.
+  - `PathAsfaleia.canonicalPath(of:)` now serves both containment checks. It compares path strings and normalizes the Darwin `/private` alias.
+- **Highlight Reel export.** The composition always added an audio track, which stayed empty for video-only buffer clips, and the export failed. The track is now removed when no clip contributes audio.
+- **Watermark test.**
+  - The test read `CGBitmapContext` rows bottom-up, but memory starts with the top row; the frames actually had the banner at the bottom.
+  - On the 240-pixel fixture, the 14 px margin plus the 48 px minimum banner reached 2 px into the center band. Margin plus banner now stay inside the bottom quarter; 1080p output is unchanged.
+- **Stale test expectations.**
+  - Too many decision assumptions is vault-limit code 19; the code and the test that expected 10 were both added in `b614db9`.
+  - A traversal media path gets the typed `.unsafeRelativePath` from the shape check, which BackupRestore relies on.
+  - ImageIO's JPEG encoder always writes ColorSpace and the pixel dimensions into `{Exif}`. So the sanitizer test now checks that no source EXIF (the UserComment) and no GPS survives.
+- **CI.** xctest buffered its piped output in 16 KB blocks, which hid the hanging test. The test step now runs under a pseudo-terminal with a 15-minute watchdog (`verification/run_with_pty_watchdog.py`).
+
+**Unchanged by CI.**
+- Open gates:
+  - device and rendered checks (DEVICE_TESTS);
+  - live Meta glasses: credentials, hardware, and the DAT runtime risks;
+  - TestFlight/App Store release;
+  - ADR 0001, then the Android and Windows clients.
+- Readiness flags are unchanged. Watermark stays `ready=false` until DEV-UI-07 passes on an Apple device, even though its macOS render test now passes.
 
 ## Full-project source-gap review (2026-10-13)
 The official CameraAccess sample ends its DAT session when the app backgrounds and returns to idle. To preserve R0lling's A07 contract, live background/lock handling must stop stream and session, while foreground auto-resume starts a fresh session before reattaching the camera; continuous background capture remains unpromised.

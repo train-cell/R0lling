@@ -63,25 +63,28 @@ Project checkpoint ή build: [v1.0.0-rc1]
 
 ---
 
-## 3. Mac / `swift test` checklist (P0-01 — honest blocker)
+## 3. Mac / `swift test` checklist (P0-01 — green on the PR head)
 
-> **Status:** 🚫 Εκκρεμεί Apple build/test. WSL Swift parse περνά, αλλά Linux SwiftPM build σταματά επειδή δεν παρέχεται Apple `ImageIO`. Δεν υπάρχει fake PASS.
+> **Status:** ✅ Hosted run [38446457099](https://github.com/train-cell/R0lling/actions/runs/38446457099) on PR train-cell/R0lling#1 head `2b64aaf` (2026-10-13). Όλα τα jobs είναι πράσινα: `python-verify`, `portable-harnesses`, `build-and-test` με 380/380 XCTest και 0 failures, και `package-ios-app` (device Release, Simulator Debug, unsigned IPA). Το `main` αλλάζει μόνο με merge του PR. Device και rendered έλεγχοι εκκρεμούν (§1–2).
 > Proof artifact: πράσινο GHA log **ή** τοπικό `swift-test.log` → γραμμή στο τρέχον `docs/HANDOFF_R0lling_2026-10-12.md` και ενημέρωση του `docs/AUDIT_VERIFICATION.md`.
 
 ### 3.1 GitHub Actions (προτιμητέο)
 
 | # | Βήμα | Πού | Done? |
 |---|---|---|---|
-| 1 | Άνοιξε το υπάρχον CI run ή ζήτησε εξουσιοδοτημένο run από GitHub Actions | GitHub → Actions | ☐ |
-| 2 | Job `python-verify` = πράσινο (`verify_all_subsystems.py`, `verify_theme_apple_meta_compliance.py`, assistant-context, transcript-cue και UI source-contract guards) | Actions run | ☐ |
-| 2b | Job `portable-harnesses` = πράσινο (Linux, container `swift:6.1`: 19 portable XCTest harnesses + focused/source probes) | Actions run | ☐ |
-| 3 | Job `build-and-test` = πράσινο (`macos-26`, Xcode 26.4+: `swift build --build-tests` + `swift test`) | Actions run | ☐ |
-| 4 | Κατέβασε artifact `swift-build-and-test-logs` (`swift-test.log` + `swift-build.log`) | Actions → Artifacts | ☐ |
-| 5 | Επικόλλησε στο HANDOFF: `GHA run <URL> · swift test PASS · <timestamp>` | `docs/HANDOFF_R0lling_2026-10-12.md` | ☐ |
-| 6 | Επιβεβαίωσε ότι `package-ios-app` ολοκληρώθηκε· απαιτεί επιτυχία των `build-and-test`, `portable-harnesses` και `python-verify`, και παράγει unsigned IPA artifact | Actions run / Artifacts | ☐ |
-| 7 | (Optional) `AVAsset.isPlayable` smoke για placeholder clip — DEV-05 | Mac XCTest / device | ☐ |
+| 1 | Άνοιξε το υπάρχον CI run ή ζήτησε εξουσιοδοτημένο run από GitHub Actions | GitHub → Actions | ✅ run 38446457099 |
+| 2 | Job `python-verify` = πράσινο (`verify_all_subsystems.py`, `verify_theme_apple_meta_compliance.py`, assistant-context, transcript-cue και UI source-contract guards) | Actions run | ✅ |
+| 2b | Job `portable-harnesses` = πράσινο (Linux, container `swift:6.1`: 19 portable XCTest harnesses + focused/source probes) | Actions run | ✅ |
+| 3 | Job `build-and-test` = πράσινο (`macos-26`, Xcode 26.4+: `swift build --build-tests` + `swift test`) | Actions run | ✅ 380/380 |
+| 4 | Κατέβασε artifact `swift-build-and-test-logs` (`swift-test.log` + `swift-build.log`) | Actions → Artifacts | ☐ uploaded (ID 11839435374); download by the user |
+| 5 | Επικόλλησε στο HANDOFF: `GHA run <URL> · swift test PASS · <timestamp>` | `docs/HANDOFF_R0lling_2026-10-12.md` | ✅ |
+| 6 | Επιβεβαίωσε ότι `package-ios-app` ολοκληρώθηκε· απαιτεί επιτυχία των `build-and-test`, `portable-harnesses` και `python-verify`, και παράγει unsigned IPA artifact | Actions run / Artifacts | ✅ |
+| 7 | (Optional) `AVAsset.isPlayable` smoke για placeholder clip — DEV-05 | Mac XCTest / device | ✅ Mac XCTest (placeholder και Highlight Reel)· ☐ device (DEV-05) |
 
-> Ιστορικό (2026-10-13): τα hosted runs στα `b614db9` (38173016590) και `b29429b` (38415047820) απέτυχαν πριν από το `swift build`. Η διόρθωση workflow/guards/manifests είναι uncommitted και δεν έχει εκτελεστεί· βλ. [AUDIT_VERIFICATION.md](AUDIT_VERIFICATION.md).
+> Ιστορικό (2026-10-13):
+> - Τα hosted runs στα `b614db9` (38173016590) και `b29429b` (38415047820) απέτυχαν πριν από το `swift build`.
+> - Οι διορθώσεις workflow, guards και manifests έγιναν commit στο PR train-cell/R0lling#1.
+> - Το πρώτο Apple run (38434056716) έδωσε 122 pass και 19 fail και μετά κόλλησε. Αιτίες και διορθώσεις: [AUDIT_VERIFICATION.md](AUDIT_VERIFICATION.md) και [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) (fourth pass).
 
 Workflow file: `.github/workflows/swift-ci.yml`. The archived diagnose-stage scripts are not part of the current `python-verify` job.
 

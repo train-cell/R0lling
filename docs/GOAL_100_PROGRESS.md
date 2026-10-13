@@ -1,6 +1,6 @@
 # GOAL 100 — current completion status
 
-Updated: 2026-10-13. Current snapshot: base is pushed `main` = `origin/main` = `b29429b6d24051ee2d4f4b52e793f9c5b0748932`, containing the `93f6833` checkpoint and its follow-ups. The latest continuation started clean from that base on branch `claude/beautiful-cannon-6bot68`; its edits are uncommitted until the user asks for a commit. No tests/builds and no Apple rendering were run. See [AUDIT_VERIFICATION.md](AUDIT_VERIFICATION.md) for evidence and the current review boundary.
+Updated: 2026-10-13. Current snapshot: base is pushed `main` = `origin/main` = `b29429b6d24051ee2d4f4b52e793f9c5b0748932`, containing the `93f6833` checkpoint and its follow-ups. The latest continuation started clean from that base on branch `claude/beautiful-cannon-6bot68`. With the user's authorization it is committed and pushed in PR train-cell/R0lling#1, whose head `2b64aaf` passed every CI job (run 38446457099). No session ran tests or builds locally, and nothing was installed or rendered on an Apple device or Simulator. See [AUDIT_VERIFICATION.md](AUDIT_VERIFICATION.md) for evidence and the current review boundary.
 
 ## Latest progress (continuation from `b29429b`, 2026-10-13)
 
@@ -10,7 +10,29 @@ Updated: 2026-10-13. Current snapshot: base is pushed `main` = `origin/main` = `
   - two zero-caller demo cards with sample tasks and fixed playback values moved byte-identical to `Experimental/`, resolving them as orphans under the freeze policy.
 
   Unbuilt and unrendered.
-- **First Apple build and test run (fourth pass):** hosted run 38434056716 on `f0431f0` compiled the package and tests on `macos-26` (the first Apple compile since `82c4c0e`). `swift test` reported 122 passes and 19 failures, then hung until the job timeout. The failures are fixed in source (details in IMPLEMENTATION_STATUS, fourth pass); the CI test step now names a hanging test. P0-01 stays open until a hosted run is green.
+- **First Apple build and test runs (fourth pass):** P0-01 is green on the PR head.
+  - Hosted run 38446457099 on `2b64aaf` passed every job:
+    - the Python guards;
+    - the Linux harnesses;
+    - the macOS build with 380/380 XCTest cases;
+    - the iOS app build (device Release, Simulator Debug, unsigned `.ipa`).
+  - The first Apple run (38434056716 on `f0431f0`) compiled, then reported 122 passes and 19 failures and hung. Its causes are fixed:
+    - the Darwin `/var` symlink in the vault walks, a real iOS app-container bug;
+    - URL comparison of not-yet-created media paths;
+    - an empty audio track in the Highlight Reel export;
+    - an inverted test pixel read;
+    - stale test expectations;
+    - a test barrier that could wait forever.
+  - Details are in IMPLEMENTATION_STATUS, fourth pass.
+- **Against GOAL §6 (statement, not a claim of 100%).**
+  - **Met on the PR head:**
+    - the CI parts of «Software 100%»: `python-verify` and `portable-harnesses`;
+    - the extra parts of «Engineering soft-GO»: P0-01 macOS `swift test`, and the app scaffold building.
+  - **Still open:** the matrix rows that are not closed are `SW`/`DEV` or `SW`/`MAC` items. Their source path is wired; their DoD needs Apple-device, Obsidian or rendered verification:
+    - B05, B11, B14–B16;
+    - C04, C07;
+    - the live-DAT alternative of P0-02 (DECISIONS records simulation as the only usable mode).
+  - **No claim:** no 100% or launch-readiness claim is made while these device, render, live-glasses and release gates remain open.
 - **Compile and configuration (second pass, unbuilt):** no commit from `82c4c0e` onward has compiled. Hosted run 37957186872 on `46fe025` reported errors in `EncryptedDiaryStore` and `DecisionJournalCardView` that were still present. These, plus errors found by a file-by-file static review (13 sites in total: `Package.swift` `.iOS(.v17_2)`, Today/Share macOS-unavailable and non-existent SwiftUI API, an invalid `frame` overload, missing returns in Fitness/diary, a missing `otherRange:` label, the DAT reader/encoder, two test errors), are fixed in source, as is a stale DAT stub in the Linux glasses probe. The XcodeGen `info:` block that would overwrite `Info.plist`, the never-installed host `@StateObject`, and the DAT analytics/crash-reporting defaults are fixed too. P0-01 still needs a real Apple build.
 - **Honesty/behavior fixes (second pass, unbuilt):** simulation status/battery, journal card captions, Obsidian warnings and sidecars, composer/scratchpad saves, clip placeholder fallback, deterministic OCR/entity tags, podcast stop and summary coverage, selected-day wording, microphone denial, Photos display names, mm:ss duration badge, clip labels that follow the 5s/10s buffer setting, the Hermes router error domain, and a debug-only Obsidian conflict log. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 - **Cross-platform preparation (documentation only):**

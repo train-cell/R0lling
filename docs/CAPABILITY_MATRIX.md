@@ -1,6 +1,13 @@
 # Capability map
 
-Updated: 2026-10-13. Current authority: IMPLEMENTATION_STATUS.md and the source files below. “Implemented” refers to a source path; Apple build/runtime validation remains pending.
+Updated: 2026-10-13. Current authority: IMPLEMENTATION_STATUS.md and the source files below. “Implemented” refers to a source path.
+
+**Build status.** Since PR train-cell/R0lling#1 head `2b64aaf` (run 38446457099):
+- the package builds on macOS;
+- the XcodeGen app builds for iOS device and Simulator, including the DAT code;
+- the macOS XCTest suite passes 380/380.
+
+Entries marked “(2026-10-13; unbuilt)” were written before that run. They are now compiled, and tested only as far as their tests reach. Runtime validation on an Apple device, rendered review and live DAT remain pending.
 
 **Obsidian Dataview (2026-10-13):** Existing bridge frontmatter (date, type, app, tags) is documented with a Dataview query and placeholder-only schema template in [OBSIDIAN_DATAVIEW.md](OBSIDIAN_DATAVIEW.md). No example journal content is fabricated; actual plugin rendering remains unverified.
 

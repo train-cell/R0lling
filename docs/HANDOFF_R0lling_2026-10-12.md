@@ -90,19 +90,24 @@ Details and remaining recorded items are in [IMPLEMENTATION_STATUS.md](IMPLEMENT
 
 No test, build, Swift compile, or Apple render was run.
 
-**Fourth pass: first Apple build and test run.**
-- Hosted run 38434056716 on `f0431f0` compiled the package and the tests on `macos-26`, the first Apple compile since `82c4c0e`.
-- `swift test` then reported 122 passes and 19 failures, and hung until the 30-minute job timeout.
-- The failures are fixed in source:
-  - the Darwin `/var` symlink in the O_NOFOLLOW vault walks, which would also have broken iOS app-container vaults;
-  - inverted pixel rows in the watermark test, plus a banner capped to the bottom quarter;
-  - three stale test expectations.
-- The hanging test was hidden by xctest's 16 KB output buffering. The CI test step now runs under a pseudo-terminal with a 15-minute watchdog that names and samples a hang.
+**Fourth pass: first Apple build and test runs.**
+- **P0-01 proof line (DEVICE_TESTS §3.1 step 5):** `GHA run https://github.com/train-cell/R0lling/actions/runs/38446457099 · swift test PASS (380/380, 0 failures) · 2026-10-13T18:27:52Z · head 2b64aaf`.
+- **The same run's other jobs:**
+  - `python-verify` and the Linux `portable-harnesses` passed.
+  - `package-ios-app` built the XcodeGen app for a generic iOS device (Release) and the Simulator (Debug) and packaged an unsigned `.ipa`.
+- **The first Apple run** (38434056716 on `f0431f0`) compiled, then reported 122 passes and 19 failures and hung. The causes, all fixed on this PR:
+  - The Darwin `/var` → `/private/var` symlink was rejected by the O_NOFOLLOW vault walks. That would also have broken iOS app-container vaults, and it caused the hang: an Obsidian test waited forever on a barrier its failed export never reached. That barrier now fails fast.
+  - Media paths that did not exist yet were compared as URLs, which lose the trailing slash.
+  - The Highlight Reel export carried an empty audio track.
+  - The watermark test read its pixels upside down; the banner is now also capped to the bottom quarter.
+  - Three test expectations were stale.
+- **CI changes:** the test step now runs under a pseudo-terminal with a hang watchdog, because xctest's 16 KB output buffering had hidden the hanging test.
 
-Details are in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md), fourth pass. The iOS app job has not run yet, because it waits for the macOS tests.
+Details are in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md), fourth pass, and [AUDIT_VERIFICATION.md](AUDIT_VERIFICATION.md).
 
 **Open and user-owned items:**
-- a green hosted run of all CI jobs, including the first iOS app build (`package-ios-app`);
+- review and merge of PR train-cell/R0lling#1 (all CI jobs green on `2b64aaf`);
+- install and launch of the IPA or a Simulator build, then the device and Simulator checks in DEVICE_TESTS;
 - device and rendered Bevel review (DEVICE_TESTS);
 - answers to the remaining decision questions:
   - the ADR 0001 stack;

@@ -46,9 +46,9 @@ cross_platform_gates: docs/MULTIPLATFORM_ROADMAP.md · docs/ADR_0001_ANDROID_WIN
 
 | ID | DoD «100% ready» | Layer | Owner lane hint | Blocker |
 |---|---|---|---|---|
-| **P0-01** | GHA `swift-ci` green **ή** local `swift test` PASS + log στο HANDOFF | `MAC` | mac-ci | Open. Run 38434056716 on `f0431f0` (PR train-cell/R0lling#1): `swift build --build-tests` passed on `macos-26`/Xcode 26 (first Apple compile since `82c4c0e`); `swift test` ran 141 cases (122 pass, 19 fail) and then hung until the 30-minute timeout. The 19 failures have source fixes (Darwin `/var` symlink in the vault walks, inverted test pixel rows, stale test expectations); the hanging test is not yet identified because xctest buffered its output. The test step now runs under a pseudo-terminal with a watchdog. Needs a green hosted run |
+| **P0-01** | GHA `swift-ci` green **ή** local `swift test` PASS + log στο HANDOFF | `MAC` | mac-ci | ✅ **Green on the PR head.** Hosted run 38446457099 on `2b64aaf` (PR train-cell/R0lling#1): `python-verify`, `portable-harnesses`, `swift build --build-tests` + **380/380** XCTest on `macos-26`/Xcode 26, and `package-ios-app` all passed. `main` reflects it after merge. Earlier runs on this PR found and fixed 19 test failures and one hang (IMPLEMENTATION_STATUS, fourth pass) |
 | **P0-02** | `DECISIONS.md` ρητό **v1 simulation-only** **ή** DAT SPM wired + non-sim connect χωρίς fake | `SW`/`DEV` | decisions-dat | DAT 1.0.1 setup, registration/session, explicit camera permission, publisher bridge, and H.264 conversion have source but remain unbuilt/unverified; photo/audio/IMU remain stubs and the usable path stays simulation-only |
-| **P0-05** | Installable app shell: Info.plist permissions + Xcode app target docs/scaffold (SPM library ≠ app) | `SW`/`MAC` | app-scaffold | ✅ `project.yml`, host entry point, Info.plist, privacy manifest, entitlements, and AppIcon asset are present; Apple build remains unverified |
+| **P0-05** | Installable app shell: Info.plist permissions + Xcode app target docs/scaffold (SPM library ≠ app) | `SW`/`MAC` | app-scaffold | ✅ `project.yml`, host entry point, Info.plist, privacy manifest, entitlements, and AppIcon asset are present. The XcodeGen app builds in CI for a generic iOS device (Release) and the Simulator (Debug) and is packaged as an unsigned `.ipa` (run 38446457099). Signed install and launch on a device remain user checks |
 | **P0-06** | Stage 6 **μόνο** με πραγματικό device failure report | `DEV` | stage6 | no device report |
 
 ---
@@ -354,9 +354,9 @@ Mirror remains disabled until its live transport path is implemented and verifie
 
 | ID | Status |
 |---|---|
-| **P0-01** Mac/`swift test` | Apple build passed (run 38434056716 on `f0431f0`); XCTest partially run: 122 pass, 19 fail, then a hang (19 suites not reached). Fixes for the 19 failures and a hang watchdog are pushed; green run pending |
+| **P0-01** Mac/`swift test` | ✅ Green on PR head `2b64aaf` (run 38446457099): macOS build + 380/380 XCTest, Linux harnesses, Python guards, iOS app build |
 | P0-02 DAT vs sim | DAT 1.0.1, registration/DeviceSession, explicit camera-permission confirmation, bounded publisher adaptation, and raw-to-H.264 Annex-B conversion have source code but remain unbuilt/unverified with credentials/device. Photo/audio/IMU remain stubs, `einaiLiveYlopoiimeno` stays false, and simulation is the only usable path |
-| P0-05 App target / Info.plist | Project scaffold and privacy plist are present; Apple build not run |
+| P0-05 App target / Info.plist | Scaffold and privacy plist present; iOS device (Release) and Simulator (Debug) builds pass in CI; signed device install/launch pending |
 | P0-06 Stage 6 | NOT VERIFIED — no device failure report |
 
 ### Completion status
