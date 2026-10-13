@@ -1,4 +1,4 @@
-> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+> Current status (2026-10-13): This document records product decisions; it is not runtime evidence. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md), [SETUP_META.md](SETUP_META.md), and [AUDIT_VERIFICATION.md](AUDIT_VERIFICATION.md) for the current checkout. Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
 
 # R0lling — Αποφάσεις & Προεπιλογές (Decisions & Defaults Log) v1.0
 
@@ -28,13 +28,13 @@
 
 | Απόφαση | Τιμή | Αιτιολόγηση |
 |---|---|---|
-| **Windows / no DAT vendor** | Simulation-only path + πλήρες protocol/adapter/remux structure | Το MetaWearablesDAT δεν vendor-άρεται αξιόπιστα σε Windows SPM. |
+| **DAT SDK / current usable mode** | The iOS package declares DAT 1.0.1; registration/session, permission-confirmed camera publisher, raw-to-H.264 conversion, and PTS-derived remux timing have source, while simulation remains the only usable glasses mode | Source is not Apple build or device proof. Keep live readiness gated until the existing path is built and verified on a supported device; photo, camera audio, and IMU remain unwired. |
 | **Simulation labeling** | Device name περιέχει `SIMULATION — όχι φυσική συσκευή` | Αποφυγή LIVE hardware claims χωρίς Gen 2. |
 | **Non-sim χωρίς SDK** | Error `4002` · ποτέ fake `.connected` | R3-003 / plan honesty. |
 | **Playable clip χωρίς NAL** | Stage-4 `PlayableClipExporter` placeholder validated with `AVURLAsset.load(.isPlayable)` | A05 software path · real remux requires actual DAT samples and SPS/PPS. |
 | **Background capture promise** | `promisesContinuousBackgroundCapture = false` default | Μέχρι εμπειρικό DAT proof στο device. |
-| **Acoustic/IMU product** | Feed API wired · `FeatureReadinessRegistry.*.ready = false` | Flip flag = auto-clip χωρίς νέο wiring. |
-| **Mac flip path** | `docs/LANE_CLIP_META.md` | Ακριβή βήματα για DAT SPM + bridge wire. |
+| **Acoustic/IMU product** | Simulation-only sample plumbing · `FeatureReadinessRegistry.*.ready = false` | DAT exposes experimental camera PCM audio and `MWDATMotion`; neither is linked/wired in R0lling. Motion needs Developer Center capability approval and production publication is not currently supported. Before DAT audio permission is requested, revise the current voice-notes-only `NSMicrophoneUsageDescription` to disclose glasses camera-audio processing. Implement source mapping, app flow, and verify real callbacks on a device before changing readiness. |
+| **DAT implementation guide** | `docs/LANE_CLIP_META.md` | Προαπαιτούνται συμβατό toolchain, πραγματικό bridge/feed και device proof· το guide δεν είναι οδηγία ενεργοποίησης flags. |
 
 ---
 
@@ -69,6 +69,8 @@
 | **DoD CLOSED** | Experimental path + flags + README | Δεν μετράει ως πλήρες product feature. |
 
 **Current exception (2026-10-10):** B12's Obsidian watcher is connected as a debounced directory-entry hint for the selected root and nested directories in Settings. It reconciles added/removed folders and same-path directory replacements by identity, skips symlink subtrees, and surfaces reconciliation errors by stopping and marking the watcher unavailable. It does not read vault files, synchronize changes, or reliably detect edits to files inside existing directories. It remains `ready=false` pending Apple runtime/device validation. This narrow status surface supersedes the historical “0 AppState holds” assertion for the watcher only; other Experimental modules remain frozen.
+
+**Orphan placement follow-up (2026-10-13):** B08 ProximityAlertManager, C01 PseudoLexicalVectorSearchEngine, C02 TurnTakingGuard, C05 HyperlapseTripCompressor, and C06 LocalWhisperOfflineService had no product callers and were outside the Experimental folder. They were moved under `Sources/R0lling/Experimental/` with their public type names and `ready=false` flags unchanged. This satisfies the matrix's freeze/orphan placement option; no live feeds, models, or product behavior were added.
 
 ---
 

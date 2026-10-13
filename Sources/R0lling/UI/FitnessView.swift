@@ -100,36 +100,54 @@ private struct FitnessActivityCalendarCard: View {
     private let weekdays = FitnessActivityWeekdayLabels.greekMondayFirst
     @State private var selectedDate: Date? = FitnessActivityCalendar.athensCalendar.startOfDay(for: .now)
 
-    private var usesCompactMonthGrid: Bool {
+    private var usesCompactActivityMark: Bool {
         switch dynamicTypeSize {
         case .xSmall, .small, .medium, .large, .xLarge: true
         default: false
         }
     }
 
-    private var dayCellSize: CGFloat { usesCompactMonthGrid ? 20.5 : 44 }
-    private var monthGridSpacing: CGFloat { usesCompactMonthGrid ? 10 : 14 }
-    private var activityPillHeight: CGFloat { usesCompactMonthGrid ? 8 : 13 }
+    private let dayCellSize: CGFloat = 44
+    private let monthGridSpacing: CGFloat = 14
+    private var activityPillHeight: CGFloat { usesCompactActivityMark ? 8 : 13 }
     private var monthGridWidth: CGFloat { dayCellSize * 7 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: monthGridSpacing) {
-                    ForEach(monthBuckets) { month in
-                        monthGrid(month)
-                    }
-                }
-                .fixedSize(horizontal: true, vertical: false)
-
-                ScrollView(.horizontal, showsIndicators: true) {
+            ScrollViewReader { proxy in
+                ViewThatFits(in: .horizontal) {
                     HStack(alignment: .top, spacing: monthGridSpacing) {
                         ForEach(monthBuckets) { month in
                             monthGrid(month)
                         }
                     }
+                    .fixedSize(horizontal: true, vertical: false)
+
+                    ScrollView(.horizontal, showsIndicators: true) {
+                        HStack(alignment: .top, spacing: monthGridSpacing) {
+                            ForEach(monthBuckets) { month in
+                                monthGrid(month)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .onAppear {
+                    if let selectedDate {
+                        proxy.scrollTo(selectedDate, anchor: .center)
+                    }
+                }
+                .onChange(of: snapshot.currentDays) { previousDays, currentDays in
+                    let selectedDateIsInWindow = selectedDate.map { selected in
+                        currentDays.contains { $0.date == selected }
+                    } ?? false
+                    if !selectedDateIsInWindow || selectedDate == previousDays.last?.date {
+                        selectedDate = currentDays.last?.date
+                        if let selectedDate {
+                            proxy.scrollTo(selectedDate, anchor: .center)
+                        }
+                    }
+                }
             }
 
             if let selectedDay {
@@ -187,14 +205,6 @@ private struct FitnessActivityCalendarCard: View {
         }
         .padding(16)
         .r0llingBevelSurface(cornerRadius: 20)
-        .onChange(of: snapshot.currentDays) { previousDays, currentDays in
-            let selectedDateIsInWindow = selectedDate.map { selected in
-                currentDays.contains { $0.date == selected }
-            } ?? false
-            if !selectedDateIsInWindow || selectedDate == previousDays.last?.date {
-                selectedDate = currentDays.last?.date
-            }
-        }
     }
 
     private func monthGrid(_ month: FitnessActivityMonthGrid) -> some View {
@@ -259,6 +269,7 @@ private struct FitnessActivityCalendarCard: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .id(day.date)
         .accessibilityLabel(accessibilityLabel(for: day))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }

@@ -4,7 +4,7 @@ import AVFAudio
 import AudioToolbox
 #endif
 
-/// Υπηρεσία αναπαραγωγής διακριτικών ακουστικών σημάτων (Earcons) στα ηχεία των Meta Glasses ή στα ακουστικά
+/// Plays AudioServices system sounds for existing app events. Output routing is OS-controlled; no Meta-glasses route is wired.
 public final class EarconFeedbackService: @unchecked Sendable {
     public static let shared = EarconFeedbackService()
 

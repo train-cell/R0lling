@@ -17,37 +17,71 @@ public final class HeadGestureDetector: @unchecked Sendable {
     }
 
     private var recentPitches: [(pitch: Double, time: Double)] = []
-    private var lastNodTime: Double = 0.0
-    private var lastTriggerTime: Double = 0.0
+    private var previousSample: IMUSample?
+    private var previousSlope: Double = 0.0
+    private var lastTroughTime: Double?
+    private var lastNodTime: Double?
+    private var lastTriggerTime: Double = -.infinity
+
+    private let minimumNodAmplitude = 0.40
+    private let minimumDoubleNodInterval = 0.25
+    private let maximumDoubleNodInterval = 1.0
+    private let triggerCooldown = 5.0
     public var onDoubleNodDetected: (@Sendable () -> Void)?
 
     public init() {}
 
-    /// Τροφοδοσία δείγματος IMU από τα γυαλιά
+    /// Τροφοδοτεί pitch δείγμα. Μία κάμψη μετρά όταν ολοκληρωθεί τοπικό trough
+    /// με επαρκές prominence· συνεχόμενα frames της ίδιας κίνησης δεν μετρούν ως νέα nods.
     public func feedIMUSample(_ sample: IMUSample) {
-        recentPitches.append((sample.pitch, sample.timestamp))
+        guard sample.pitch.isFinite, sample.timestamp.isFinite else { return }
+        if let previousSample, sample.timestamp <= previousSample.timestamp {
+            return
+        }
 
-        // Διατήρηση μόνο του τελευταίου 1.5 δευτερολέπτου
+        recentPitches.append((sample.pitch, sample.timestamp))
         let cutoff = sample.timestamp - 1.5
         recentPitches.removeAll(where: { $0.time < cutoff })
 
-        // Έλεγχος ανίχνευσης κατακόρυφης ταλάντωσης (Nod: Pitch μεταβολή > 0.35 rad)
-        guard recentPitches.count >= 6 else { return }
-
-        let minPitch = recentPitches.map { $0.pitch }.min() ?? 0.0
-        let maxPitch = recentPitches.map { $0.pitch }.max() ?? 0.0
-        let amplitude = maxPitch - minPitch
-
-        if amplitude > 0.40 {
-            // Εντοπίστηκε έντονη κίνηση νεύματος
-            if (sample.timestamp - lastNodTime) > 0.25 && (sample.timestamp - lastNodTime) < 1.0 {
-                // Δεύτερο συνεχόμενο νεύμα εντός 1 δευτερολέπτου -> Double Nod!
-                if (sample.timestamp - lastTriggerTime) > 5.0 {
-                    lastTriggerTime = sample.timestamp
-                    onDoubleNodDetected?()
-                }
-            }
-            lastNodTime = sample.timestamp
+        guard let previousSample else {
+            self.previousSample = sample
+            return
         }
+
+        let slope = sample.pitch - previousSample.pitch
+        defer {
+            previousSlope = slope
+            self.previousSample = sample
+        }
+
+        // A trough is complete when pitch changes from descending to level/rising.
+        // Count one event per trough instead of testing the same rolling amplitude
+        // on every frame (which continually reset the previous event timestamp).
+        guard previousSlope < 0, slope >= 0, recentPitches.count >= 6 else { return }
+
+        let trough = previousSample
+        let windowStart = max(
+            trough.timestamp - 1.5,
+            lastTroughTime ?? recentPitches[0].time
+        )
+        let precedingPeak = recentPitches
+            .lazy
+            .filter { $0.time >= windowStart && $0.time <= trough.timestamp }
+            .map(\.pitch)
+            .max() ?? trough.pitch
+
+        lastTroughTime = trough.timestamp
+        guard precedingPeak - trough.pitch > minimumNodAmplitude else { return }
+
+        if let lastNodTime {
+            let interval = trough.timestamp - lastNodTime
+            if interval >= minimumDoubleNodInterval,
+               interval <= maximumDoubleNodInterval,
+               trough.timestamp - lastTriggerTime > triggerCooldown {
+                lastTriggerTime = trough.timestamp
+                onDoubleNodDetected?()
+            }
+        }
+        lastNodTime = trough.timestamp
     }
 }

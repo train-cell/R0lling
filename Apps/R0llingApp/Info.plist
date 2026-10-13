@@ -40,6 +40,46 @@
 			</dict>
 		</dict>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.personal.r0lling</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Developer Mode configuration; production credentials must come from the user's Meta Developer Center project. -->
+	<key>MWDAT</key>
+	<dict>
+		<key>AppLinkURLScheme</key>
+		<string>com.personal.r0lling://</string>
+		<key>MetaAppID</key>
+		<string>0</string>
+		<key>ClientToken</key>
+		<string></string>
+		<key>TeamID</key>
+		<string>$(DEVELOPMENT_TEAM)</string>
+	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+		<string>bluetooth-central</string>
+		<string>bluetooth-peripheral</string>
+		<string>external-accessory</string>
+	</array>
+	<key>UISupportedExternalAccessoryProtocols</key>
+	<array>
+		<string>com.meta.ar.wearable</string>
+	</array>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_bonjour._tcp</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchScreen</key>
@@ -69,11 +109,11 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Η αποθήκευση στη βιβλιοθήκη Φωτογραφιών δεν είναι διαθέσιμη σε αυτή την έκδοση.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Η σύνδεση Bluetooth με γυαλιά δεν είναι διαθέσιμη σε αυτή την έκδοση του R0lling.</string>
+	<string>Το Bluetooth χρησιμοποιείται από το Meta DAT για αναζήτηση και σύνδεση υποστηριζόμενων γυαλιών. Η live σύνδεση παραμένει υπό υλοποίηση και δεν είναι ακόμη διαθέσιμη.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Η σύνδεση Bluetooth με γυαλιά δεν είναι διαθέσιμη σε αυτή την έκδοση του R0lling.</string>
+	<string>Το Bluetooth χρησιμοποιείται από το Meta DAT για αναζήτηση και σύνδεση υποστηριζόμενων γυαλιών. Η live σύνδεση παραμένει υπό υλοποίηση και δεν είναι ακόμη διαθέσιμη.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Το R0lling συνδέεται με τον τοπικό βοηθό Hermes στο οικιακό σας δίκτυο (Home PC).</string>
+	<string>Το R0lling συνδέεται με τον τοπικό βοηθό Hermes και, όταν ρυθμιστεί το Meta DAT, με τα γυαλιά μέσω του τοπικού δικτύου.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Χρησιμοποιείται για ξεκλείδωμα της ιδιωτικής προεπισκόπησης με βιομετρική ταυτοποίηση.</string>
 	<key>NSHealthShareUsageDescription</key>

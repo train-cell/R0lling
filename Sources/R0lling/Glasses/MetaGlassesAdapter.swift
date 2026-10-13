@@ -1,10 +1,10 @@
 import Foundation
 
 /// Adapter για Meta Glasses Gen 2.
-/// R3-003: Χωρίς τα MWDATCore + MWDATCamera modules το non-simulation path ΔΕΝ παρουσιάζει ψευδή σύνδεση.
+/// R3-003: Το non-simulation path μένει κλειστό μέχρι να ολοκληρωθεί και να επικυρωθεί η camera/media ροή.
 /// A06: disconnect / interrupt → clear buffer + νέα generation.
 /// A07: background/lock → PAUSED + honest UI message (όχι continuous capture χωρίς proof).
-/// Sensor feeds: acoustic + IMU pipeline end-to-end (flags στο AppState ελέγχουν auto-clip).
+/// Simulation may emit synthetic acoustic/IMU samples to the sink; live DAT callbacks are not wired, and product triggers stay gated off.
 public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
     private var state: GlassesConnectionState = .disconnected
     /// Simulation είναι υποχρεωτικό όταν δεν υπάρχει DAT SDK στο build.
@@ -17,6 +17,8 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
     /// Θυμάται αν έτρεχε streaming πριν το background pause (για auto-resume).
     private var itanStreamingPrinPause: Bool = false
     private var reconnectAttempts: Int = 0
+    private var lastDATFrameTimestamp: Double?
+    private var datFrameIntervals: [Double] = []
     /// Invalidates an in-flight connection when it is cancelled or disconnected.
     private var connectionAttemptGeneration: UInt64 = 0
 
@@ -90,9 +92,9 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
     public func toggleSimulationMode(enabled: Bool) {
         guard state == .disconnected else { return }
         if !enabled && !MetaDATStreamBridge.einaiLiveYlopoiimeno {
-            // R3-003: Απαγορεύεται «real» mode χωρίς SDK — κρατάμε simulation.
+            // R3-003: Κρατάμε simulation μέχρι να ολοκληρωθεί και να επικυρωθεί το live path.
             self.simulationEnabled = true
-            print("[MetaGlassesAdapter] Real DAT mode μη διαθέσιμο χωρίς MWDATCore/MWDATCamera — παραμένει Simulation.")
+            print("[MetaGlassesAdapter] Live DAT camera/media path remains gated — παραμένει Simulation.")
             return
         }
         self.simulationEnabled = enabled
@@ -137,7 +139,7 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
                 domain: "R0lling.Glasses",
                 code: 4002,
                 userInfo: [NSLocalizedDescriptionKey:
-                    "Το Meta Wearables DAT SDK δεν είναι συνδεδεμένο σε αυτό το build. Ενεργοποίησε Simulation Mode ή πρόσθεσε το SDK στο Xcode."]
+                    "Το Meta Wearables DAT SDK δεν είναι διαθέσιμο σε αυτό το build. Χρειάζεται συμβατό iOS build ή ενεργοποίησε Simulation Mode."]
             )
             #endif
         } catch {
@@ -163,6 +165,18 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
         await MetaDATStreamBridge.kleiseLiveSession()
         itanStreamingPrinPause = false
         state = .disconnected
+    }
+
+    public func requestCameraPermissionAfterUserConfirmation() async throws {
+        guard !simulationEnabled else { return }
+        guard MetaDATStreamBridge.einaiLiveYlopoiimeno else {
+            throw NSError(
+                domain: MetaDATStreamBridge.errorDomain,
+                code: MetaDATStreamBridge.kodikosSessionApotyxia,
+                userInfo: [NSLocalizedDescriptionKey: "Το live DAT camera path παραμένει κλειστό."]
+            )
+        }
+        try await MetaDATStreamBridge.zitaCameraPermissionMetaAIHandoff()
     }
 
     public func startStreaming() async throws {
@@ -193,25 +207,41 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
             throw NSError(
                 domain: "R0lling.Glasses",
                 code: 4002,
-                userInfo: [NSLocalizedDescriptionKey: "Live stream απαιτεί MWDATCore + MWDATCamera ή Simulation Mode."]
+                userInfo: [NSLocalizedDescriptionKey: "Το live stream απαιτεί τα MWDATCore + MWDATCamera σε συμβατό iOS build ή ενεργή Simulation Mode."]
             )
             #endif
         }
 
-        state = .streaming(fps: 30.0, isBuffering: true)
-        itanStreamingPrinPause = true
         try await bufferService?.startBuffering(targetSeconds: bufferTargetSeconds)
 
-        if simulationEnabled {
-            startSimulationIngestionLoop()
-        } else {
-            startDATIngestionLoop()
+        do {
+            if simulationEnabled {
+                state = .streaming(fps: 30.0, isBuffering: true)
+                itanStreamingPrinPause = true
+                startSimulationIngestionLoop()
+            } else {
+                try await MetaDATStreamBridge.arxiseLiveCameraStream()
+                lastDATFrameTimestamp = nil
+                datFrameIntervals.removeAll(keepingCapacity: true)
+                state = .streaming(fps: 0.0, isBuffering: true)
+                itanStreamingPrinPause = true
+                startDATIngestionLoop()
+            }
+        } catch {
+            await bufferService?.stopBuffering()
+            await MetaDATStreamBridge.stamataLiveCameraStream()
+            throw error
         }
     }
 
     public func stopStreaming() async {
         streamTask?.cancel()
         streamTask = nil
+        lastDATFrameTimestamp = nil
+        datFrameIntervals.removeAll(keepingCapacity: true)
+        if !simulationEnabled {
+            await MetaDATStreamBridge.stamataLiveCameraStream()
+        }
         await bufferService?.stopBuffering()
         itanStreamingPrinPause = false
 
@@ -253,16 +283,47 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
                     await bufferService?.clearBuffer()
                     await bufferService?.markStreamInterrupted(reason: "background_or_lock")
                 }
+                if !simulationEnabled {
+                    await MetaDATStreamBridge.kleiseLiveSession()
+                }
                 let reason = event == .willEnterBackground ? "background" : "lock"
                 state = .paused(reason: reason)
+            } else if !simulationEnabled, case .connected = state {
+                // DAT sessions are terminal after stop; reconnect on the next user action.
+                await MetaDATStreamBridge.kleiseLiveSession()
+                state = .disconnected
+            } else if !simulationEnabled, case .connecting = state {
+                // Do not allow a session opened while the app is inactive to outlive A07.
+                connectionAttemptGeneration &+= 1
+                await MetaDATStreamBridge.kleiseLiveSession()
+                state = .disconnected
             }
 
         case .didBecomeActive:
             if case .paused = state {
-                let onoma = simulationEnabled
-                    ? "Meta Ray-Ban Gen 2 (SIMULATION — όχι φυσική συσκευή)"
-                    : "Meta Ray-Ban Gen 2"
-                state = .connected(deviceName: onoma, batteryPercent: simulationEnabled ? 90 : nil)
+                if simulationEnabled {
+                    state = .connected(
+                        deviceName: "Meta Ray-Ban Gen 2 (SIMULATION — όχι φυσική συσκευή)",
+                        batteryPercent: 90
+                    )
+                } else {
+                    guard policy.autoResumeStreamOnForeground && itanStreamingPrinPause else {
+                        itanStreamingPrinPause = false
+                        state = .disconnected
+                        return outcome
+                    }
+                    do {
+                        let session = try await MetaDATStreamBridge.anoixeLiveSession()
+                        state = .connected(
+                            deviceName: session.deviceName,
+                            batteryPercent: session.batteryPercent
+                        )
+                    } catch {
+                        itanStreamingPrinPause = false
+                        state = .error("Auto-resume session απέτυχε: \(error.localizedDescription)")
+                        return outcome
+                    }
+                }
 
                 if policy.autoResumeStreamOnForeground && itanStreamingPrinPause {
                     do {
@@ -368,6 +429,7 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
                 guard let self = self else { break }
                 do {
                     if let video = try await MetaDATStreamBridge.diavaseEpomenoVideoFrame() {
+                        await self.recordDATFrameTimestamp(video.timestampSeconds)
                         let generation = await self.bufferService?.streamGeneration ?? 0
                         let tagged = BufferedSample(
                             timestampSeconds: video.timestampSeconds,
@@ -377,24 +439,6 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
                             streamGeneration: generation
                         )
                         await self.bufferService?.appendSample(sample: tagged)
-                    }
-                    if let audio = try await MetaDATStreamBridge.diavaseEpomenoAudioSample() {
-                        let generation = await self.bufferService?.streamGeneration ?? 0
-                        let tagged = BufferedSample(
-                            timestampSeconds: audio.timestampSeconds,
-                            isKeyframe: true,
-                            isAudio: true,
-                            data: audio.data,
-                            streamGeneration: generation
-                        )
-                        await self.bufferService?.appendSample(sample: tagged)
-                        // Approximate RMS από amplitude proxy αν δεν υπάρχει float PCM ακόμα
-                        let proxyLevel = Float(audio.data.first ?? 0) / 255.0
-                        let approxDb = proxyLevel > 0 ? 20.0 * log10f(proxyLevel) : -100.0
-                        await self.steileDATOralAcoustic(approxDb: approxDb)
-                    }
-                    if let imu = try await MetaDATStreamBridge.diavaseEpomenoIMU() {
-                        await self.steileDATIMU(imu)
                     }
                 } catch {
                     // Σε DAT frame error: προσπάθεια reconnect κατά policy, αλλιώς paused/error.
@@ -419,17 +463,32 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
         reconnectAttempts += 1
     }
 
+    private func recordDATFrameTimestamp(_ timestamp: Double) {
+        guard timestamp.isFinite else { return }
+        if let previousTimestamp = lastDATFrameTimestamp {
+            let interval = timestamp - previousTimestamp
+            if interval > 0, interval <= 1.0 {
+                datFrameIntervals.append(interval)
+                if datFrameIntervals.count > 12 { datFrameIntervals.removeFirst() }
+            } else {
+                datFrameIntervals.removeAll(keepingCapacity: true)
+            }
+        }
+        lastDATFrameTimestamp = timestamp
+
+        guard !datFrameIntervals.isEmpty,
+              case .streaming(_, let isBuffering) = state else { return }
+        let totalInterval = datFrameIntervals.reduce(0, +)
+        guard totalInterval > 0 else { return }
+        state = .streaming(
+            fps: Double(datFrameIntervals.count) / totalInterval,
+            isBuffering: isBuffering
+        )
+    }
+
     private func auxSetError(_ message: String) {
         state = .error(message)
         itanStreamingPrinPause = false
-    }
-
-    private func steileDATOralAcoustic(approxDb: Float) {
-        sensorFeedSink?.receiveAcousticLevel(decibels: approxDb)
-    }
-
-    private func steileDATIMU(_ imu: HeadGestureDetector.IMUSample) {
-        sensorFeedSink?.receiveIMUSample(imu)
     }
 
     private func steileSensorFeeds(frameIndex: Int, timestamp: Double) {

@@ -26,13 +26,13 @@ The current `Info.plist` declares:
 | `NSSpeechRecognitionUsageDescription` | Speech-to-text |
 | `NSPhotoLibraryUsageDescription` | Importing media |
 | `NSPhotoLibraryAddUsageDescription` | Reserved for future Photos-library export; current media import uses pickers and does not write to Photos |
-| `NSBluetoothAlwaysUsageDescription`, `NSBluetoothPeripheralUsageDescription` | Reserved for future glasses pairing; this version has no CoreBluetooth transport and live Meta DAT remains unavailable |
-| `NSLocalNetworkUsageDescription` | Outgoing connection to a manually configured local Hermes endpoint; Bonjour discovery is not implemented |
+| `NSBluetoothAlwaysUsageDescription`, `NSBluetoothPeripheralUsageDescription` | Meta DAT SDK is declared for iOS and the plist has Developer Mode placeholders; the live session/camera bridge remains gated and unavailable |
+| `NSLocalNetworkUsageDescription` | Hermes endpoint is manually configured; DAT Bonjour configuration is declarative and no live glasses discovery/session is wired |
 | `NSFaceIDUsageDescription` | Private diary unlock |
-| `NSHealthShareUsageDescription` | Reading five optional HealthKit measurements, sleep intervals, and recorded workouts for the Health and Fitness screens |
+| `NSHealthShareUsageDescription` | Reading five optional HealthKit quantity measurements, sleep intervals, and recorded workouts for the Health and Fitness screens |
 | `NSHealthUpdateUsageDescription` | Reserved for future HealthKit writes; current HealthKit service requests read-only access |
 
-Several usage keys are retained for planned capabilities and do not represent working product flows. This version has no camera capture, Photos-library write, CoreBluetooth glasses transport, clip-audio capture/synchronization, or HealthKit write path. Photos and Files picker imports are implemented; speech notes and HealthKit measurement, sleep, and workout reads are separate implemented paths. Live Meta DAT is unavailable. No permission prompt or denial flow has been verified on-device.
+Several usage keys are retained for planned capabilities and do not represent working product flows. This version has no camera capture, Photos-library write, CoreBluetooth glasses transport, clip-audio capture/synchronization, or HealthKit write path. Photos and Files picker imports are implemented; speech notes and HealthKit measurement, sleep, and workout reads are separate implemented paths. The DAT SDK callback/configuration shell is present, but live Meta DAT session and camera behavior remain unavailable and gated. No permission prompt or denial flow has been verified on-device.
 
 ## Disk space
 

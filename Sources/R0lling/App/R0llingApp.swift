@@ -1,4 +1,39 @@
+import Foundation
 import SwiftUI
+#if canImport(MWDATCore)
+import MWDATCore
+import OSLog
+
+private enum MetaDATApplicationLifecycle {
+    private static let logger = Logger(subsystem: "com.personal.r0lling", category: "MetaDAT")
+    private static let appLinkScheme = "com.personal.r0lling"
+
+    static func configure() {
+        do {
+            try Wearables.configure()
+        } catch {
+            // Keep the app usable in its explicitly labeled simulation mode if SDK setup fails.
+            logger.error("DAT SDK configuration failed: \(String(describing: error), privacy: .private)")
+        }
+    }
+
+    static func handleURL(_ url: URL) {
+        guard url.scheme?.caseInsensitiveCompare(appLinkScheme) == .orderedSame,
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.queryItems?.contains(where: { $0.name == "metaWearablesAction" }) == true else {
+            return
+        }
+
+        Task {
+            do {
+                _ = try await Wearables.shared.handleUrl(url)
+            } catch {
+                logger.error("DAT callback handling failed: \(String(describing: error), privacy: .private)")
+            }
+        }
+    }
+}
+#endif
 
 #if !SWIFT_PACKAGE
 @main
@@ -6,7 +41,11 @@ import SwiftUI
 public struct R0llingApp: App {
     @StateObject private var appState = AppState()
 
-    public init() {}
+    public init() {
+        #if canImport(MWDATCore)
+        MetaDATApplicationLifecycle.configure()
+        #endif
+    }
 
     public var body: some Scene {
         WindowGroup {
@@ -16,6 +55,11 @@ public struct R0llingApp: App {
                 .task {
                     await appState.loadInitialData()
                 }
+                #if canImport(MWDATCore)
+                .onOpenURL { url in
+                    MetaDATApplicationLifecycle.handleURL(url)
+                }
+                #endif
         }
     }
 }

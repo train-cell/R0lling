@@ -337,8 +337,40 @@ public final class AppState: ObservableObject {
         }
     }
 
-    public func toggleGlassesPrimaryAction() async {
-        switch GlassesPrimaryAction.resolve(isStreaming: isStreaming, state: glassesState) {
+    public func toggleGlassesPrimaryAction(cameraPermissionConfirmed: Bool = false) async {
+        isSimulationMode = await glassesAdapter.isSimulationMode
+        let action = GlassesPrimaryAction.resolve(isStreaming: isStreaming, state: glassesState)
+
+        if cameraPermissionConfirmed,
+           !isSimulationMode,
+           action != .stopStreaming,
+           action != .waitForConnection {
+            if action == .connectThenStartStreaming {
+                await toggleGlassesConnection()
+                guard glassesState.isConnected else { return }
+            }
+
+            do {
+                try await glassesAdapter.requestCameraPermissionAfterUserConfirmation()
+            } catch {
+                glassesState = await glassesAdapter.connectionState
+                showToast("Camera permission: \(error.localizedDescription)")
+                return
+            }
+
+            // Meta AI may background this app during its permission handoff. A07
+            // closes the old DAT session there, so reconnect before starting capture.
+            glassesState = await glassesAdapter.connectionState
+            if !glassesState.isConnected {
+                await toggleGlassesConnection()
+                guard glassesState.isConnected else { return }
+            }
+
+            await toggleLiveStream()
+            return
+        }
+
+        switch action {
         case .waitForConnection:
             return
         case .stopStreaming, .startStreaming:

@@ -1,5 +1,5 @@
-// swift-tools-version: 5.10
-// The swift-tools-version declares the minimum version of Swift required to build this package.
+// swift-tools-version: 6.3
+// The Meta DAT SDK currently requires the Swift 6.3 toolchain. Keep this package in Swift 5 language mode while adopting the compatible manifest/toolchain.
 
 import PackageDescription
 
@@ -7,7 +7,7 @@ let package = Package(
     name: "R0lling",
     defaultLocalization: "el",
     platforms: [
-        .iOS(.v17),
+        .iOS(.v17_2),
         .macOS(.v14)
     ],
     products: [
@@ -17,15 +17,17 @@ let package = Package(
         )
     ],
     dependencies: [
-        // Meta Wearables DAT remains intentionally unlinked until the live bridge is implemented.
-        // Current products are MWDATCore + MWDATCamera; see docs/LANE_CLIP_META.md.
+        .package(
+            url: "https://github.com/facebook/meta-wearables-dat-ios",
+            exact: "1.0.1"
+        )
     ],
     targets: [
         .target(
             name: "R0lling",
             dependencies: [
-                // Add MWDATCore + MWDATCamera only with the compatible Xcode/Swift toolchain
-                // and after implementing and reviewing MetaDATStreamBridge.
+                .product(name: "MWDATCore", package: "meta-wearables-dat-ios", condition: .when(platforms: [.iOS])),
+                .product(name: "MWDATCamera", package: "meta-wearables-dat-ios", condition: .when(platforms: [.iOS]))
             ],
             path: "Sources/R0lling",
             exclude: ["Experimental/README.md"],
@@ -42,5 +44,6 @@ let package = Package(
                 .enableUpcomingFeature("StrictConcurrency")
             ]
         )
-    ]
+    ],
+    swiftLanguageModes: [.v5]
 )

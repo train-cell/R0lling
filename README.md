@@ -44,6 +44,8 @@ The Python scripts contain independent model examples and source/config checks. 
 
 The UI direction follows the Bevel screens in the external `ui understanding` folder: a charcoal canvas, flat slate cards with quiet outlines and restrained shadows, a deeper blue sleep-detail surface, clear system typography, and floating capsule navigation. The primary destinations are Today, Journal, Fitness, and Health. Fitness has a 30-day HealthKit workout calendar and duration comparison; Today keeps the summary prominent and collapses secondary tools by default. Styling source changes were made across existing screens; rendered iPhone/Simulator comparison remains pending.
 
+The confirmed long-term release target also includes Android and Windows clients while preserving the native SwiftUI iOS app and local-first data model. There is no Android or Windows app in this checkout yet. See the [cross-platform release roadmap](docs/MULTIPLATFORM_ROADMAP.md); this target is not a claim that those clients are implemented or released.
+
 ## Build
 
 On a Mac with Xcode:

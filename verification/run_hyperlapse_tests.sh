@@ -7,7 +7,7 @@ trap 'rm -rf "$scratch_dir"' EXIT
 
 mkdir -p "$scratch_dir/Sources/CoreLocation" "$scratch_dir/Sources/R0lling" "$scratch_dir/Tests/R0llingTests"
 cp "$repo_root/verification/CoreLocationShim.swift" "$scratch_dir/Sources/CoreLocation/"
-cp "$repo_root/Sources/R0lling/Buffer/HyperlapseTripCompressor.swift" "$scratch_dir/Sources/R0lling/"
+cp "$repo_root/Sources/R0lling/Experimental/HyperlapseTripCompressor.swift" "$scratch_dir/Sources/R0lling/"
 cp "$repo_root/Tests/R0llingTests/HyperlapseTripCompressorTests.swift" "$scratch_dir/Tests/R0llingTests/"
 
 cat > "$scratch_dir/Package.swift" <<'MANIFEST'

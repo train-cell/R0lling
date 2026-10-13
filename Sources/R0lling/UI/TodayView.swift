@@ -11,6 +11,7 @@ public struct TodayView: View {
     @State private var isTodayDetailsExpanded = false
     @State private var isShareComposerPresented = false
     @State private var isDatePickerPresented = false
+    @State private var isCameraPermissionConfirmationPresented = false
     @FocusState private var composerIsFocused: Bool
     private let onOpenSettings: () -> Void
     private let onOpenHealth: () -> Void
@@ -281,7 +282,12 @@ public struct TodayView: View {
 
     private var glassesPrimaryActionButton: some View {
         Button(action: {
-            Task { await appState.toggleGlassesPrimaryAction() }
+            let action = GlassesPrimaryAction.resolve(isStreaming: appState.isStreaming, state: appState.glassesState)
+            if !appState.isSimulationMode, action != .stopStreaming, action != .waitForConnection {
+                isCameraPermissionConfirmationPresented = true
+            } else {
+                Task { await appState.toggleGlassesPrimaryAction() }
+            }
         }) {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: "eyeglasses")
@@ -302,6 +308,14 @@ public struct TodayView: View {
         .accessibilityValue(appState.glassesState.statusDescription)
         .accessibilityHint(glassesControlAccessibilityHint)
         .disabled(appState.glassesState.isConnectionAttemptInProgress)
+        .alert("Άδεια κάμερας γυαλιών", isPresented: $isCameraPermissionConfirmationPresented) {
+            Button("Συνέχεια") {
+                Task { await appState.toggleGlassesPrimaryAction(cameraPermissionConfirmed: true) }
+            }
+            Button("Ακύρωση", role: .cancel) {}
+        } message: {
+            Text("Το R0lling θα ελέγξει την άδεια και, αν χρειάζεται, θα ανοίξει το Meta AI για το αίτημα. Η ροή buffer ξεκινά μόνο αφού δοθεί η άδεια.")
+        }
     }
 
     private var glassesStatusControls: some View {

@@ -24,7 +24,7 @@ public enum FeatureReadinessRegistry {
     public static let earcon = Flag(
         id: "earcon",
         ready: true,
-        reason: "AudioServices earcons σε clip save/error"
+        reason: "AudioServices system sounds σε clip save/error · OS-controlled route · χωρίς direct glasses routing"
     )
     public static let timeCapsule = Flag(
         id: "timeCapsule",
@@ -122,7 +122,7 @@ public enum FeatureReadinessRegistry {
     public static let proximity = Flag(
         id: "proximity",
         ready: false,
-        reason: "Χωρίς location/vision feed"
+        reason: "Experimental orphan · χωρίς location/vision feed"
     )
     public static let watchCompanion = Flag(
         id: "watchCompanion",
@@ -132,12 +132,12 @@ public enum FeatureReadinessRegistry {
     public static let pseudoVectorSearch = Flag(
         id: "pseudoVectorSearch",
         ready: false,
-        reason: "FNV pseudo embeddings · όχι CLIP weights"
+        reason: "Experimental orphan · FNV pseudo embeddings, όχι CLIP weights"
     )
     public static let turnTaking = Flag(
         id: "turnTaking",
         ready: false,
-        reason: "Χωρίς VAD/mic feed"
+        reason: "Experimental orphan · χωρίς VAD/mic feed"
     )
     public static let mirror = Flag(
         id: "mirror",
@@ -147,12 +147,12 @@ public enum FeatureReadinessRegistry {
     public static let hyperlapse = Flag(
         id: "hyperlapse",
         ready: false,
-        reason: "GPS frame-select only · όχι video mux"
+        reason: "Experimental · GPS frame-select only · όχι capture/video mux"
     )
     public static let whisperStub = Flag(
         id: "whisperStub",
         ready: false,
-        reason: "Stub χωρίς weights · χρήση Apple Speech"
+        reason: "Experimental fail-closed stub · χωρίς weights · χωρίς product caller"
     )
     public static let multiFrameVision = Flag(
         id: "multiFrameVision",

@@ -62,13 +62,24 @@ public struct FitnessActivityMonthGrid: Identifiable, Sendable, Equatable {
 
     public var id: Date { monthStart }
 
+    /// Builds a calendar from day buckets. Dates are normalized with `calendar.startOfDay`;
+    /// repeated buckets are merged and duplicate workout IDs within a day keep their first value.
     public static func make(
         from days: [FitnessActivityDay],
         calendar: Calendar = FitnessActivityCalendar.athensCalendar
     ) -> [Self] {
-        let dayByDate = Dictionary(uniqueKeysWithValues: days.map { ($0.date, $0) })
-        let monthStarts = Set(days.compactMap {
-            calendar.dateInterval(of: .month, for: $0.date)?.start
+        var dayByDate: [Date: FitnessActivityDay] = [:]
+        for day in days {
+            let date = calendar.startOfDay(for: day.date)
+            var seenWorkoutIDs = Set<UUID>()
+            let workouts = ((dayByDate[date]?.workouts ?? []) + day.workouts)
+                .filter { seenWorkoutIDs.insert($0.id).inserted }
+                .sorted { $0.startedAt < $1.startedAt }
+            dayByDate[date] = FitnessActivityDay(date: date, workouts: workouts)
+        }
+
+        let monthStarts = Set(dayByDate.keys.compactMap {
+            calendar.dateInterval(of: .month, for: $0)?.start
         }).sorted()
 
         return monthStarts.map { monthStart in

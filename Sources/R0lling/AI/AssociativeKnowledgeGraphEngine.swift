@@ -1,10 +1,12 @@
 import Foundation
 
-/// Μηχανή Σημασιολογικού Συνειρμικού Γράφου Γνώσης (Associative Knowledge Graph Engine)
-/// Εξάγει RDF Σημασιολογικά Τρίπλετα (Subject - Predicate - Object) από καταγραφές και φωνητικές σημειώσεις.
-/// Επιτρέπει δημιουργία 3D συνειρμικών χαρτών γνώσης και εξαγωγή σε Mermaid & Graphviz για το Obsidian.
+/// Local pattern-based helper for extracting a small set of candidate relations from journal text.
+/// Its triples are not a general RDF model, and it does not build a 3D graph.
+/// It exports the extracted relations as Mermaid or Graphviz text for Obsidian.
 public final class AssociativeKnowledgeGraphEngine: @unchecked Sendable {
     
+    /// Lightweight subject-predicate-object value used by the local heuristic extractor.
+    /// The existing type name does not imply RDF ontology or inference support.
     public struct RDFTriple: Identifiable, Sendable, Codable, Hashable {
         public let id: UUID
         public let subject: String
@@ -70,12 +72,14 @@ public final class AssociativeKnowledgeGraphEngine: @unchecked Sendable {
     public func extractTriples(from text: String, date: Date = Date()) -> [RDFTriple] {
         var extracted: [RDFTriple] = []
         
+        let tokenSeparators = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ".,;"))
+
         // Patterns: "Συνάντηση με X", "Met with X", "Συνάντησα τον X"
         if let range = firstCaseInsensitiveRange(
             in: text,
             matching: ["συνάντηση με ", "συνάντησα τον ", "met with "]
         ) {
-            let entity = String(text[range.upperBound...]).components(separatedBy: CharacterSet(charactersIn: " .,;")).first ?? ""
+            let entity = firstTrimmedCandidate(in: text, after: range, separatedBy: tokenSeparators)
             if !entity.isEmpty {
                 extracted.append(RDFTriple(subject: "User", predicate: "metWith", object: entity.capitalized, timestamp: date))
             }
@@ -86,7 +90,7 @@ public final class AssociativeKnowledgeGraphEngine: @unchecked Sendable {
             in: text,
             matching: ["στο ", "στην ", "στη ", "at "]
         ) {
-            let place = String(text[range.upperBound...]).components(separatedBy: CharacterSet(charactersIn: " .,;")).first ?? ""
+            let place = firstTrimmedCandidate(in: text, after: range, separatedBy: tokenSeparators)
             if !place.isEmpty {
                 extracted.append(RDFTriple(subject: "User", predicate: "visitedLocation", object: place.capitalized, timestamp: date))
             }
@@ -97,9 +101,13 @@ public final class AssociativeKnowledgeGraphEngine: @unchecked Sendable {
             in: text,
             matching: ["συζητήσαμε για ", "μίλησα για ", "discussed "]
         ) {
-            let topic = String(text[range.upperBound...]).components(separatedBy: CharacterSet(charactersIn: ".,;")).first ?? ""
+            let topic = firstTrimmedCandidate(
+                in: text,
+                after: range,
+                separatedBy: CharacterSet(charactersIn: ".,;")
+            )
             if !topic.isEmpty {
-                extracted.append(RDFTriple(subject: "User", predicate: "discussedTopic", object: topic.trimmingCharacters(in: .whitespaces), timestamp: date))
+                extracted.append(RDFTriple(subject: "User", predicate: "discussedTopic", object: topic, timestamp: date))
             }
         }
         
@@ -113,6 +121,18 @@ public final class AssociativeKnowledgeGraphEngine: @unchecked Sendable {
             }
         }
         return nil
+    }
+
+    private func firstTrimmedCandidate(
+        in text: String,
+        after range: Range<String.Index>,
+        separatedBy separators: CharacterSet
+    ) -> String {
+        String(text[range.upperBound...])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: separators)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
     
     /// Εξαγωγή του γράφου σε Obsidian Mermaid format (`graph TD`)

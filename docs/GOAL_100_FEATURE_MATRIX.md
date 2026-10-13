@@ -46,8 +46,8 @@ remediation_commit: NONE (local working tree is uncommitted)
 | ID | DoD «100% ready» | Layer | Owner lane hint | Blocker |
 |---|---|---|---|---|
 | **P0-01** | GHA `swift-ci` green **ή** local `swift test` PASS + log στο HANDOFF | `MAC` | mac-ci | WSL parser passes; Linux build stops at unavailable Apple `ImageIO`; Apple test proof pending |
-| **P0-02** | `DECISIONS.md` ρητό **v1 simulation-only** **ή** DAT SPM wired + non-sim connect χωρίς fake | `SW`/`DEV` | decisions-dat | ✅ sim-only |
-| **P0-05** | Installable app shell: Info.plist permissions + Xcode app target docs/scaffold (SPM library ≠ app) | `SW`/`MAC` | app-scaffold | ✅ `Apps/R0llingApp/` |
+| **P0-02** | `DECISIONS.md` ρητό **v1 simulation-only** **ή** DAT SPM wired + non-sim connect χωρίς fake | `SW`/`DEV` | decisions-dat | DAT 1.0.1 setup, registration/session, explicit camera permission, publisher bridge, and H.264 conversion have source but remain unbuilt/unverified; photo/audio/IMU remain stubs and the usable path stays simulation-only |
+| **P0-05** | Installable app shell: Info.plist permissions + Xcode app target docs/scaffold (SPM library ≠ app) | `SW`/`MAC` | app-scaffold | ✅ `project.yml`, host entry point, Info.plist, privacy manifest, entitlements, and AppIcon asset are present; Apple build remains unverified |
 | **P0-06** | Stage 6 **μόνο** με πραγματικό device failure report | `DEV` | stage6 | no device report |
 
 ---
@@ -91,8 +91,8 @@ remediation_commit: NONE (local working tree is uncommitted)
 | | |
 |---|---|
 | **Plan scenario** | Buffer 5/10s → playable clip στο timeline |
-| **Wired σήμερα** | Sim placeholder MP4 + `isSimulationPlaceholder` · DAT remux 🚫 |
-| **DoD 100% ready** | **Sim path:** `AVAsset.isPlayable == true` σε Mac + honest label. **Live path:** DAT NAL → remux playable + duration ≈ buffer · DEV-05 PASS |
+| **Wired σήμερα** | Sim placeholder MP4 + `isSimulationPlaceholder`; H.264 Annex-B remux and raw-to-H.264 conversion have source, but the live DAT path remains gated and unverified |
+| **DoD 100% ready** | **Sim path:** `AVAsset.isPlayable == true` σε Mac + honest label. **Live path:** DAT NAL → remux playable, per-sample durations derived from strictly increasing PTS (last sample uses last observed interval), duration ≈ buffer · DEV-05 PASS |
 | **Layers** | `SW` sim · `MAC` AVAsset · `DEV` Gen2 |
 | **Honesty** | Sim-only v1 μπορεί να είναι «SW 100%» **μόνο** αν DECISIONS δηλώνει sim-only και UI δεν ισχυρίζεται LIVE hardware |
 
@@ -192,26 +192,26 @@ remediation_commit: NONE (local working tree is uncommitted)
 
 | # | Feature | Primary file | Current honesty | DoD 100% ready | Layer |
 |---|---|---|---|---|---|
-| B01 | Acoustic auto-clip | `AcousticTriggerService` | gated OFF · no mic feed | Mic RMS → `processAudioLevel` · flag `true` · no false toast · **ή** remove hooks + doc FREEZE | `DEV`/`ORPHAN` |
-| B02 | Head double-nod | `HeadGestureDetector` | gated OFF · no IMU | IMU feed από adapter · flag `true` · **ή** Experimental | `DEV`/`ORPHAN` |
+| B01 | Acoustic auto-clip | `AcousticTriggerService` | disabled · simulation-only sample plumbing · no live DAT microphone feed · ready=false; DAT camera PCM extension is experimental and unwired; current microphone usage text covers voice notes only | Before DAT audio permission, revise microphone disclosure; implement and validate the permission/route flow, PCM-to-RMS mapping, app flow, and device behavior before enabling; otherwise keep frozen | `DEV`/`ORPHAN` |
+| B02 | Head double-nod | `HeadGestureDetector` | disabled · simulation-only sample plumbing · no live DAT IMU feed · ready=false; detector now counts completed pitch troughs above 0.40 rad with inclusive 0.25–1.0s spacing; experimental `MWDATMotion` is not linked and requires Developer Center approval | Map optional orientation samples into the existing pitch contract, then validate real callbacks, detector thresholds, app flow, and device behavior before enabling; otherwise keep Experimental/frozen | `DEV`/`ORPHAN` |
 | B03 | Spatial audio | `Experimental/SpatialAudioProcessor` | Experimental orphan · P1-04 ✅ | Keep Experimental **ή** wire σε mux | `ORPHAN` ✅ |
 | B04 | Adaptive battery stream | `MetaGlassesAdapter` | sim battery path | Real battery telemetry → FPS/bitrate · Gen2 proof | `DEV` |
-| B05 | Earcons | `EarconFeedbackService` | iOS system sounds | Earcon on clip/error paths · optional glasses audio route proof | `SW`/`DEV` |
+| B05 | Earcons | `EarconFeedbackService` | AudioServices system sounds on clip-save/error paths; OS controls output routing, with no direct glasses route | Keep current app events; verify audio behavior on Apple device before claiming a glasses route | `SW`/`DEV` |
 | B06 | On-device Vision OCR | `OnDeviceVisionService` + `OnDeviceVisionAnalysisPipeline` + `AppState.executeWhatAmISeeing` | Local OCR now runs before optional cloud description; isolated pipeline tests pass, but native Vision OCR and image recognition still need Apple-device verification | VN request PASS σε device | `SW source-tested` / `DEV` pending |
 | B07 | Multi-frame vision | `AIRouter.askWhatAmISeeingMultiFrames` + `AppState.executeWhatAmISeeing` | AppState submits available buffer keyframes when at least two exist; the live DAT H264→image feed is still unavailable and keyframe capture remains unverified | Produce 3–4 real keyframes from DAT buffer · live vision | `SW caller-wired` / `DEV` pending |
-| B08 | Proximity alerts | `ProximityAlertManager` | held · no feed | Vision loop feed + cooldown · **ή** Experimental | `ORPHAN`/`DEV` |
+| B08 | Proximity alerts | `Experimental/ProximityAlertManager` | Experimental orphan · no location/vision feed or product caller · readiness false | Keep Experimental · **ή** wire a real feed + cooldown | `ORPHAN` ✅ / `DEV` if wired |
 | B09 | Transcript keyword cues | `TranscriptKeywordTagger` via `AppState.addNote` | Greek/English keyword cues use word/phrase boundaries, are visibly labeled `κείμενο: …`, and pass 5/5 isolated regression tests; no acoustic emotion inference is claimed | Keep wording text-based; audio prosody analysis is outside current implementation | `SW source-tested` |
 | B10 | PII scrubber | `OutboundPIIRedactor` in shared chat request builder | Common email, mod-97-checksum-valid IBAN, Luhn-valid payment-card, US SSN, contextual Greek AFM, and phone patterns are scrubbed from outbound text; tests cover provider-bound requests | Best-effort only: image pixels, names, and free-form addresses are not inferred; Apple provider/device path validation remains pending | `SW` |
 | B11 | Obsidian Canvas | `ObsidianCanvasGenerator` | wired fail-closed G5-003 | Export opens in Obsidian · nodes match entries | `SW`/`DEV` |
 | B12 | File watcher | `Experimental/ObsidianFileWatcher` + AppState + Settings | Debounced directory-entry hints for root and nested directories; reconciles new/removed directories and skips symlink subtrees; no content reads/sync or reliable file-content edit detection | Apple Files-provider/security-scope/device validation; keep readiness false meanwhile | `SW source-tested` / `DEV pending` |
-| B13 | Dataview YAML | `ObsidianVaultBridge` frontmatter | export path | Dataview query sample in docs + export sample file | `SW` |
+| B13 | Dataview YAML | ObsidianVaultBridge frontmatter | Exported daily-note metadata plus a Dataview query and schema-template example are documented; no synthetic journal entry is included | Query/template docs are source-backed; actual Obsidian plugin rendering remains unverified | SW source/docs · vault review pending |
 | B14 | Daily podcast | `DailyPodcastGenerator` | wired · G5-005/P2-020 | Summarize→speech completion-at-end · device hear | `SW`/`DEV` |
 | B15 | Scavenger streaks | `ScavengerHuntStreakManager` | wired G5-002/P2-024 | Persist survives restart · badge unlock proof | `SW`/`MAC` |
 | B16 | Time Capsule | `TimeCapsuleEngine` | wired TodayView | TZ-aware anniversary entries on device | `SW`/`DEV` |
 | B17 | Highlight reel | `HighlightReelMuxer` + `HighlightReelJournalCommitter` | AVComposition G5-001; verified video is attached to a journal entry for in-app playback | `AVAsset.isPlayable` reel σε Mac · ≥2 clips · journal reference + attachment playback | `MAC`/`DEV` |
 | B18 | Watermark export | `Experimental/ClipWatermarkExporter` + `MediaViewerSheet` | AVFoundation/Core Animation overlay exporter and gated share action implemented; `ready=false` pending Apple validation | Run Apple build and fixture render/playability test, compare result in Simulator/device, then reassess readiness | `SW pending` / `MAC` / `DEV` |
 | B19 | Metal frame pool | `Experimental/MetalFrameBufferPool` | Experimental orphan · P1-04 ✅ | Keep Experimental **ή** real Metal | `ORPHAN` ✅ |
-| B20 | Watch companion | `WatchConnectivityCoordinator` | schema SEC-003 · no Watch target | watchOS target + clip/note E2E **ή** document latent + hide UI | `DEV` |
+| B20 | Watch companion | `WatchConnectivityCoordinator` | schema-only latent coordinator · ready=false · no watchOS target or Watch UI; AppState callbacks and state updates are gated | Keep latent + UI hidden **ή** add watchOS target and clip/note E2E | `SW gate/docs ✅` / `DEV` if integrated |
 
 ---
 
@@ -219,12 +219,12 @@ remediation_commit: NONE (local working tree is uncommitted)
 
 | # | Feature | File | Current honesty | DoD 100% ready | Layer |
 |---|---|---|---|---|---|
-| C01 | Vector search | `PseudoLexicalVectorSearchEngine` | FNV pseudo · ready=false | Rename ✅ · UI search **ή** real CoreML (DEV) | `SW` rename ✅ |
-| C02 | Turn-taking | `TurnTakingGuard` | no VAD | VAD/mic gate στο speech · **ή** Experimental | `ORPHAN`/`DEV` |
+| C01 | Vector search | `Experimental/PseudoLexicalVectorSearchEngine` | FNV pseudo · no product caller · ready=false | Keep Experimental · **ή** real CoreML + UI search | `ORPHAN` ✅ / `DEV` if wired |
+| C02 | Turn-taking | `Experimental/TurnTakingGuard` | no VAD/mic feed or speech caller · ready=false | Keep Experimental · **ή** wire VAD/mic gate into speech | `ORPHAN` ✅ / `DEV` if wired |
 | C03 | Remote mirror | `RemoteMirrorStreamServer` | AUTH + Release kill · ready=false | TLS identity πριν ready=true · frames από buffer | `SW` harden ✅ · `DEV` frames |
-| C04 | Knowledge graph | `AssociativeKnowledgeGraphEngine` | heuristic Mermaid | Export non-empty · Obsidian opens · no fake success | `SW` (partial ready) |
-| C05 | Hyperlapse | `HyperlapseTripCompressor` | Validated GPS-sample frame selection only; no location capture, video mux, or UI; registry remains not ready | AV mux output playable **ή** keep explicitly experimental/readiness-gated | `ORPHAN`/`DEV` |
-| C06 | Whisper offline | `LocalWhisperOfflineService` | stub fail-closed | Real model **ή** keep stub + UI never claims offline STT | `SW` honesty / `DEV` model |
+| C04 | Knowledge graph | `AssociativeKnowledgeGraphEngine` | Local text-pattern heuristic exported as Mermaid; entity, place, and topic candidates are trimmed and whitespace-only candidates are discarded | Export non-empty · Obsidian opens · no fake success | `SW` source path; Obsidian rendering remains pending |
+| C05 | Hyperlapse | `Experimental/HyperlapseTripCompressor` | Experimental GPS-sample frame selection only; no location/camera capture, video mux, or UI; registry remains not ready | Keep Experimental **ή** mux playable video from real inputs | `ORPHAN` ✅ / `DEV` if wired |
+| C06 | Whisper offline | `Experimental/LocalWhisperOfflineService` | fail-closed stub · no model weights, product caller, or UI claim · ready=false | Keep Experimental stub and do not claim offline Whisper · **ή** bundle/validate real model | `SW honesty / ORPHAN` ✅ · `DEV` if model |
 | C07 | Meal nutrition | `MealNutritionVisionLogger` | heuristic tokens | Label always «estimate» · optional HealthKit later backlog | `SW` honesty OK if labeled |
 
 ---
@@ -342,7 +342,7 @@ The rows below identify code paths and outstanding proof. Their labels are not p
 |---|---|
 | earcon · timeCapsule · highlightReel · podcast · canvas · KG · emotionTags · scavengerStreak · appleSpeech · onDeviceVisionOCR · entityTags · nutritionHeuristic · dataviewFrontmatter | acoustic · headGesture · spatial · metal · watermark · fileWatcher · proximity · watch · pseudoVector · turnTaking · **mirror** · hyperlapse · whisperStub · multiFrameVision · adaptiveBattery |
 
-C01 rename and orphan placement are source-level changes; tests/build have not run.
+B08/C01/C02/C05 no-caller helpers now use the Experimental placement permitted by the freeze policy; their readiness flags remain false. Tests/build have not run for these path moves.
 `adaptiveBattery` stays disabled until real battery telemetry and DAT are available.
 Mirror remains disabled until its live transport path is implemented and verified.
 
@@ -351,7 +351,7 @@ Mirror remains disabled until its live transport path is implemented and verifie
 | ID | Status |
 |---|---|
 | **P0-01** Mac/`swift test` | Apple build/XCTest NOT RUN. WSL Swift parser passes; Linux package build stops at unavailable Apple `ImageIO` |
-| P0-02 DAT vs sim | Simulation is declared; live DAT code remains a stub |
+| P0-02 DAT vs sim | DAT 1.0.1, registration/DeviceSession, explicit camera-permission confirmation, bounded publisher adaptation, and raw-to-H.264 Annex-B conversion have source code but remain unbuilt/unverified with credentials/device. Photo/audio/IMU remain stubs, `einaiLiveYlopoiimeno` stays false, and simulation is the only usable path |
 | P0-05 App target / Info.plist | Project scaffold and privacy plist are present; Apple build not run |
 | P0-06 Stage 6 | NOT VERIFIED — no device failure report |
 

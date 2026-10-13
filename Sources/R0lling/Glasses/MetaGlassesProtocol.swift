@@ -1,10 +1,7 @@
 import Foundation
 
-/// Sink για acoustic / IMU feeds από Meta glasses → AppState (end-to-end feed API).
-///
-/// Τα `SUPER_FEATURE_*_FEED_WIRED` flags στο `AppState` ελέγχουν μόνο αν τα triggers
-/// παράγουν auto-clip toasts. Η ροή δεδομένων περνάει πάντα από αυτό το protocol
-/// ώστε το flip flag = 100% χωρίς νέο wiring.
+/// Sink interface for adapter sensor samples. The live Meta DAT sensor callbacks are not wired;
+/// the current producer is simulation-only, and acoustic/head-gesture triggers remain gated off.
 public protocol GlassesSensorFeedSink: AnyObject, Sendable {
     /// RMS / dBFS στάθμη ήχου από mic stream (γυαλιά ή iPhone fallback).
     func receiveAcousticLevel(decibels: Float)
@@ -32,7 +29,8 @@ public enum GlassesConnectionState: Sendable, Equatable {
                 return "\(name) (\(bat)%)"
             }
             return name
-        case .streaming(let fps, _): return "Ζωντανή ροή (\(Int(fps)) FPS)"
+        case .streaming(let fps, _):
+            return fps > 0 ? "Ζωντανή ροή (\(Int(fps)) FPS)" : "Ζωντανή ροή"
         case .paused(let reason): return "Παύση: \(reason)"
         case .error(let msg): return "Σφάλμα: \(msg)"
         }
@@ -91,13 +89,15 @@ public protocol MetaGlassesAdapterProtocol: Sendable {
     var reconnectPolicy: GlassesReconnectPolicy { get async }
     func connectDevice() async throws
     func disconnectDevice() async
+    /// Request Meta camera permission only after an explicit in-app confirmation.
+    func requestCameraPermissionAfterUserConfirmation() async throws
     func startStreaming() async throws
     func stopStreaming() async
     func capturePhoto() async throws -> Data
     func toggleSimulationMode(enabled: Bool) async
     /// A07: χειρισμός background / lock / foreground.
     func handleAppLifecycle(_ event: GlassesAppLifecycleEvent) async -> GlassesLifecycleOutcome
-    /// Εγγραφή sink για acoustic + IMU (feed API end-to-end).
+    /// Registers the consumer for adapter samples; the current producer is simulation-only.
     func setSensorFeedSink(_ sink: (any GlassesSensorFeedSink)?) async
     /// Ενημέρωση πολιτικής reconnect / background.
     func setReconnectPolicy(_ policy: GlassesReconnectPolicy) async

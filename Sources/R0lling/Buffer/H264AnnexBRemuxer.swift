@@ -18,6 +18,11 @@ public enum H264AnnexBRemuxer {
     /// Ελάχιστο πλήθος video samples για απόπειρα remux.
     public static let elaxistaVideoSamples: Int = 2
 
+    #if canImport(AVFoundation)
+    /// Κοινή χρονική βάση για PTS και sample durations στο H.264 remux.
+    private static let REMUX_XRONIKI_VASI: CMTimeScale = 600
+    #endif
+
     /// Προσπαθεί remux των buffered Annex-B samples σε playable MP4.
     public static func eksagogiPlayableMP4(
         samples: [BufferedSample],
@@ -120,6 +125,11 @@ public enum H264AnnexBRemuxer {
         pps: Data,
         destinationURL: URL
     ) async throws {
+        let xronismoiDeigmaton = try ftiakseSampleTimings(
+            deigmataVideo: videoSamples,
+            xronikiVasi: Self.REMUX_XRONIKI_VASI
+        )
+
         if FileManager.default.fileExists(atPath: destinationURL.path) {
             try FileManager.default.removeItem(at: destinationURL)
         }
@@ -171,18 +181,9 @@ public enum H264AnnexBRemuxer {
             )
         }
 
-        guard let firstVideoSample = videoSamples.first else {
-            throw NSError(
-                domain: errorDomain,
-                code: kodikosElleipsisSPSPPS,
-                userInfo: [NSLocalizedDescriptionKey: "Δεν υπάρχουν video samples για remux."]
-            )
-        }
-        let baseTime = firstVideoSample.timestampSeconds
         writer.startSession(atSourceTime: .zero)
-        let timescale: CMTimeScale = 600
 
-        for sample in videoSamples {
+        for (sample, sampleTiming) in zip(videoSamples, xronismoiDeigmaton) {
             let readinessDeadline = ProcessInfo.processInfo.systemUptime + 10
             while !videoInput.isReadyForMoreMediaData {
                 try Task.checkCancellation()
@@ -196,15 +197,9 @@ public enum H264AnnexBRemuxer {
                 try await Task.sleep(nanoseconds: 2_000_000)
             }
 
-            let relative = max(0.0, sample.timestampSeconds - baseTime)
-            let pts = CMTime(seconds: relative, preferredTimescale: timescale)
             let avccData = metatropiAnnexBSeAVCC(sample.data)
             let blockBuffer = try ftiakseCopiedBlockBuffer(avccData)
-            var timing = CMSampleTimingInfo(
-                duration: CMTime(value: 20, timescale: timescale),
-                presentationTimeStamp: pts,
-                decodeTimeStamp: .invalid
-            )
+            var timing = sampleTiming
             var sampleBuffer: CMSampleBuffer?
             var sampleSize = avccData.count
             let sbStatus = CMSampleBufferCreateReady(
@@ -255,6 +250,65 @@ public enum H264AnnexBRemuxer {
             )
         }
         outputVerified = true
+    }
+
+    /// Υπολογίζει timing ανά video sample από τη σειρά των presentation timestamps.
+    /// Το τελευταίο sample χρησιμοποιεί το τελευταίο παρατηρημένο διάστημα.
+    private static func ftiakseSampleTimings(
+        deigmataVideo: [BufferedSample],
+        xronikiVasi: CMTimeScale
+    ) throws -> [CMSampleTimingInfo] {
+        // Κάθε sample καλύπτει το διάστημα έως το επόμενο PTS· για το τελευταίο χρησιμοποιείται το προηγούμενο.
+        let xronoi = deigmataVideo.map(\.timestampSeconds)
+        guard xronoi.count >= elaxistaVideoSamples,
+              xronoi.allSatisfy(\.isFinite),
+              let arxikosXronos = xronoi.first else {
+            throw ftiakseTimingError("Ανεπαρκή ή μη πεπερασμένα video timestamps.")
+        }
+
+        let xronoiParousiasis = xronoi.map { xronos in
+            CMTime(seconds: xronos - arxikosXronos, preferredTimescale: xronikiVasi)
+        }
+        guard xronoiParousiasis.allSatisfy({ $0.isValid && $0.isNumeric }) else {
+            throw ftiakseTimingError("Δεν μπορούν να αναπαρασταθούν τα video timestamps.")
+        }
+
+        var paratirimenesDiarkeies: [CMTime] = []
+        paratirimenesDiarkeies.reserveCapacity(xronoiParousiasis.count - 1)
+        for deiktis in 0..<(xronoiParousiasis.count - 1) {
+            let trexonXronos = xronoiParousiasis[deiktis]
+            let epomenosXronos = xronoiParousiasis[deiktis + 1]
+            guard CMTimeCompare(epomenosXronos, trexonXronos) > 0 else {
+                throw ftiakseTimingError("Τα video timestamps δεν είναι αυστηρά αύξοντα.")
+            }
+
+            let diarkeia = CMTimeSubtract(epomenosXronos, trexonXronos)
+            guard diarkeia.isValid, diarkeia.isNumeric, CMTimeCompare(diarkeia, .zero) > 0 else {
+                throw ftiakseTimingError("Δεν μπορεί να υπολογιστεί θετική διάρκεια video sample.")
+            }
+            paratirimenesDiarkeies.append(diarkeia)
+        }
+
+        guard let teleftaiaDiarkeia = paratirimenesDiarkeies.last else {
+            throw ftiakseTimingError("Δεν υπάρχει παρατηρημένο διάστημα για το τελευταίο video sample.")
+        }
+        let diarkeies = paratirimenesDiarkeies + [teleftaiaDiarkeia]
+        return zip(xronoiParousiasis, diarkeies).map { xronismos in
+            CMSampleTimingInfo(
+                duration: xronismos.1,
+                presentationTimeStamp: xronismos.0,
+                decodeTimeStamp: .invalid
+            )
+        }
+    }
+
+    /// Δημιουργεί το υπάρχον writer error με περιγραφή αποτυχίας timestamp.
+    private static func ftiakseTimingError(_ perigrafi: String) -> NSError {
+        NSError(
+            domain: errorDomain,
+            code: kodikosWriterApotyxia,
+            userInfo: [NSLocalizedDescriptionKey: perigrafi]
+        )
     }
 
     private static func ftiakseFormatDescription(
