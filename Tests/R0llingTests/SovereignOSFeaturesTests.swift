@@ -191,7 +191,10 @@ final class SovereignOSFeaturesTests: XCTestCase {
     }
 
     func testCognitiveTelemetryIncludesElapsedActiveFocusWithoutChangingOtherScores() {
-        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        // Local noon: the raw timestamp is exactly local midnight in America/Los_Angeles,
+        // where the day boundary would cut the five elapsed minutes to zero.
+        let now = Calendar.current.startOfDay(for: Date(timeIntervalSince1970: 1_800_000_000))
+            .addingTimeInterval(12 * 3600)
         let base = CognitiveTelemetryScore(cognitiveStrain: 3.2, focusMinutes: 0, readinessPercent: 88)
         let deadline = now.addingTimeInterval(20 * 60)
 

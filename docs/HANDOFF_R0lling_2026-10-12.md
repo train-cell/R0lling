@@ -9,12 +9,39 @@ Updated: 2026-10-13
 Repository: train-cell/R0lling (the user's Windows checkout is `C:\Users\skyd3\antigarvity\R0lling`)
 Bevel references: `C:\Users\skyd3\antigarvity\ui understanding` (external; the screenshots are not in the repository)
 Current base: pushed `main` = `origin/main` = `b29429b6d24051ee2d4f4b52e793f9c5b0748932` ("Continue R0lling UI and platform handoff"), which contains the earlier `93f6833` checkpoint and its follow-ups.
-Latest continuation: cloud session on branch `claude/beautiful-cannon-6bot68`, fast-forwarded to `b29429b`. Its edits are uncommitted until the user asks for a commit (see the next section).
+Latest continuation: cloud session on branch `claude/beautiful-cannon-6bot68`, committed and pushed in PR train-cell/R0lling#1 (not merged; `main` is unchanged until the user merges). See «Session end» below.
 Git author configured for the requested account: train-cell (email intentionally omitted here).
 
 This current-state snapshot supersedes stale next-step and no-commit instructions in [HANDOFF_R0lling_2026-10-11.md](HANDOFF_R0lling_2026-10-11.md). That file remains useful as a dated styling history.
 
 ## Cloud continuation from pushed main (2026-10-13, latest)
+
+### Session end (2026-10-13): state and next steps
+
+**State.**
+- Everything is committed and pushed to PR [train-cell/R0lling#1](https://github.com/train-cell/R0lling/pull/1), which is marked ready for review. Nothing is uncommitted.
+- Hosted CI on the last code change (`2b64aaf`, run 38446457099) passed every job:
+  - the Python guards;
+  - the Linux harnesses;
+  - the macOS build with 380/380 XCTest cases;
+  - the iOS app build (device Release, Simulator Debug, unsigned `.ipa`).
+- Later commits are docs plus one time-zone-safe test date.
+- Nothing was installed, launched or rendered on an Apple device or Simulator.
+
+**For the user, in order.**
+1. **Merge.** Use «Create a merge commit». If you squash, remove the `[skip ci]` lines that the checkpoint commits put in the default message, otherwise CI will not run on `main`. Then confirm CI is green on `main`.
+2. **Device checks.** Install the IPA (CI artifact; it needs signing) or a Simulator build, and run DEVICE_TESTS: DEV-01…15 and DEV-UI-01…14, including the Bevel comparison.
+3. **Enable after device evidence.** Watermark (DEV-UI-07) and the Obsidian file watcher have code and stay `ready=false` until those checks pass.
+4. **Live Meta Gen 2.** It needs hardware, production Meta credentials, and fixes for the DAT runtime risks in [LANE_CLIP_META.md](LANE_CLIP_META.md).
+5. **Release.** TestFlight / App Store.
+6. **Android and Windows.** Decide ADR 0001 (Proposed); then the separate clients can start from the designs and the v1 contract. No Android or Windows code exists yet.
+
+**Next-session prompt (cloud or local).** Continue R0lling from `main` after PR train-cell/R0lling#1 is merged (or from branch `claude/beautiful-cannon-6bot68` if it is not).
+- Read first: this handoff, IMPLEMENTATION_STATUS (fourth pass), AUDIT_VERIFICATION, GOAL_100_PROGRESS and DEVICE_TESTS.
+- Work from the user's device or Simulator findings, or from the ADR 0001 decision. Keep SwiftUI on iOS, data local-only with explicit Obsidian/backup exchange, and the v1 contract unchanged.
+- Hosted CI (`.github/workflows/swift-ci.yml`) is the build and test authority. Its test step names a hanging test via `verification/run_with_pty_watchdog.py`.
+- Do not claim 100% or launch readiness while device, render, live-glasses or release gates are open.
+
 
 **Environment.** Claude Code cloud container, clone of `train-cell/R0lling`. It started on branch `claude/beautiful-cannon-6bot68` at `b614db9`, which was clean. After `git fetch origin main` the branch was fast-forwarded (`--ff-only`, no reset or commit) to the pushed `main`, `b29429b6d24051ee2d4f4b52e793f9c5b0748932`. The full status was then clean: no modified, untracked, or ignored files, and no stash.
 
