@@ -104,7 +104,7 @@ A heuristic scan for bodies whose last statement is a bare expression (it re-fin
 
 ### Third pass: documented software items (2026-10-13; on PR train-cell/R0lling#1)
 
-The user asked for every documented software item to be implemented, then committed. Scope follows the current authorities (GOAL_100 matrix, DECISIONS, DESIGN, CAPABILITY); the hyperanalysis, BACKLOG and retired feature notes are historical. The first checkpoint `f0431f0` passed `python-verify` and `portable-harnesses` on GitHub Actions (run 38434056716); the macOS build/test result is recorded below when it arrives.
+The user asked for every documented software item to be implemented, then committed. Scope follows the current authorities (GOAL_100 matrix, DECISIONS, DESIGN, CAPABILITY); the hyperanalysis, BACKLOG and retired feature notes are historical. The first checkpoint `f0431f0` passed `python-verify` and `portable-harnesses` on GitHub Actions (run 38434056716); the macOS build and test results are in the fourth pass below.
 
 **Implemented.**
 - **Voice-note original audio (DECISIONS §1, A04).** Settings › «Φωνητικές σημειώσεις» › «Αποθήκευση αρχικού ήχου (.m4a)», off by default. When on, `SpeechTranscriptionService` also encodes the dictation input to AAC `.m4a` (`VoiceNoteAudioWriter`) and `AppState` stores it as an `.audio` attachment of the same note. The transcript stays the primary record; an encoder or storage failure keeps the note and reports it; audio from dictations that do not become notes is deleted. The microphone usage text now mentions the opt-in audio.
@@ -118,6 +118,26 @@ The user asked for every documented software item to be implemented, then commit
 - **Light/System appearance.** DECISIONS §1 lists it, but DESIGN.md (the styling source of truth) defines one dark palette. v1 stays dark; Light/System moved to BACKLOG until a documented palette and rendered review exist.
 - **Dynamic Type on existing fixed-size text.** DESIGN.md requires Dynamic Type for new surfaces; converting existing Bevel-matched screens changes layouts at large sizes and needs rendered review, so it stays a recorded review item.
 - **AAC clip audio.** No current stream (simulation or DAT) provides real audio, so DECISIONS' fallback (video-only MP4 with a clear indication) is what applies.
+
+### Fourth pass: first Apple build and test run (2026-10-13; PR train-cell/R0lling#1)
+
+- **Build.** Run 38434056716 on `f0431f0`: `swift build --build-tests` on `macos-26` with Xcode 26 passed. This is the first successful Apple compile since `82c4c0e`.
+- **Tests.** `swift test` then reported 141 test cases from 24 suites, 122 passed and 19 failed. After that its output stopped, and the job hit its 30-minute timeout. Run 38436071722 on `41c5f7b` timed out the same way.
+- **The 19 failures and their fixes** (source fixes, not yet re-run):
+  - **14 × `BackupRestoreTests`.** Agent memory rejected every macOS temporary vault with error 6104.
+    - `AgentFolderManager` and `VaultDirectoryFileAccess` walk the vault path from `/` with `O_NOFOLLOW`. Darwin's `/var` is a root-owned symlink to `/private/var`, and Foundation's `resolvingSymlinksInPath()` strips `/private` again.
+    - iOS app containers also live under `/var/mobile`, so device paths would have failed the same way.
+    - Both walkers now rewrite only that verified first component. Every later symlink is still rejected.
+  - **2 × `ClipWatermarkExporterTests`.** The frames showed the banner at the bottom edge, but the test read `CGBitmapContext` rows bottom-up. The memory starts with the top row, so the test now reads top-down.
+    - On the 240-pixel fixture, the 14 px margin plus the 48 px minimum banner reached 2 px into the center band.
+    - The exporter now keeps margin plus banner inside the bottom quarter; 1080p output is unchanged.
+  - **1 × `EncryptedDiaryStoreTests`.** Too many decision assumptions throws code 19, the vault-limit code. Code 10 means a missing decision or assumption. The test expected 10; both lines were added in `b614db9`.
+  - **2 × `MediaStorageTests`.**
+    - Traversal: a traversal path is rejected by the `<folder>/<file>` shape check before PathAsfaleia runs. That check throws the typed `.unsafeRelativePath` error, which BackupRestore depends on (added in `82c4c0e`).
+    - EXIF: ImageIO's JPEG encoder always writes ColorSpace and the pixel dimensions into `{Exif}`. The sanitizer test now checks that no source EXIF (the test's UserComment) and no GPS survives, instead of expecting no `{Exif}` at all.
+- **The hang.** xctest buffered its piped output in 16 KB blocks, so the last visible line, the start of `MetaGlassesComplianceTests.testUnsupportedBufferWindowFallsBackToTenSeconds`, is not the test that hung. The hanging test is one of the next ~70 (ObservationGameEngine, ObsidianBridge, ObsidianFileWatcher, maybe OnDeviceVisionAnalysisPipeline).
+  - The CI test step now runs under a pseudo-terminal with a 15-minute watchdog (`verification/run_with_pty_watchdog.py`). On a hang, the watchdog names the running test, samples xctest, and stops the run so the logs upload.
+- **Not yet run on Apple.** The 19 suites from ObservationGameEngineTests onward.
 
 ## Full-project source-gap review (2026-10-13)
 The official CameraAccess sample ends its DAT session when the app backgrounds and returns to idle. To preserve R0lling's A07 contract, live background/lock handling must stop stream and session, while foreground auto-resume starts a fresh session before reattaching the camera; continuous background capture remains unpromised.
