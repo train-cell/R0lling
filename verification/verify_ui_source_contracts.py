@@ -85,17 +85,18 @@ def main() -> None:
 
     fitness = (SOURCE_ROOT / "UI" / "FitnessView.swift").read_text(encoding="utf-8")
     fitness_grid_contract = (
-        "case .xSmall, .small, .medium, .large, .xLarge: true",
-        "private var dayCellSize: CGFloat { usesCompactMonthGrid ? 20.5 : 44 }",
-        "private var monthGridSpacing: CGFloat { usesCompactMonthGrid ? 10 : 14 }",
+        "private let dayCellSize: CGFloat = 44",
+        "private let monthGridSpacing: CGFloat = 14",
         "private var monthGridWidth: CGFloat { dayCellSize * 7 }",
         "ScrollView(.horizontal, showsIndicators: true)",
+        "proxy.scrollTo(selectedDate, anchor: .center)",
+        ".id(day.date)",
     )
     missing_fitness_grid_contract = [item for item in fitness_grid_contract if item not in fitness]
     if missing_fitness_grid_contract:
         raise SystemExit(
-            "Fitness must fit two compact months at standard text sizes, expand cells for XXL/accessibility text, "
-            f"and retain a narrow-width horizontal fallback: {missing_fitness_grid_contract}"
+            "Fitness day buttons must keep 44pt cells at every text size, scroll the two-month window horizontally, "
+            f"and center the selected day: {missing_fitness_grid_contract}"
         )
 
     today = (SOURCE_ROOT / "UI" / "TodayView.swift").read_text(encoding="utf-8")
@@ -103,8 +104,15 @@ def main() -> None:
     header_start = today.index("private var headerView: some View {")
     header_end = today.index("private var glassesControlAccessibilityLabel:", header_start)
     header = today[header_start:header_end]
-    if "ViewThatFits(in: .horizontal)" not in header or "lineLimit: 2" not in header or ".minimumScaleFactor(0.72)" in header:
-        raise SystemExit("Today date header must wrap at narrow/accessibility widths without shrinking its large-title text")
+    date_button_start = today.index("private func datePickerButton(")
+    date_button_end = today.index("private var isSelectedDayToday", date_button_start)
+    date_button = today[date_button_start:date_button_end]
+    if (
+        "dateAndGlassesRow" not in header
+        or "datePickerButton(font: .largeTitle.weight(.bold), lineLimit: 2, fixedWidth: false)" not in header
+        or ".minimumScaleFactor(" in date_button
+    ):
+        raise SystemExit("Today date heading must use its own row and wrap at narrow/accessibility widths without shrinking its large-title text")
     if "DatePicker(" not in today or "selection: $appState.selectedDate" not in today:
         raise SystemExit("Today date title must open a real date picker backed by the selected journal date")
     if ".onChange(of: appState.selectedDate)" not in today or "await appState.refreshEntries()" not in today:
@@ -251,19 +259,34 @@ def main() -> None:
     category_picker = composer[category_picker_start:category_picker_end]
     if "ViewThatFits(in: .horizontal)" not in category_picker or ".scrollIndicators(.visible)" not in category_picker:
         raise SystemExit("Share categories must fit in one row when possible and expose scrolling when they do not")
-    if "private func categoryButton(_ category: ShareComposerCategory" not in category_picker or "LinearGradient(" not in category_picker:
-        raise SystemExit("Share category pills must keep their bevel-style treatment in both fitted and scrolling layouts")
+    if (
+        "private func categoryButton(_ category: ShareComposerCategory" not in category_picker
+        or "R0llingTheme.bgSelectedControl : R0llingTheme.bgUnselectedControl" not in category_picker
+    ):
+        raise SystemExit("Share category pills must keep their flat selected/inactive fills in both fitted and scrolling layouts")
+    if ".stroke(" in category_picker or ".shadow(" in category_picker:
+        raise SystemExit("Share category pills use flat fills without an added outline or drop shadow (IMG_0479)")
     if "guard category != .stress" in category_picker or ".disabled(category == .stress)" in category_picker:
         raise SystemExit("The Stress tab must be selectable and show its honest no-data state")
     if "min(UIScreenSharePreview.maximumHeight, geometry.size.height)" not in composer:
         raise SystemExit("Today share preview cards must fit within the available vertical space without clipping")
     if "private var effectivePalette: ShareComposerPalette" not in composer or "category == .overview, page == 1" not in composer:
         raise SystemExit("The second default overview card must match the monochrome Bevel reference while preserving palette customization")
-    preview_start = composer.index(".frame(width: geometry.size.width * 0.90")
-    preview_end = composer.index(".frame(maxWidth: .infinity, maxHeight: .infinity)", preview_start)
+    preview_start = composer.index("let cardWidth = min(")
+    preview_end = composer.index(".frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)", preview_start)
     preview_card = composer[preview_start:preview_end]
+    for expected in (
+        "max(geometry.size.width * 0.625, 220)",
+        "let cardSpacing = cardWidth * 0.14",
+        "ShareComposerCheckerboard()",
+        "ShareComposerCardArtwork(",
+    ):
+        if expected not in preview_card:
+            raise SystemExit(f"Today share carousel must render every card over the checkerboard at the documented preview geometry: {expected}")
     if "if page == 0" in preview_card or "Color.clear" in preview_card:
-        raise SystemExit("Every Today share carousel card must retain a visible Bevel-style card surface")
+        raise SystemExit("Every Today share carousel page must remain visible")
+    if "let usesRaisedSurface = effectivePalette != .monochrome" not in composer:
+        raise SystemExit("Only the monochrome share artwork may omit the raised card surface (IMG_0480)")
     if '"Σχέδιο \\(selectedPage + 1) από 6"' in composer or '"Κάρτα \\(selectedPage + 1) από 6"' not in composer:
         raise SystemExit("Today share carousel accessibility must describe the pages as cards, not design variants")
     if not re.search(r"#if os\(iOS\)\s*\.presentationCornerRadius\(30\)\s*#endif", composer):

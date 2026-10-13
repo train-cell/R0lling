@@ -39,30 +39,24 @@ jobs:
       - name: Guard source/UI invariants unavailable to Linux type-checking
         run: python verification/verify_ui_source_contracts.py
 
-  build-and-test:
-    name: Swift build + test (macOS)
-    runs-on: macos-14
-    timeout-minutes: 20
-    needs: []  # parallel με python-verify
+  portable-harnesses:
+    # These isolated harnesses compile selected production files with Linux
+    # shims (for example ImageIO, Vision, and CoreLocation stand-ins). They were
+    # validated on Linux Swift 6.1, so they run in the official Swift 6.1 Linux
+    # image instead of blocking the authoritative Apple build below.
+    name: Portable production-source harnesses (Linux; not Apple validation)
+    runs-on: ubuntu-latest
+    container: swift:6.1
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode 16 / 15
+      - name: Install Python for runner source preprocessing
         run: |
-          if [ -d "/Applications/Xcode_16.1.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
-          elif [ -d "/Applications/Xcode_16.0.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
-          elif [ -d "/Applications/Xcode_16.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
-          elif [ -d "/Applications/Xcode_15.4.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
-          elif [ -d "/Applications/Xcode.app" ]; then
-            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          fi
-          xcodebuild -version
+          apt-get update
+          apt-get install -y --no-install-recommends python3
 
       - name: Swift Version
         run: swift --version
@@ -93,6 +87,32 @@ jobs:
           bash verification/run_on_device_vision_probe.sh
           bash verification/run_portable_source_probes.sh
 
+  build-and-test:
+    name: Swift build + test (macOS)
+    runs-on: macos-26
+    timeout-minutes: 30
+    needs: []  # parallel με python-verify και portable-harnesses
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26.4+ (Swift 6.3 required by Meta DAT 1.0.1)
+        run: |
+          for candidate in /Applications/Xcode_26.6.app /Applications/Xcode_26.5.app /Applications/Xcode_26.4.1.app /Applications/Xcode_26.4.app; do
+            if [ -d "$candidate" ]; then
+              sudo xcode-select -s "$candidate/Contents/Developer"
+              xcodebuild -version
+              exit 0
+            fi
+          done
+          echo "::error::Xcode 26.4 or newer is required by swift-tools-version 6.3 and Meta DAT 1.0.1."
+          ls -d /Applications/Xcode*.app || true
+          exit 1
+
+      - name: Swift Version
+        run: swift --version
+
       - name: Build R0lling (macOS target)
         run: |
           set -o pipefail
@@ -104,7 +124,10 @@ jobs:
       - name: Run Tests (macOS target)
         run: |
           set -o pipefail
-          if ! swift test 2>&1 | tee swift-test.log; then
+          # xctest block-buffers a pipe (16 KB), which once hid the hanging test. The
+          # pseudo-terminal keeps output line-buffered; after 15 minutes the watchdog
+          # names the running test, samples xctest, and stops so the logs still upload.
+          if ! python3 verification/run_with_pty_watchdog.py 900 -- swift test 2>&1 | tee swift-test.log; then
             python3 verification/extract_swift_build_errors.py swift-test.log
             exit 1
           fi
@@ -122,26 +145,28 @@ jobs:
 
   package-ios-app:
     name: Build & Package iOS App (.ipa)
-    runs-on: macos-14
-    timeout-minutes: 25
-    # Do not publish an IPA artifact if either the Swift checks or the
-    # independent source/config checks failed.
-    needs: [build-and-test, python-verify]
+    runs-on: macos-26
+    timeout-minutes: 30
+    # Do not publish an IPA artifact if the Swift checks, the portable
+    # harnesses, or the independent source/config checks failed.
+    needs: [build-and-test, portable-harnesses, python-verify]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode 16 / 15
+      - name: Select Xcode 26.4+ (Swift 6.3 required by Meta DAT 1.0.1)
         run: |
-          if [ -d "/Applications/Xcode_16.1.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
-          elif [ -d "/Applications/Xcode_16.0.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
-          elif [ -d "/Applications/Xcode_15.4.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
-          fi
-          xcodebuild -version
+          for candidate in /Applications/Xcode_26.6.app /Applications/Xcode_26.5.app /Applications/Xcode_26.4.1.app /Applications/Xcode_26.4.app; do
+            if [ -d "$candidate" ]; then
+              sudo xcode-select -s "$candidate/Contents/Developer"
+              xcodebuild -version
+              exit 0
+            fi
+          done
+          echo "::error::Xcode 26.4 or newer is required by swift-tools-version 6.3 and Meta DAT 1.0.1."
+          ls -d /Applications/Xcode*.app || true
+          exit 1
 
       - name: Install XcodeGen
         run: brew install xcodegen

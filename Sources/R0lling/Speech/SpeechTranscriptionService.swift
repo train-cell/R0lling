@@ -29,6 +29,9 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
     private let audioEngine = AVAudioEngine()
     private var accumulatedTranscript: String = ""
     private let stateLock = NSRecursiveLock()
+    private var keepsVoiceNoteAudio = false
+    private var activeVoiceNoteAudio: VoiceNoteAudioWriter?
+    private var finishedVoiceNoteAudio: VoiceNoteAudioRecording?
     #if os(iOS)
     private var previousAudioSession: (
         category: AVAudioSession.Category,
@@ -45,6 +48,34 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
         self.commandHandler = handler
     }
 
+    /// DECISIONS §1 / A04: when enabled before `startListening`, the microphone input is also
+    /// encoded to a temporary AAC `.m4a` so the note can keep its original audio. The transcript
+    /// stays the primary record; off by default.
+    public func setKeepsVoiceNoteAudio(_ enabled: Bool) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        keepsVoiceNoteAudio = enabled
+    }
+
+    /// Hands over the audio of the last finished dictation (the caller owns and removes the file).
+    public func takeFinishedVoiceNoteAudio() -> VoiceNoteAudioRecording? {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        let recording = finishedVoiceNoteAudio
+        finishedVoiceNoteAudio = nil
+        return recording
+    }
+
+    /// Deletes audio from a dictation that did not become a note.
+    public func discardFinishedVoiceNoteAudio() {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        if let recording = finishedVoiceNoteAudio {
+            try? FileManager.default.removeItem(at: recording.fileURL)
+        }
+        finishedVoiceNoteAudio = nil
+    }
+
     /// Ξεκινά ακρόαση iOS mic. Απαιτεί `NSSpeechRecognitionUsageDescription` + `NSMicrophoneUsageDescription` στο host app.
     public func startListening(localeIdentifier: String = "el-GR") throws {
         stateLock.lock()
@@ -52,6 +83,7 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
         guard !isListening else { return }
 
         try ensureSpeechAuthorized()
+        try ensureMicrophoneNotDenied()
         try configureAudioSession()
 
         let primary = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier))
@@ -100,8 +132,19 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
         if hasInputTap { inputNode.removeTap(onBus: 0); hasInputTap = false }
+        // A previous dictation's audio that was never claimed by a note is dropped.
+        if let staleRecording = finishedVoiceNoteAudio {
+            try? FileManager.default.removeItem(at: staleRecording.fileURL)
+            finishedVoiceNoteAudio = nil
+        }
+        // Optional keepsake only: if the encoder cannot start, dictation continues without it.
+        let audioWriter: VoiceNoteAudioWriter? = keepsVoiceNoteAudio
+            ? (try? VoiceNoteAudioWriter(format: recordingFormat))
+            : nil
+        activeVoiceNoteAudio = audioWriter
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
             request.append(buffer)
+            audioWriter?.append(buffer)
         }
         hasInputTap = true
 
@@ -167,6 +210,10 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
             audioEngine.inputNode.removeTap(onBus: 0)
             hasInputTap = false
         }
+        if let audioWriter = activeVoiceNoteAudio {
+            activeVoiceNoteAudio = nil
+            finishedVoiceNoteAudio = audioWriter.finish()
+        }
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
         recognitionRequest = nil
@@ -203,6 +250,21 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
         }
     }
 
+    /// A16: with record permission denied the input node only delivers silence, so dictation would
+    /// look active while hearing nothing. An undetermined permission is left to the system prompt
+    /// that iOS shows when the record session first uses the input route.
+    private func ensureMicrophoneNotDenied() throws {
+        #if os(iOS)
+        if AVAudioApplication.shared.recordPermission == .denied {
+            throw AppErrorTaxonomy.makeError(
+                domain: AppErrorTaxonomy.permissionDomain,
+                code: AppErrorTaxonomy.permissionMicrophoneDenied,
+                message: "Δεν υπάρχει άδεια μικροφώνου. Ενεργοποίησέ την στις Ρυθμίσεις."
+            )
+        }
+        #endif
+    }
+
     private func configureAudioSession() throws {
         #if os(iOS)
         let session = AVAudioSession.sharedInstance()
@@ -232,5 +294,67 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
             self.previousAudioSession = nil
         }
         #endif
+    }
+}
+
+/// Original audio of one dictation, kept only when the user enabled it in Settings.
+public struct VoiceNoteAudioRecording: Sendable, Equatable {
+    public let fileURL: URL
+    public let durationSeconds: Double
+}
+
+/// Encodes dictation buffers to AAC `.m4a` next to speech recognition. Writes arrive on the
+/// audio tap thread; `finish()` runs after the tap is removed and closes the file.
+final class VoiceNoteAudioWriter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var file: AVAudioFile?
+    private var framesWritten: AVAudioFramePosition = 0
+    private var didFail = false
+    private let sampleRate: Double
+    let fileURL: URL
+
+    init(format: AVAudioFormat) throws {
+        fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r0lling-voice-note-\(UUID().uuidString).m4a")
+        sampleRate = format.sampleRate
+        let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: format.sampleRate,
+            AVNumberOfChannelsKey: format.channelCount,
+            AVEncoderAudioQualityKey: AVAudioQuality.medium.rawValue
+        ]
+        file = try AVAudioFile(
+            forWriting: fileURL,
+            settings: settings,
+            commonFormat: format.commonFormat,
+            interleaved: format.isInterleaved
+        )
+    }
+
+    func append(_ buffer: AVAudioPCMBuffer) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let file, !didFail else { return }
+        do {
+            try file.write(from: buffer)
+            framesWritten += AVAudioFramePosition(buffer.frameLength)
+        } catch {
+            // Stop the keepsake on the first encoder error; the transcript is unaffected.
+            didFail = true
+        }
+    }
+
+    /// Closes the file (AVAudioFile finalizes on release) and returns it if audio was written.
+    func finish() -> VoiceNoteAudioRecording? {
+        lock.lock()
+        let wroteAudio = file != nil && !didFail && framesWritten > 0 && sampleRate > 0
+        file = nil
+        let duration = sampleRate > 0 ? Double(framesWritten) / sampleRate : 0
+        lock.unlock()
+        guard wroteAudio else {
+            try? FileManager.default.removeItem(at: fileURL)
+            return nil
+        }
+        return VoiceNoteAudioRecording(fileURL: fileURL, durationSeconds: duration)
     }
 }

@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import Accessibility
 
 #if canImport(ImageIO)
 import ImageIO
@@ -45,7 +46,9 @@ struct TodayShareComposerView: View {
                 .padding(.bottom, 16)
             }
             .background(R0llingTheme.bgSurface.ignoresSafeArea())
+            #if os(iOS)
             .toolbar(.hidden, for: .navigationBar)
+            #endif
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 actionBar
             }
@@ -279,11 +282,15 @@ struct TodayShareComposerView: View {
                     .foregroundColor(R0llingTheme.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 12)
-                    .accessibilityLiveRegion(.polite)
             }
         }
         .padding(.horizontal, 18)
         .background(R0llingTheme.bgSurface)
+        .onChange(of: statusMessage) { _, message in
+            // SwiftUI has no live-region modifier; announce status changes to VoiceOver instead.
+            guard let message, !message.isEmpty else { return }
+            AccessibilityNotification.Announcement(message).post()
+        }
     }
 
     @ViewBuilder
@@ -354,7 +361,8 @@ struct TodayShareComposerView: View {
                     .foregroundColor(R0llingTheme.textPrimary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
-                    .frame(width: 88, minHeight: 32)
+                    .frame(width: 88)
+                    .frame(minHeight: 32)
             }
         }
         .contentShape(Rectangle())

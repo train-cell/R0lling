@@ -492,7 +492,7 @@ enum VaultDirectoryFileAccess {
         let rootFD = open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC)
         guard rootFD >= 0 else { throw posixError("Αδυναμία ανοίγματος filesystem root.") }
         var currentFD = rootFD
-        for component in path.split(separator: "/").map(String.init) {
+        for component in pathWithDarwinPrivatePrefix(path).split(separator: "/").map(String.init) {
             var nextFD = component.withCString { name in
                 openat(currentFD, name, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
             }
@@ -519,6 +519,27 @@ enum VaultDirectoryFileAccess {
             currentFD = nextFD
         }
         return currentFD
+    }
+
+    /// Darwin keeps `/var`, `/tmp` and `/etc` as root-owned symlinks into `/private`, and
+    /// Foundation's `resolvingSymlinksInPath()` strips `/private` again, so app-container and
+    /// temporary paths (`/var/mobile/...`, `/var/folders/...`) would fail the O_NOFOLLOW walk.
+    /// Only that verified first component is rewritten; every later symlink is still rejected.
+    private static func pathWithDarwinPrivatePrefix(_ path: String) -> String {
+        let components = path.split(separator: "/").map(String.init)
+        guard let first = components.first else { return path }
+        var metadata = stat()
+        guard lstat("/" + first, &metadata) == 0,
+              UInt32(metadata.st_mode) & UInt32(S_IFMT) == UInt32(S_IFLNK),
+              metadata.st_uid == 0 else {
+            return path
+        }
+        var destination = [CChar](repeating: 0, count: 64)
+        let length = readlink("/" + first, &destination, 63)
+        guard length > 0 else { return path }
+        let target = String(decoding: destination.prefix(length).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        guard target == "private/\(first)" || target == "/private/\(first)" else { return path }
+        return "/private/" + components.joined(separator: "/")
     }
 
     private static func components(of relativePath: String) throws -> [String] {

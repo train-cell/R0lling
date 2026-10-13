@@ -212,12 +212,17 @@ public struct AssistantView: View {
 
                     Button(action: {
                         Task {
+                            // The actions work on the day selected in Today, which may not be today.
+                            let entries = appState.todayEntries
+                            let dayLabel = Calendar.current.isDateInToday(appState.selectedDate)
+                                ? ""
+                                : " · \(appState.selectedDate.formattedGreekHeader())"
                             do {
-                                let s = try await appState.aiRouter.summarizeDay(entries: appState.todayEntries)
+                                let s = try await appState.aiRouter.summarizeDay(entries: entries)
                             appState.chatMessages.append((
                                 id: UUID(),
                                 isUser: false,
-                                text: "📋 **Ημερήσια Σύνοψη:**\n\(s)",
+                                text: "📋 **Ημερήσια Σύνοψη\(dayLabel):**\n\(s)" + appState.daySummaryCoverageNote(entryCount: entries.count),
                                 timestamp: Date()
                             ))
                         } catch {
@@ -266,14 +271,18 @@ public struct AssistantView: View {
                 }
 
                 Button(action: {
-                    Task {
-                        await appState.playDailyPodcast()
+                    if appState.isDailyPodcastActive {
+                        appState.stopDailyPodcast()
+                    } else {
+                        Task {
+                            await appState.playDailyPodcast()
+                        }
                     }
                 }) {
                     HStack(spacing: 4) {
-                        Image(systemName: "mic.fill")
+                        Image(systemName: appState.isDailyPodcastActive ? "stop.fill" : "mic.fill")
                             .foregroundColor(R0llingTheme.bevelEmerald)
-                        Text("🎙️ Podcast")
+                        Text(appState.isDailyPodcastActive ? "Διακοπή Podcast" : "🎙️ Podcast")
                     }
                     .font(.system(.footnote, design: .rounded).weight(.semibold))
                     .foregroundColor(R0llingTheme.textPrimary)

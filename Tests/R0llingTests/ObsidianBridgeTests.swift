@@ -3,19 +3,31 @@ import XCTest
 
 private actor ObsidianExportBarrier {
     private var isPaused = false
-    private var pauseContinuation: CheckedContinuation<Void, Never>?
+    private var endedWithoutPausing = false
+    private var pauseContinuation: CheckedContinuation<Bool, Never>?
     private var releaseContinuation: CheckedContinuation<Void, Never>?
 
     func pause() async {
         isPaused = true
-        pauseContinuation?.resume()
+        pauseContinuation?.resume(returning: true)
         pauseContinuation = nil
         await withCheckedContinuation { releaseContinuation = $0 }
     }
 
-    func waitUntilPaused() async {
+    /// Wakes the waiting test when the export returned or threw before reaching the barrier,
+    /// so an early export error fails the test instead of hanging it (CI run 38434056716).
+    func exportEnded() {
         guard !isPaused else { return }
-        await withCheckedContinuation { pauseContinuation = $0 }
+        endedWithoutPausing = true
+        pauseContinuation?.resume(returning: false)
+        pauseContinuation = nil
+    }
+
+    /// `true` once the export is parked at the barrier, `false` if it ended first.
+    func waitUntilPaused() async -> Bool {
+        if isPaused { return true }
+        if endedWithoutPausing { return false }
+        return await withCheckedContinuation { pauseContinuation = $0 }
     }
 
     func release() {
@@ -87,9 +99,20 @@ final class ObsidianBridgeTests: XCTestCase {
         }
 
         let exportTask = Task {
-            try await switchingBridge.exportEntry(entry, mediaStorage: mediaStorage)
+            do {
+                let outcome = try await switchingBridge.exportEntry(entry, mediaStorage: mediaStorage)
+                await barrier.exportEnded()
+                return outcome
+            } catch {
+                await barrier.exportEnded()
+                throw error
+            }
         }
-        await barrier.waitUntilPaused()
+        guard await barrier.waitUntilPaused() else {
+            let result = await exportTask.result
+            XCTFail("The export ended before the attachment barrier, so the vault switch was never exercised: \(result)")
+            return
+        }
         await switchingBridge.setVaultURL(secondVault, requiresScopedAccess: false)
         await barrier.release()
 

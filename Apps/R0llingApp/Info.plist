@@ -64,10 +64,19 @@
 		<string></string>
 		<key>TeamID</key>
 		<string>$(DEVELOPMENT_TEAM)</string>
+		<key>Analytics</key>
+		<dict>
+			<key>OptOut</key>
+			<true/>
+		</dict>
+		<key>CrashReporting</key>
+		<dict>
+			<key>OptOut</key>
+			<true/>
+		</dict>
 	</dict>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>processing</string>
 		<string>bluetooth-central</string>
 		<string>bluetooth-peripheral</string>
 		<string>external-accessory</string>
@@ -101,7 +110,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Η λήψη από την κάμερα δεν είναι διαθέσιμη σε αυτή την έκδοση του R0lling.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Το R0lling χρησιμοποιεί το μικρόφωνο για φωνητικές σημειώσεις. Δεν καταγράφει ήχο για clips.</string>
+	<string>Το R0lling χρησιμοποιεί το μικρόφωνο για φωνητικές σημειώσεις και, μόνο αν το ενεργοποιήσετε στις Ρυθμίσεις, κρατά τον αρχικό τους ήχο τοπικά. Δεν καταγράφει ήχο για clips.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Το R0lling μετατρέπει τη φωνή σας σε κείμενο για αυτόματη καταγραφή στο ημερολόγιο.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

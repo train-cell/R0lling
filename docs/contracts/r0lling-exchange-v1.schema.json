@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "R0lling v1 local-exchange interchange profile",
+  "description": "Conservative profile derived from Sources/R0lling/Core/Models.swift, Sources/R0lling/Persistence/JSONFileStorageService.swift, Sources/R0lling/Persistence/BackupRestoreEngine.swift and Sources/R0lling/Obsidian/ObsidianVaultBridge.swift at commit b29429b6d24051ee2d4f4b52e793f9c5b0748932. A document that conforms is shaped like the iOS v1 writer output and stays inside the iOS v1 reader's validation rules as read from source. It has not yet been validated against an app-generated file or by a second implementation. Rules that JSON Schema cannot express (unique entry IDs, entriesCount equality, IANA zone validity, byte limits, restore semantics) are listed in docs/CROSS_PLATFORM_DATA_CONTRACT.md. The root accepts either the local journal file or a backup manifest; validate a specific shape with #/$defs/journalFile or #/$defs/backupManifest.",
+  "oneOf": [
+    { "$ref": "#/$defs/journalFile" },
+    { "$ref": "#/$defs/backupManifest" }
+  ],
+  "$defs": {
+    "timestamp": {
+      "description": "ISO-8601 instant in UTC with whole seconds and a literal Z, as written by Foundation's .iso8601 strategy. The iOS v1 decoder does not accept fractional seconds.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "uuid": {
+      "description": "Canonical UUID text. iOS writes uppercase hex (Foundation uuidString); the same uppercase text is used in Obsidian block markers and generated media filenames, so other writers must not lowercase it.",
+      "type": "string",
+      "pattern": "^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$"
+    },
+    "entrySource": {
+      "enum": ["manual", "glasses", "glasses_clip", "voice", "import", "ai"]
+    },
+    "mediaType": {
+      "enum": ["photo", "video", "clip", "audio"]
+    },
+    "mediaRelativePath": {
+      "description": "Path below the installation's own media root: one media-type folder and one file name of 1-255 ASCII characters from [0-9A-Za-z._-] that does not start with a dot (BackupRestoreEngine.validateAttachmentPath).",
+      "type": "string",
+      "pattern": "^(Photos|Videos|Clips|Audio)/[0-9A-Za-z_-][0-9A-Za-z._-]{0,254}$"
+    },
+    "mediaAttachment": {
+      "type": "object",
+      "required": ["id", "relativePath", "mediaType", "byteSize", "captureTimestamp", "hasAudio"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "relativePath": { "$ref": "#/$defs/mediaRelativePath" },
+        "originalFilename": {
+          "description": "Display name only; never a path. iOS always writes it and falls back to the last path component of relativePath when it is absent on read.",
+          "type": "string"
+        },
+        "mediaType": { "$ref": "#/$defs/mediaType" },
+        "byteSize": { "type": "integer", "minimum": 0 },
+        "durationSeconds": { "type": "number" },
+        "captureTimestamp": { "$ref": "#/$defs/timestamp" },
+        "width": { "type": "integer" },
+        "height": { "type": "integer" },
+        "hasAudio": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mediaType": { "const": "photo" } }, "required": ["mediaType"] },
+          "then": { "properties": { "relativePath": { "pattern": "^Photos/" } } }
+        },
+        {
+          "if": { "properties": { "mediaType": { "const": "video" } }, "required": ["mediaType"] },
+          "then": { "properties": { "relativePath": { "pattern": "^Videos/" } } }
+        },
+        {
+          "if": { "properties": { "mediaType": { "const": "clip" } }, "required": ["mediaType"] },
+          "then": { "properties": { "relativePath": { "pattern": "^Clips/" } } }
+        },
+        {
+          "if": { "properties": { "mediaType": { "const": "audio" } }, "required": ["mediaType"] },
+          "then": { "properties": { "relativePath": { "pattern": "^Audio/" } } }
+        }
+      ]
+    },
+    "journalEntry": {
+      "type": "object",
+      "required": ["id", "timestamp", "timeZoneIdentifier", "content", "source", "tags", "attachments", "isFavorite", "lastModified"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "timeZoneIdentifier": {
+          "description": "IANA time-zone identifier of the entry; its calendar day (yyyy-MM-dd) groups the entry and names its Obsidian daily note.",
+          "type": "string",
+          "minLength": 1
+        },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "source": { "$ref": "#/$defs/entrySource" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "locationName": { "type": "string" },
+        "attachments": { "type": "array", "items": { "$ref": "#/$defs/mediaAttachment" } },
+        "isFavorite": { "type": "boolean" },
+        "lastModified": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "agentMemory": {
+      "type": "object",
+      "required": ["memoryNotes", "userPreferences", "openLoops", "lastUpdated"],
+      "additionalProperties": false,
+      "properties": {
+        "memoryNotes": { "type": "string" },
+        "userPreferences": { "type": "string" },
+        "openLoops": { "type": "string" },
+        "lastUpdated": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "journalFile": {
+      "description": "Local journal file (iOS: Application Support/R0lling/journal_v1.json, at most 64 MiB).",
+      "type": "object",
+      "required": ["schemaVersion", "appVersion", "lastUpdated", "entries"],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "appVersion": { "type": "string" },
+        "lastUpdated": { "$ref": "#/$defs/timestamp" },
+        "entries": { "type": "array", "items": { "$ref": "#/$defs/journalEntry" } }
+      }
+    },
+    "backupManifest": {
+      "description": "manifest.json at the root of a backup bundle directory (at most 16 MiB). Each attachment's bytes live at Media/<relativePath> inside the bundle and byteSize must equal that file's size, which must be greater than zero.",
+      "type": "object",
+      "required": ["schemaVersion", "backupTimestamp", "appVersion", "entriesCount", "entries"],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "backupTimestamp": { "$ref": "#/$defs/timestamp" },
+        "appVersion": { "type": "string" },
+        "entriesCount": { "type": "integer", "minimum": 0, "maximum": 50000 },
+        "entries": {
+          "type": "array",
+          "maxItems": 50000,
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/journalEntry" },
+              { "properties": { "attachments": { "maxItems": 256 } } }
+            ]
+          }
+        },
+        "agentMemory": { "$ref": "#/$defs/agentMemory" }
+      }
+    },
+    "obsidianExportHashes": {
+      "description": "R0llingMeta/export-hashes.json inside the linked Obsidian vault (at most 16 MiB): vault-relative daily-note path to the lowercase hex SHA-256 of that note's exact UTF-8 bytes after the last R0lling write.",
+      "type": "object",
+      "propertyNames": { "pattern": "^[0-9]{4}/[0-9]{2}/[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md$" },
+      "additionalProperties": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    }
+  }
+}

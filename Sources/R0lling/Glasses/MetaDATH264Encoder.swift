@@ -146,7 +146,7 @@ final class MetaDATH264Encoder: @unchecked Sendable {
     func finish() async {
         closeInput()
 
-        await withCheckedContinuation { continuation in
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             workQueue.async { [self] in
                 if let session = compressionSession {
                     _ = VTCompressionSessionCompleteFrames(session, untilPresentationTimeStamp: .invalid)
@@ -311,7 +311,7 @@ final class MetaDATH264Encoder: @unchecked Sendable {
         guard byteCount > 0 else { throw EncoderError.missingOutputData }
         var bytes = [UInt8](repeating: 0, count: byteCount)
         let copyStatus = bytes.withUnsafeMutableBytes { destination in
-            guard let baseAddress = destination.baseAddress else { return kCMBlockBufferBadPointerErr }
+            guard let baseAddress = destination.baseAddress else { return kCMBlockBufferBadPointerParameterErr }
             return CMBlockBufferCopyDataBytes(
                 blockBuffer,
                 atOffset: 0,

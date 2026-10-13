@@ -57,194 +57,6 @@ private func imageThumbnail(from url: URL, maximumPixelSize: Int) -> Image? {
     #endif
 }
 
-/// Bevel-style Concentric 3-Ring Visualization (Buffer, Captures Target, Vault Status)
-public struct BevelConcentricRingsView: View {
-    public let bufferRatio: Double    // 0.0 ... 1.0 (Ring 1: Outer Cyan)
-    public let clipsRatio: Double     // 0.0 ... 1.0 (Ring 2: Middle Purple)
-    public let batteryRatio: Double   // 0.0 ... 1.0 (Ring 3: Inner Emerald)
-
-    public init(bufferRatio: Double = 0, clipsRatio: Double = 0, batteryRatio: Double = 0) {
-        self.bufferRatio = min(max(bufferRatio, 0.0), 1.0)
-        self.clipsRatio = min(max(clipsRatio, 0.0), 1.0)
-        self.batteryRatio = min(max(batteryRatio, 0.0), 1.0)
-    }
-
-    public var body: some View {
-        ZStack {
-            // Ring 1: Buffer Health (Outer - warm amber)
-            Circle()
-                .stroke(R0llingTheme.accentAmber.opacity(0.18), lineWidth: 8)
-                .frame(width: 96, height: 96)
-            Circle()
-                .trim(from: 0.0, to: CGFloat(bufferRatio))
-                .stroke(
-                    R0llingTheme.accentAmber,
-                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-                .frame(width: 96, height: 96)
-
-            // Ring 2: Clips Target (Middle - lime)
-            Circle()
-                .stroke(R0llingTheme.accentLime.opacity(0.18), lineWidth: 8)
-                .frame(width: 74, height: 74)
-            Circle()
-                .trim(from: 0.0, to: CGFloat(clipsRatio))
-                .stroke(
-                    R0llingTheme.accentLime,
-                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-                .frame(width: 74, height: 74)
-
-            // Ring 3: Hardware Battery / Vault (Inner - periwinkle)
-            Circle()
-                .stroke(R0llingTheme.accentCyan.opacity(0.18), lineWidth: 8)
-                .frame(width: 52, height: 52)
-            Circle()
-                .trim(from: 0.0, to: CGFloat(batteryRatio))
-                .stroke(
-                    R0llingTheme.accentCyan,
-                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-                .frame(width: 52, height: 52)
-
-            // Central Icon
-            Image(systemName: "bolt.fill")
-                .font(.system(size: 14, weight: .black))
-                .foregroundColor(R0llingTheme.accentLavender)
-        }
-        .frame(width: 104, height: 104)
-    }
-}
-
-/// Hero Telemetry Card (Bevel 3-Metrics Summary + Strava Athletic Card)
-public struct BevelTelemetryCard: View {
-    public let bufferDuration: Double
-    public let todayClipsCount: Int
-    public let isStreaming: Bool
-    public var isSimulation: Bool = true
-    public let glassesStatus: String
-
-    public init(
-        bufferDuration: Double,
-        todayClipsCount: Int,
-        isStreaming: Bool,
-        glassesStatus: String
-    ) {
-        self.bufferDuration = bufferDuration
-        self.todayClipsCount = todayClipsCount
-        self.isStreaming = isStreaming
-        self.glassesStatus = glassesStatus
-    }
-
-    public var body: some View {
-        VStack(spacing: 14) {
-            // Top Status Bar: Hardware Chip & Telemetry Pill
-            HStack {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(isStreaming ? R0llingTheme.accentPurple : R0llingTheme.bevelEmerald)
-                        .frame(width: 8, height: 8)
-                    Text(glassesStatus.uppercased())
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(R0llingTheme.textPrimary)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(R0llingTheme.bgElevated)
-                .clipShape(Capsule())
-                .r0llingBevelCapsule()
-
-                Spacer()
-
-                // Strava Style "ACTIVE TELEMETRY"
-                Text("POV ROLLING BUFFER")
-                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                    .foregroundColor(R0llingTheme.textMuted)
-                    .tracking(1.2)
-            }
-
-            // Middle: Concentric Rings + 3 Key Metrics
-            HStack(spacing: 20) {
-                // Bevel 3-Ring Chart
-                BevelConcentricRingsView(
-                    bufferRatio: min(bufferDuration / 10.0, 1.0),
-                    clipsRatio: min(Double(todayClipsCount) / 10.0, 1.0),
-                    batteryRatio: 0
-                )
-
-                // 3 Metrics Breakdown
-                VStack(alignment: .leading, spacing: 10) {
-                    // Metric 1: Buffer
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(R0llingTheme.bevelCyan)
-                            .frame(width: 6, height: 6)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("BUFFER CAPACITY")
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(R0llingTheme.textMuted)
-                            Text(String(format: "%.1fs / 10.0s", bufferDuration))
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                                .foregroundColor(R0llingTheme.textPrimary)
-                        }
-                    }
-
-                    // Metric 2: Today Clips
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(R0llingTheme.accentPurple)
-                            .frame(width: 6, height: 6)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("TODAY'S CLIPS")
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(R0llingTheme.textMuted)
-                            Text("\(todayClipsCount) CLIPS CAPTURED")
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                                .foregroundColor(R0llingTheme.textPrimary)
-                        }
-                    }
-
-                    // Metric 3: Resolution & Storage
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(R0llingTheme.bevelEmerald)
-                            .frame(width: 6, height: 6)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("VIDEO STREAM")
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(R0llingTheme.textMuted)
-                            Text(isSimulation ? "SYNTHETIC BUFFER" : "FORMAT UNAVAILABLE")
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                                .foregroundColor(R0llingTheme.textPrimary)
-                        }
-                    }
-                }
-
-                Spacer()
-            }
-
-            // Coaching Target Strip (Bevel-style target range)
-            HStack {
-                Image(systemName: "sparkles")
-                    .foregroundColor(R0llingTheme.accentLavender)
-                    .font(.system(size: 12))
-                Text("Rolling Target: 10s Circular Ring actively caching keyframes in RAM.")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(R0llingTheme.textSecondary)
-                Spacer()
-            }
-            .padding(10)
-            .background(R0llingTheme.bgElevated.opacity(0.8))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        }
-        .padding(16)
-        .r0llingBevelSurface(cornerRadius: 20, fillColor: R0llingTheme.heroCardFill)
-    }
-}
-
 /// Κάρτα καταχώρισης στο στυλ Strava Activity Card
 public struct TimelineEntryCard: View {
     public let entry: JournalEntry
@@ -275,7 +87,7 @@ public struct TimelineEntryCard: View {
         VStack(alignment: .leading, spacing: 12) {
             // 1. Activity Header (Athlete / Hardware source, Time, Favorite)
             HStack(alignment: .center, spacing: 10) {
-                // Device Avatar with live badge
+                // Source avatar. No status dot: a journal card has no live state to report.
                 ZStack(alignment: .bottomTrailing) {
                     Circle()
                         .fill(R0llingTheme.bgElevated)
@@ -283,11 +95,6 @@ public struct TimelineEntryCard: View {
                     Image(systemName: entry.source.iconName)
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(R0llingTheme.accentPurple)
-
-                    Circle()
-                        .fill(R0llingTheme.bevelEmerald)
-                        .frame(width: 10, height: 10)
-                        .overlay(Circle().stroke(R0llingTheme.bgSurface, lineWidth: 2))
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -303,10 +110,6 @@ public struct TimelineEntryCard: View {
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(R0llingTheme.textSecondary)
                     }
-
-                    Text("POV FIRST-PERSON CAPTURE")
-                        .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                        .foregroundColor(R0llingTheme.textMuted)
                 }
 
                 Spacer()
@@ -409,7 +212,7 @@ public struct TimelineEntryCard: View {
                         Image(systemName: entry.isFavorite ? "heart.fill" : "heart")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundColor(entry.isFavorite ? R0llingTheme.accentPurple : R0llingTheme.textMuted)
-                        Text(entry.isFavorite ? "Favorited" : "Kudos")
+                        Text("Αγαπημένο")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(entry.isFavorite ? R0llingTheme.accentPurple : R0llingTheme.textMuted)
                     }
@@ -420,6 +223,8 @@ public struct TimelineEntryCard: View {
                     .clipShape(Capsule())
                     .r0llingBevelCapsule()
                 }
+                .accessibilityLabel("Αγαπημένο")
+                .accessibilityAddTraits(entry.isFavorite ? .isSelected : [])
             }
             .padding(.top, 4)
         }
@@ -501,13 +306,28 @@ public struct MediaPreviewCard: View {
 
             VStack {
                 HStack {
+                    if isVideoOnlyClip {
+                        // DECISIONS §1: a clip without synchronized audio is labeled as such.
+                        HStack(spacing: 4) {
+                            Image(systemName: "speaker.slash.fill")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Χωρίς ήχο")
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.black.opacity(0.65))
+                        .clipShape(Capsule())
+                        .accessibilityHidden(true)
+                    }
                     Spacer()
                     if let dur = attachment.durationSeconds {
                         HStack(spacing: 4) {
                             Circle()
                                 .fill(Color.white)
                                 .frame(width: 5, height: 5)
-                            Text(String(format: "00:%02d", Int(dur)))
+                            Text(Self.durationBadgeText(dur))
                                 .font(.system(size: 11, weight: .black, design: .monospaced))
                                 .foregroundColor(.white)
                         }
@@ -589,7 +409,7 @@ public struct MediaPreviewCard: View {
         )
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(attachment.originalFilename), \(attachment.mediaType.folderName)")
+        .accessibilityLabel("\(attachment.originalFilename), \(attachment.mediaType.folderName)\(isVideoOnlyClip ? ", χωρίς ήχο" : "")")
         .accessibilityHint("Άνοιγμα προεπισκόπησης πολυμέσου")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(.default) {
@@ -650,10 +470,22 @@ public struct MediaPreviewCard: View {
         }
     }
 
+    /// Rolling-buffer clips are exported video-only (`hasAudio == false`); imported videos are not
+    /// labeled because their audio track is not inspected on import.
+    private var isVideoOnlyClip: Bool {
+        attachment.mediaType == .clip && !attachment.hasAudio
+    }
+
     private var katastasiArxeiou: String {
         if loadError != nil { return "MISSING" }
         if resolvedURL != nil { return "LOCAL FILE" }
         return "NO RESOLVER"
+    }
+
+    /// mm:ss badge; the former fixed "00:%02d" format showed a 75 s clip as "00:75".
+    static func durationBadgeText(_ seconds: Double) -> String {
+        let totalSeconds = seconds.isFinite ? Int(min(max(seconds, 0), 359_999)) : 0
+        return String(format: "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
     }
 
     private func fortoseMedia() async {
@@ -729,6 +561,8 @@ public struct FloatingClipBar: View {
     public let bufferDuration: Double
     public let isStreaming: Bool
     public var isSimulation: Bool = true
+    /// Configured rolling window (5 or 10 s); the export is limited to it.
+    public var clipSeconds: Double = 10.0
     public var onClipTapped: () -> Void
 
     public var body: some View {
@@ -757,12 +591,14 @@ public struct FloatingClipBar: View {
                 HStack(spacing: 8) {
                     Image(systemName: "scissors")
                         .font(.system(size: 15, weight: .black))
-                    Text("CAPTURE 10s")
+                    Text("CAPTURE \(Int(clipSeconds.rounded()))s")
                         .font(.subheadline.weight(.semibold))
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
+                // DECISIONS §1: the fallback Clip button is at least 56pt high.
+                .frame(minHeight: 56)
                 .background(R0llingTheme.primaryButtonGradient)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .shadow(color: Color.black.opacity(0.16), radius: 3, x: 0, y: 2)
@@ -842,6 +678,8 @@ public struct LiveViewfinderCard: View {
     public let isStreaming: Bool
     public var isSimulation: Bool = true
     public let bufferDuration: Double
+    /// Configured rolling window (5 or 10 s) shown next to the buffered duration.
+    public var targetSeconds: Double = 10.0
     public var onClipTap: () -> Void
 
     @State private var scanOffset: CGFloat = -60
@@ -850,11 +688,13 @@ public struct LiveViewfinderCard: View {
         isStreaming: Bool,
         isSimulation: Bool = true,
         bufferDuration: Double,
+        targetSeconds: Double = 10.0,
         onClipTap: @escaping () -> Void
     ) {
         self.isStreaming = isStreaming
         self.isSimulation = isSimulation
         self.bufferDuration = bufferDuration
+        self.targetSeconds = targetSeconds
         self.onClipTap = onClipTap
     }
 
@@ -896,7 +736,7 @@ public struct LiveViewfinderCard: View {
                         .font(.system(size: 11, weight: .heavy, design: .monospaced))
                         .foregroundColor(R0llingTheme.textPrimary)
 
-                    Text("Κυκλική αποθήκευση: \(String(format: "%.1fs", bufferDuration)) / 10.0s")
+                    Text("Κυκλική αποθήκευση: \(String(format: "%.1fs", bufferDuration)) / \(String(format: "%.1fs", targetSeconds))")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(R0llingTheme.accentLavender)
                 }
@@ -1149,6 +989,7 @@ public struct MediaViewerSheet: View {
                         .font(.system(size: 54))
                         .foregroundColor(R0llingTheme.accentPurple)
                 }
+                .accessibilityLabel(isPlayingAudio ? "Παύση ήχου" : "Αναπαραγωγή ήχου")
             } else if let playbackErrorMessage {
                 Text(playbackErrorMessage)
                     .font(.caption)

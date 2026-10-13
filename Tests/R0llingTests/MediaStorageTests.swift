@@ -173,13 +173,13 @@ final class MediaStorageTests: XCTestCase {
     }
 
     func testPathTraversalRejected() async throws {
+        // The `<MediaType folder>/<file>` shape check runs before PathAsfaleia, so a traversal
+        // is reported with the same typed error as every other unsafe media path.
         do {
             _ = try mediaStorage.getMediaFileURL(relativePath: "../Secrets/key.txt")
             XCTFail("Path traversal πρέπει να απορρίπτεται")
         } catch {
-            let ns = error as NSError
-            XCTAssertEqual(ns.domain, PathAsfaleia.errorDomain)
-            XCTAssertEqual(ns.code, PathAsfaleia.kodikosApokleismou)
+            XCTAssertEqual(error as? MediaApothikeusiError, .unsafeRelativePath(relativePath: "../Secrets/key.txt"))
         }
     }
 
@@ -358,7 +358,7 @@ final class MediaStorageTests: XCTestCase {
         )
 
         XCTAssertNil(outputProperties[kCGImagePropertyGPSDictionary as String])
-        XCTAssertNil(outputProperties[kCGImagePropertyExifDictionary as String])
+        assertNoSourceEXIF(outputProperties)
         XCTAssertEqual(outputProperties[kCGImagePropertyOrientation as String] as? Int, 6)
 
         let boundedVisionImage = try ImageMetadataSanitizer.encodeForVision(input as Data)
@@ -368,7 +368,7 @@ final class MediaStorageTests: XCTestCase {
             CGImageSourceCopyPropertiesAtIndex(boundedSource, 0, nil) as? [String: Any]
         )
         XCTAssertNil(boundedProperties[kCGImagePropertyGPSDictionary as String])
-        XCTAssertNil(boundedProperties[kCGImagePropertyExifDictionary as String])
+        assertNoSourceEXIF(boundedProperties)
         XCTAssertLessThanOrEqual(
             boundedProperties[kCGImagePropertyPixelWidth as String] as? Int ?? Int.max,
             ImageMetadataSanitizer.maximumVisionPixelDimension
@@ -414,5 +414,27 @@ final class MediaStorageTests: XCTestCase {
         } catch {
             // Path may still resolve but file gone — OK either way.
         }
+    }
+
+    /// ImageIO's JPEG encoder always writes the colour space and pixel dimensions of the pixels
+    /// it encodes into `{Exif}`; anything else would have been carried over from the source.
+    private func assertNoSourceEXIF(
+        _ properties: [String: Any],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any] else { return }
+        let encoderGenerated: Set<String> = [
+            kCGImagePropertyExifColorSpace as String,
+            kCGImagePropertyExifPixelXDimension as String,
+            kCGImagePropertyExifPixelYDimension as String
+        ]
+        XCTAssertNil(exif[kCGImagePropertyExifUserComment as String], file: file, line: line)
+        XCTAssertTrue(
+            Set(exif.keys).isSubset(of: encoderGenerated),
+            "Source EXIF survived sanitizing: \(exif.keys.sorted())",
+            file: file,
+            line: line
+        )
     }
 }

@@ -21,9 +21,20 @@ def test_theme_bevel_inspired():
         content = f.read()
 
     # Charcoal/slate surfaces, periwinkle and wellness metric colors.
-    for token in ("0x17181C", "0x2A2B32", "0x343640", "0x41434D",
-                  "0xF3BD55", "0xB8E34A", "0x79AFFF", "0x62C99A"):
-        assert token in content, f"Missing Bevel-inspired theme token {token} in Theme.swift"
+    # Values must match the token table in docs/DESIGN.md; update both together.
+    expected_tokens = {
+        "bgPrimary": "0x1F2023",
+        "bgSurface": "0x2E3037",
+        "bgElevated": "0x34363D",
+        "borderSubtle": "0x464850",
+        "accentAmber": "0xF1BD6E",
+        "accentLime": "0xAFD66C",
+        "accentCyan": "0x79AFFF",
+        "statusSuccess": "0x7AC290",
+    }
+    for name, value in expected_tokens.items():
+        declaration = f"static let {name} = Color(hex: {value})"
+        assert declaration in content, f"Theme.swift must declare {name} as {value} (docs/DESIGN.md)"
 
     # Check that in active UI files, there are no active calls to stravaOrange or stravaFlame or .orange
     ui_files = [
@@ -97,10 +108,16 @@ def test_apple_privacy_and_permissions():
         "NSBluetoothPeripheralUsageDescription",
         "NSHealthUpdateUsageDescription",
     ]
+    unavailable_markers = (
+        "δεν είναι διαθέσιμη",
+        "δεν είναι διαθέσιμο",
+        "δεν είναι ακόμη διαθέσιμη",
+        "δεν είναι ακόμη διαθέσιμο",
+    )
     for key in reserved_usage_keys:
         value = info.get(key)
         assert isinstance(value, str) and any(
-            marker in value.lower() for marker in ("δεν είναι διαθέσιμη", "δεν είναι διαθέσιμο")
+            marker in value.lower() for marker in unavailable_markers
         ), f"Reserved capability {key} must be described as unavailable"
 
     # Verify ATS local networking

@@ -224,15 +224,18 @@ public actor RollingBufferService: RollingBufferServiceProtocol {
         var isSimulationPlaceholder = true
 
         if exeiPragmatikoNAL {
-            // A05: απόπειρα πραγματικού remux — σε αποτυχία SPS/PPS πέφτουμε στο Stage-4 placeholder.
+            // A05: απόπειρα πραγματικού remux — μόνο σε ημιτελές stream (SPS/PPS) πέφτουμε στο Stage-4 placeholder.
             do {
                 try await H264AnnexBRemuxer.eksagogiPlayableMP4(
                     samples: clipSamples,
                     destinationURL: tempURL
                 )
                 isSimulationPlaceholder = false
-            } catch {
-                // Preserve task cancellation instead of silently generating a replacement clip.
+            } catch let remuxError as NSError
+                where remuxError.domain == H264AnnexBRemuxer.errorDomain
+                && remuxError.code == H264AnnexBRemuxer.kodikosElleipsisSPSPPS {
+                // Writer, timing, and cancellation errors propagate so real frames are never
+                // silently replaced by a placeholder that would be announced as a saved clip.
                 try Task.checkCancellation()
                 try await PlayableClipExporter.grapsePlayablePlaceholderMP4(
                     durationSeconds: actualDuration,

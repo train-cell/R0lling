@@ -18,9 +18,12 @@ Updated: 2026-10-13
 - SwiftUI, HealthKit, Vision, PhotosUI, AVFoundation, Security, LocalAuthentication, and Apple picker/file APIs appear in the existing sources. The Swift package is not presently a platform-neutral app core.
 - `JournalEntry` and `MediaAttachment` are Codable domain values. `JSONFileStorageService` writes journal schema version 1 with ISO-8601 dates. `BackupRestoreEngine.BackupManifest` also has schema version 1 and includes journal entries, optional Agent memory, and copied media. These are candidate interoperability contracts, not yet validated by a second implementation.
 - Obsidian export is an existing explicit integration. Its conflict handling and selected-vault access remain governed by the current iOS behavior and docs.
-- The field-level rules and cross-client acceptance gate are recorded in [CROSS_PLATFORM_DATA_CONTRACT.md](CROSS_PLATFORM_DATA_CONTRACT.md); no cross-platform implementation is claimed yet.
+- The field-level rules and cross-client acceptance gate are recorded in [CROSS_PLATFORM_DATA_CONTRACT.md](CROSS_PLATFORM_DATA_CONTRACT.md); no cross-platform implementation is claimed yet. As of 2026-10-13 it also records the exact v1 encoding rules read from source (whole-second UTC dates, uppercase UUIDs, path grammar, limits, restore and Obsidian semantics), with a machine-readable profile in [`contracts/r0lling-exchange-v1.schema.json`](contracts/r0lling-exchange-v1.schema.json) that has not yet been validated against app-generated files.
+- Feature scope, honest-unavailability rules, and behavior parity constants for the new clients are in [CROSS_PLATFORM_FEATURE_PARITY.md](CROSS_PLATFORM_FEATURE_PARITY.md); platform designs are in [ANDROID_CLIENT_DESIGN.md](ANDROID_CLIENT_DESIGN.md) and [WINDOWS_CLIENT_DESIGN.md](WINDOWS_CLIENT_DESIGN.md).
 
-## Recommended implementation shape
+## Recommended implementation shape (proposal under evaluation)
+
+The direction below is a proposal, not an approved technical decision. It is evaluated against native-per-platform, .NET MAUI, and Flutter alternatives in [ADR_0001_ANDROID_WINDOWS_CLIENT_STACK.md](ADR_0001_ANDROID_WINDOWS_CLIENT_STACK.md) (status: Proposed). That ADR keeps this direction as the recommendation only if time-boxed spikes pass: Windows accessibility through Java Access Bridge including Narrator, a Windows distribution path the user accepts, iOS-bundle contract conformance, and Android DAT feasibility if glasses are in scope.
 
 Preserve the existing SwiftUI iOS client and its native integrations. Implement Android and Windows as separate clients over a new portable Kotlin domain/data module, with platform-specific adapters at the edges. Kotlin Multiplatform with Compose targets Android and Windows desktop, allowing those two clients to share domain rules and visual tokens without replacing the existing iOS app.
 

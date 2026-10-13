@@ -12,6 +12,7 @@ public struct TodayView: View {
     @State private var isShareComposerPresented = false
     @State private var isDatePickerPresented = false
     @State private var isCameraPermissionConfirmationPresented = false
+    @AppStorage("r0lling.buffer.targetSeconds") private var storedBufferTargetSeconds: Double = 10.0
     @FocusState private var composerIsFocused: Bool
     private let onOpenSettings: () -> Void
     private let onOpenHealth: () -> Void
@@ -38,9 +39,10 @@ public struct TodayView: View {
                                 isStreaming: appState.isStreaming,
                                 isSimulation: appState.isSimulationMode,
                                 bufferDuration: appState.bufferDuration,
+                                targetSeconds: clipTargetSeconds,
                                 onClipTap: {
                                     Task {
-                                        await appState.triggerClip(seconds: 10.0)
+                                        await appState.triggerClip(seconds: clipTargetSeconds)
                                     }
                                 }
                             )
@@ -140,9 +142,10 @@ public struct TodayView: View {
                     bufferDuration: appState.bufferDuration,
                     isStreaming: appState.isStreaming,
                     isSimulation: appState.isSimulationMode,
+                    clipSeconds: clipTargetSeconds,
                     onClipTapped: {
                         Task {
-                            await appState.triggerClip(seconds: 10.0)
+                            await appState.triggerClip(seconds: clipTargetSeconds)
                         }
                     }
                 )
@@ -180,15 +183,17 @@ public struct TodayView: View {
                 .tint(R0llingTheme.accentLavender)
                 .padding(.horizontal, 16)
                 .navigationTitle("Ημερολόγιο")
+                #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
+                #endif
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
+                    ToolbarItem(placement: Self.datePickerLeadingPlacement) {
                         Button("Σήμερα") {
                             appState.selectedDate = Date()
                             isDatePickerPresented = false
                         }
                     }
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: Self.datePickerTrailingPlacement) {
                         Button("Τέλος") { isDatePickerPresented = false }
                     }
                 }
@@ -305,7 +310,7 @@ public struct TodayView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(glassesControlAccessibilityLabel)
-        .accessibilityValue(appState.glassesState.statusDescription)
+        .accessibilityValue(glassesStatusSpokenValue)
         .accessibilityHint(glassesControlAccessibilityHint)
         .disabled(appState.glassesState.isConnectionAttemptInProgress)
         .alert("Άδεια κάμερας γυαλιών", isPresented: $isCameraPermissionConfirmationPresented) {
@@ -331,6 +336,13 @@ public struct TodayView: View {
                 .fill(glassesStatusColor)
                 .frame(width: 7, height: 7)
                 .accessibilityHidden(true)
+            if showsSimulationStreamQualifier {
+                Text("Προσομοίωση ·")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(R0llingTheme.accentAmber)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
             Text(appState.glassesState.statusDescription)
                 .font(.caption2.weight(.semibold))
                 .foregroundColor(R0llingTheme.textSecondary)
@@ -343,7 +355,19 @@ public struct TodayView: View {
         .r0llingBevelSurface(cornerRadius: 17)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Κατάσταση γυαλιών")
-        .accessibilityValue(appState.glassesState.statusDescription)
+        .accessibilityValue(glassesStatusSpokenValue)
+    }
+
+    /// Streaming and paused states do not carry the simulation device name, so the
+    /// simulated buffer stream must not read as live glasses capture.
+    private var showsSimulationStreamQualifier: Bool {
+        appState.isSimulationMode && (appState.glassesState.isLive || appState.glassesState.isPaused)
+    }
+
+    private var glassesStatusSpokenValue: String {
+        showsSimulationStreamQualifier
+            ? "Προσομοίωση, \(appState.glassesState.statusDescription)"
+            : appState.glassesState.statusDescription
     }
 
     private var glassesStatusColor: Color {
@@ -379,6 +403,29 @@ public struct TodayView: View {
 
     private var isSelectedDayToday: Bool {
         Calendar.current.isDateInToday(appState.selectedDate)
+    }
+
+    /// The rolling window chosen in Settings (same key and 5s/10s normalization as the adapter).
+    /// Settings disables the choice while streaming, so it matches the active stream.
+    private var clipTargetSeconds: Double {
+        MetaGlassesAdapter.normalizedBufferTarget(storedBufferTargetSeconds)
+    }
+
+    // Navigation-bar placements are iOS-only; the package also builds for macOS 14.
+    private static var datePickerLeadingPlacement: ToolbarItemPlacement {
+        #if os(iOS)
+        return .navigationBarLeading
+        #else
+        return .cancellationAction
+        #endif
+    }
+
+    private static var datePickerTrailingPlacement: ToolbarItemPlacement {
+        #if os(iOS)
+        return .navigationBarTrailing
+        #else
+        return .confirmationAction
+        #endif
     }
 
     private var selectedDateTitle: String {
@@ -476,7 +523,9 @@ public struct TodayView: View {
                 .tracking(1.2)
 
             Text(isSelectedDayToday
-                ? "Ξεκίνα τη ροή από τα Meta Glasses, σημείωσε μια σκέψη, ή επισύναψε φωτογραφία/βίντεο από Photos."
+                ? (appState.isSimulationMode
+                    ? "Ξεκίνα τη ροή προσομοίωσης γυαλιών, σημείωσε μια σκέψη, ή επισύναψε φωτογραφία/βίντεο από Photos."
+                    : "Ξεκίνα τη ροή από τα Meta Glasses, σημείωσε μια σκέψη, ή επισύναψε φωτογραφία/βίντεο από Photos.")
                 : "Δεν υπάρχουν καταγραφές για αυτή την ημερομηνία. Επέστρεψε στο σήμερα για νέα καταγραφή.")
                 .font(.body)
                 .foregroundColor(R0llingTheme.textSecondary)
@@ -578,6 +627,13 @@ public struct TodayView: View {
         let text = composerText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         composerText = ""
-        Task { await appState.addNote(text: text) }
+        Task {
+            let saved = await appState.addNote(text: text)
+            // Keep the user's words when the journal refused the save (for example a full disk),
+            // unless a new note has already been started in the composer.
+            if !saved && composerText.isEmpty {
+                composerText = text
+            }
+        }
     }
 }

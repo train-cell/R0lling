@@ -92,7 +92,7 @@ public final class DirectAPIConnector: AIConnectorProtocol, @unchecked Sendable 
 
     public func summarizeDay(entries: [JournalEntry]) async throws -> String {
         guard !entries.isEmpty else {
-            return "Δεν υπάρχουν καταγραφές για τη σημερινή ημέρα."
+            return "Δεν υπάρχουν καταγραφές για αυτή την ημέρα."
         }
         let promptText = "Κάνε μια όμορφη, περιεκτική σύνοψη των παραπάνω καταγραφών της ημέρας, τονίζοντας τα σημαντικότερα γεγονότα."
         let payload = AIRequestPayload(prompt: promptText, contextEntries: entries)

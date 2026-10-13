@@ -542,7 +542,7 @@ private struct FitnessActivityTrendChart: View {
 
     private func axisDate(_ date: Date?) -> String {
         guard let date else { return "" }
-        FitnessActivityCalendar.formatted(date, template: "d MMM")
+        return FitnessActivityCalendar.formatted(date, template: "d MMM")
     }
 
     private func point(
