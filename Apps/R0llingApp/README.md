@@ -2,9 +2,11 @@
 
 `Package.swift` defines the reusable `R0lling` Swift package. `project.yml` defines the iOS app target through XcodeGen, `Host/` contains the app entry point, and `Info.plist` contains app metadata and privacy usage descriptions. The generated `.xcodeproj` is not checked in.
 
+`Info.plist` is the source of truth for the target: `project.yml` points `INFOPLIST_FILE` at it and has no XcodeGen `info:` block, because XcodeGen rewrites an `info:` plist on every `xcodegen generate` and would drop the checked-in usage strings, URL scheme, and `MWDAT` keys (changed 2026-10-13; not yet generated or built). `Host/R0llingAppHostScaffold.swift` returns `R0llingApp().body`; the package keeps `AppState` in a root view so this wrapping cannot split the UI and the initial load across two instances.
+
 ## Build the app on macOS
 
-Requirements are an Apple toolchain compatible with the declared iOS 17.2 deployment target, XcodeGen, and an iOS Simulator or device. The repo's CI generates the project and builds both generic iOS and Simulator targets; inspect the CI run to learn which Xcode version actually ran.
+Requirements are Xcode 26.4 or newer (Swift 6.3, required by the Meta DAT 1.0.1 package declared in `Package.swift`) for the iOS 17.2 deployment target, XcodeGen, and an iOS Simulator or device. The repo's CI generates the project and builds both generic iOS and Simulator targets on `macos-26` with the newest available Xcode 26.4+; inspect the CI run to learn which Xcode version actually ran.
 
 ```bash
 cd Apps/R0llingApp
@@ -13,7 +15,7 @@ xcodebuild build -project R0llingApp.xcodeproj -scheme R0llingApp \
   -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO
 ```
 
-To run on a physical device, select a signing team and device in Xcode. This build setup does not imply that the current uncommitted remediation has been built or exercised on an Apple device.
+To run on a physical device, select a signing team and device in Xcode. This build setup does not imply that the current checkout has been built or exercised on an Apple device.
 
 ## Privacy usage descriptions
 
@@ -32,7 +34,7 @@ The current `Info.plist` declares:
 | `NSHealthShareUsageDescription` | Reading five optional HealthKit quantity measurements, sleep intervals, and recorded workouts for the Health and Fitness screens |
 | `NSHealthUpdateUsageDescription` | Reserved for future HealthKit writes; current HealthKit service requests read-only access |
 
-Several usage keys are retained for planned capabilities and do not represent working product flows. This version has no camera capture, Photos-library write, CoreBluetooth glasses transport, clip-audio capture/synchronization, or HealthKit write path. Photos and Files picker imports are implemented; speech notes and HealthKit measurement, sleep, and workout reads are separate implemented paths. The DAT SDK callback/configuration shell is present, but live Meta DAT session and camera behavior remain unavailable and gated. No permission prompt or denial flow has been verified on-device.
+Several usage keys are retained for planned capabilities and do not represent working product flows. This version has no camera capture, Photos-library write, CoreBluetooth glasses transport, clip-audio capture/synchronization, or HealthKit write path. Photos and Files picker imports are implemented; speech notes and HealthKit measurement, sleep, and workout reads are separate implemented paths. The DAT SDK callback/configuration shell is present, but live Meta DAT session and camera behavior remain unavailable and gated. The `MWDAT` dictionary opts out of DAT analytics and SDK crash reporting (`Analytics > OptOut`, `CrashReporting > OptOut` = `true`); the DAT README states both are on when the key is missing. No permission prompt or denial flow has been verified on-device.
 
 ## Disk space
 

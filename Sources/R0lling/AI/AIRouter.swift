@@ -125,7 +125,7 @@ public actor AIRouter {
         case .hermes:
             guard let connector = hermesConnector else {
                 throw AIErrorTaxonomy.makeError(
-                    domain: AIErrorTaxonomy.directDomain,
+                    domain: AIErrorTaxonomy.hermesDomain,
                     code: AIErrorTaxonomy.routerHermesMissing,
                     message: "Ο Hermes Connector δεν είναι αρχικοποιημένος."
                 )

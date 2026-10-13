@@ -89,7 +89,7 @@ public final class HermesConnector: AIConnectorProtocol, @unchecked Sendable {
 
     public func summarizeDay(entries: [JournalEntry]) async throws -> String {
         guard !entries.isEmpty else {
-            return "Δεν υπάρχουν καταγραφές για τη σημερινή ημέρα."
+            return "Δεν υπάρχουν καταγραφές για αυτή την ημέρα."
         }
         let promptText = "Hermes, δημιούργησε την ημερήσια ανασκόπηση των καταγραφών μου."
         let payload = AIRequestPayload(prompt: promptText, contextEntries: entries)

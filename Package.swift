@@ -7,7 +7,8 @@ let package = Package(
     name: "R0lling",
     defaultLocalization: "el",
     platforms: [
-        .iOS(.v17_2),
+        // PackageDescription has no `.v17_2` case; the DAT 1.0.1 binaries target iOS 17.2.
+        .iOS("17.2"),
         .macOS(.v14)
     ],
     products: [

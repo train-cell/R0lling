@@ -50,6 +50,8 @@ public final class AppState: ObservableObject {
     public let timeCapsuleEngine = TimeCapsuleEngine()
     public let streakManager = ScavengerHuntStreakManager()
     public let podcastGenerator = DailyPodcastGenerator()
+    @Published public private(set) var isDailyPodcastActive = false
+    private var dailyPodcastGeneration: UInt64 = 0
     private var pendingVisionTags: [String] = []
     private var pendingVisionNoteID: UUID?
     public let highlightMuxer: HighlightReelMuxer
@@ -435,15 +437,18 @@ public final class AppState: ObservableObject {
             journalCommitted = true
             await refreshEntries()
 
-            await exportEntryToObsidianIfConfigured(entry)
+            let obsidianWarning = await exportEntryToObsidianIfConfigured(entry)
 
             EarconFeedbackService.shared.playEarcon(.clipSaved)
 
             if result.isPlayable {
                 let label = result.isSimulationPlaceholder ? "Simulation Clip" : "Clip"
-                showToast("✂️ Το \(label) (\(String(format: "%.1fs", result.duration))) αποθηκεύτηκε (playable).")
+                showToast(
+                    "✂️ Το \(label) (\(String(format: "%.1fs", result.duration))) αποθηκεύτηκε (playable).",
+                    obsidianWarning: obsidianWarning
+                )
             } else {
-                showToast("⚠️ Clip αποθηκεύτηκε αλλά ΔΕΝ είναι playable.")
+                showToast("⚠️ Clip αποθηκεύτηκε αλλά ΔΕΝ είναι playable.", obsidianWarning: obsidianWarning)
             }
         } catch {
             if !journalCommitted, let attachmentForRollback {
@@ -477,7 +482,9 @@ public final class AppState: ObservableObject {
 
         let detectedTextCues = transcriptKeywordTagger.detectCues(in: text)
         let detectedEntityTags = entityRecognizer.detectEntities(textClues: [text])
-        let mergedTags = Array(Set(tags + detectedTextCues + detectedEntityTags))
+        // Order-preserving dedup: caller tags first, then transcript cues, then entity tags.
+        var seenTags = Set<String>()
+        let mergedTags = (tags + detectedTextCues + detectedEntityTags).filter { seenTags.insert($0).inserted }
 
         let entry = JournalEntry(
             content: text,
@@ -488,8 +495,8 @@ public final class AppState: ObservableObject {
         do {
             try await storage.saveEntry(entry)
             await refreshEntries()
-            await exportEntryToObsidianIfConfigured(entry)
-            showToast("✅ Η σημείωση αποθηκεύτηκε.")
+            let obsidianWarning = await exportEntryToObsidianIfConfigured(entry)
+            showToast("✅ Η σημείωση αποθηκεύτηκε.", obsidianWarning: obsidianWarning)
             return true
         } catch {
             showToast("Σφάλμα αποθήκευσης: \(error.localizedDescription)")
@@ -857,13 +864,15 @@ public final class AppState: ObservableObject {
         lastGameEvaluation = result
     }
 
-    /// Εξαγωγή Obsidian μετά journal save — fail-closed toast αν vault configured αλλά export αποτύχει (CQ-P1-012).
-    /// A09: conflict → toast + δημοσίευση sidecar paths.
+    /// Εξαγωγή Obsidian μετά journal save — fail-closed μήνυμα αν vault configured αλλά export αποτύχει (CQ-P1-012).
+    /// A09: conflict → δημοσίευση sidecar paths. Returns the warning so the caller can show it together with
+    /// its own success message; a separate toast would be replaced immediately by that success toast.
+    @discardableResult
     private func exportEntryToObsidianIfConfigured(
         _ entry: JournalEntry,
         previousEntry: JournalEntry? = nil
-    ) async {
-        guard await obsidianBridge.currentVaultURL != nil else { return }
+    ) async -> String? {
+        guard await obsidianBridge.currentVaultURL != nil else { return nil }
         do {
             let outcome: ObsidianSingleExportResult
             if let previousEntry, previousEntry.dateKey != entry.dateKey {
@@ -878,11 +887,21 @@ public final class AppState: ObservableObject {
             if outcome.hadConflict {
                 let sidecar = outcome.conflictSidecarRelativePath ?? "sidecar"
                 teleutaiaObsidianConflicts = [sidecar]
-                showToast("⚠️ Obsidian conflict — πρωτότυπο ανέπαφο → \(sidecar)")
+                return "⚠️ Obsidian conflict — πρωτότυπο ανέπαφο → \(sidecar)"
             }
+            return nil
         } catch {
-            showToast("⚠️ Journal OK· Obsidian: \(error.localizedDescription)")
+            return "⚠️ Journal OK· Obsidian: \(error.localizedDescription)"
         }
+    }
+
+    /// Shows a success message together with any Obsidian export warning in one toast.
+    private func showToast(_ message: String, obsidianWarning: String?) {
+        guard let obsidianWarning else {
+            showToast(message)
+            return
+        }
+        showToast("\(message)\n\(obsidianWarning)")
     }
 
     /// A08: εφαρμογή vault από iOS Files / document picker (security-scoped bookmark).
@@ -1171,8 +1190,11 @@ public final class AppState: ObservableObject {
             )
             journalCommitted = true
             await refreshEntries()
-            await exportEntryToObsidianIfConfigured(entry)
-            showToast("🎬 Highlight Reel (\(reel.totalClipsIncluded) clips, \(Int(reel.totalDurationSeconds))s) αποθηκεύτηκε στο journal και είναι playable.")
+            let obsidianWarning = await exportEntryToObsidianIfConfigured(entry)
+            showToast(
+                "🎬 Highlight Reel (\(reel.totalClipsIncluded) clips, \(Int(reel.totalDurationSeconds))s) αποθηκεύτηκε στο journal και είναι playable.",
+                obsidianWarning: obsidianWarning
+            )
         } catch {
             if !journalCommitted, let attachmentForRollback {
                 await removeUnreferencedMediaAfterFailedJournalCommit(attachmentForRollback)
@@ -1189,40 +1211,76 @@ public final class AppState: ObservableObject {
         }
         let canvasJSON = canvasGenerator.generateCanvasJSON(
             entries: todayEntries,
-            title: "Σύνοψη \(Date().formattedGreekHeader())"
+            title: "Σύνοψη \(selectedDate.formattedGreekHeader())"
         )
         guard await obsidianBridge.currentVaultURL != nil else {
             showToast("Σφάλμα Canvas: δεν έχει οριστεί Obsidian vault.")
             return
         }
         do {
-            _ = try await obsidianBridge.grapse_arxeio_sto_vault(
+            let writtenURL = try await obsidianBridge.grapse_arxeio_sto_vault(
                 relativePath: "Weekly-Canvas.canvas",
                 contents: canvasJSON
             )
-            showToast("🎨 Obsidian Canvas εξήχθη επιτυχώς!")
+            if writtenURL.lastPathComponent == "Weekly-Canvas.canvas" {
+                showToast("🎨 Obsidian Canvas εξήχθη επιτυχώς!")
+            } else {
+                // The bridge never overwrites an existing different file; report the sidecar honestly.
+                teleutaiaObsidianConflicts = [writtenURL.lastPathComponent]
+                showToast("⚠️ Το Weekly-Canvas.canvas υπήρχε με άλλο περιεχόμενο· το νέο Canvas γράφτηκε στο \(writtenURL.lastPathComponent) χωρίς αντικατάσταση.")
+            }
         } catch {
             showToast("Σφάλμα Canvas: \(error.localizedDescription)")
         }
     }
 
     /// Daily podcast — εμφανίζει σφάλμα αν αποτύχει το summarize (G5-005).
+    /// `isDailyPodcastActive` covers both preparing the summary and speaking it, so the UI can offer stop.
     public func playDailyPodcast() async {
         guard FeatureReadinessRegistry.podcast.ready else {
             showToast("Podcast απενεργοποιημένο.")
             return
         }
+        guard !isDailyPodcastActive else { return }
+        isDailyPodcastActive = true
+        dailyPodcastGeneration &+= 1
+        let generation = dailyPodcastGeneration
+        let entries = todayEntries
         do {
-            let summary = try await aiRouter.summarizeDay(entries: todayEntries)
-            podcastGenerator.playDailyPodcast(summaryText: summary)
-            showToast("🎙️ Αναπαραγωγή Daily Podcast...")
+            let summary = try await aiRouter.summarizeDay(entries: entries)
+            // Stopped while the summary was being prepared: do not start speaking afterwards.
+            guard generation == dailyPodcastGeneration else { return }
+            guard !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                isDailyPodcastActive = false
+                showToast("Σφάλμα Podcast: η σύνοψη επέστρεψε κενή.")
+                return
+            }
+            podcastGenerator.playDailyPodcast(summaryText: summary) { [weak self] in
+                Task { @MainActor [weak self] in
+                    guard let self, self.dailyPodcastGeneration == generation else { return }
+                    self.isDailyPodcastActive = false
+                }
+            }
+            showToast("🎙️ Αναπαραγωγή Daily Podcast..." + daySummaryCoverageNote(entryCount: entries.count))
         } catch {
+            guard generation == dailyPodcastGeneration else { return }
+            isDailyPodcastActive = false
             showToast("Σφάλμα Podcast: \(error.localizedDescription)")
         }
     }
 
     public func stopDailyPodcast() {
+        dailyPodcastGeneration &+= 1
+        isDailyPodcastActive = false
         podcastGenerator.stopPodcast()
+    }
+
+    /// Day summaries send only the newest `OpenAIChatRequestBuilder.maxContextEntries` entries to the
+    /// AI provider; disclose that when the selected day has more, instead of implying full coverage.
+    func daySummaryCoverageNote(entryCount: Int) -> String {
+        let limit = OpenAIChatRequestBuilder.maxContextEntries
+        guard entryCount > limit else { return "" }
+        return "\nΗ σύνοψη βασίζεται στις \(limit) πιο πρόσφατες από τις \(entryCount) καταγραφές της ημέρας."
     }
 
     // MARK: - Mirror (DISABLED μέχρι TLS — ready=false)
@@ -1269,7 +1327,7 @@ public final class AppState: ObservableObject {
         knowledgeGraphEngine.replaceTriples(currentTriples)
         let tripleCount = knowledgeGraphEngine.allTriples.count
         guard tripleCount > 0 else {
-            showToast("Knowledge Graph: καμία σχέση από τις σημερινές καταγραφές.")
+            showToast("Knowledge Graph: καμία σχέση από τις καταγραφές της ημέρας.")
             return
         }
         let mermaidGraph = knowledgeGraphEngine.exportMermaidGraph()
@@ -1279,11 +1337,17 @@ public final class AppState: ObservableObject {
         }
         let doc = "# 🧠 Associative Knowledge Graph\n\n\(mermaidGraph)"
         do {
-            _ = try await obsidianBridge.grapse_arxeio_sto_vault(
+            let writtenURL = try await obsidianBridge.grapse_arxeio_sto_vault(
                 relativePath: "Knowledge-Graph.md",
                 contents: doc
             )
-            showToast("🧠 Knowledge Graph (\(tripleCount) triples) εξήχθη στο Obsidian.")
+            if writtenURL.lastPathComponent == "Knowledge-Graph.md" {
+                showToast("🧠 Knowledge Graph (\(tripleCount) triples) εξήχθη στο Obsidian.")
+            } else {
+                // The bridge never overwrites an existing different file; report the sidecar honestly.
+                teleutaiaObsidianConflicts = [writtenURL.lastPathComponent]
+                showToast("⚠️ Το Knowledge-Graph.md υπήρχε με άλλο περιεχόμενο· το νέο Graph γράφτηκε στο \(writtenURL.lastPathComponent) χωρίς αντικατάσταση.")
+            }
         } catch {
             showToast("Σφάλμα εξαγωγής Graph: \(error.localizedDescription)")
         }
@@ -1322,8 +1386,11 @@ public final class AppState: ObservableObject {
                 pendingNutritionEstimateIsSaved = true
             }
             await refreshEntries()
-            await exportEntryToObsidianIfConfigured(entry)
-            showToast("Η ενδεικτική εκτίμηση γεύματος αποθηκεύτηκε (~\(Int(snapshot.totalCalories)) kcal).")
+            let obsidianWarning = await exportEntryToObsidianIfConfigured(entry)
+            showToast(
+                "Η ενδεικτική εκτίμηση γεύματος αποθηκεύτηκε (~\(Int(snapshot.totalCalories)) kcal).",
+                obsidianWarning: obsidianWarning
+            )
         } catch {
             showToast("Σφάλμα καταγραφής γεύματος: \(error.localizedDescription)")
         }
@@ -1409,8 +1476,8 @@ public final class AppState: ObservableObject {
                 return (previous, current)
             }
             await refreshEntries()
-            await exportEntryToObsidianIfConfigured(updated, previousEntry: previous)
-            showToast("✅ Η καταγραφή ενημερώθηκε.")
+            let obsidianWarning = await exportEntryToObsidianIfConfigured(updated, previousEntry: previous)
+            showToast("✅ Η καταγραφή ενημερώθηκε.", obsidianWarning: obsidianWarning)
         } catch {
             showToast("Σφάλμα επεξεργασίας: \(error.localizedDescription)")
         }
@@ -1447,9 +1514,9 @@ public final class AppState: ObservableObject {
                 return
             }
             await refreshEntries()
-            await exportEntryToObsidianIfConfigured(change.updated, previousEntry: change.previous)
+            let obsidianWarning = await exportEntryToObsidianIfConfigured(change.updated, previousEntry: change.previous)
             let entry = change.updated
-            showToast("✅ Ημερομηνία → \(entry.dateKey)")
+            showToast("✅ Ημερομηνία → \(entry.dateKey)", obsidianWarning: obsidianWarning)
         } catch {
             showToast("Σφάλμα ημερομηνίας: \(error.localizedDescription)")
         }
@@ -1525,8 +1592,8 @@ public final class AppState: ObservableObject {
                 if let entry {
                     journalCommitted = true
                     await refreshEntries()
-                    await exportEntryToObsidianIfConfigured(entry)
-                    showToast("✅ Media επισυνάφθηκε στην καταγραφή.")
+                    let obsidianWarning = await exportEntryToObsidianIfConfigured(entry)
+                    showToast("✅ Media επισυνάφθηκε στην καταγραφή.", obsidianWarning: obsidianWarning)
                     return
                 }
                 throw NSError(domain: "R0lling.Journal", code: 404, userInfo: [
@@ -1549,8 +1616,8 @@ public final class AppState: ObservableObject {
             }
             journalCommitted = true
             await refreshEntries()
-            await exportEntryToObsidianIfConfigured(entry)
-            showToast("✅ \(attachment.mediaType.folderName) αποθηκεύτηκε τοπικά.")
+            let obsidianWarning = await exportEntryToObsidianIfConfigured(entry)
+            showToast("✅ \(attachment.mediaType.folderName) αποθηκεύτηκε τοπικά.", obsidianWarning: obsidianWarning)
         } catch {
             if !journalCommitted {
                 try? await mediaStorage.deleteMediaFile(relativePath: attachment.relativePath)

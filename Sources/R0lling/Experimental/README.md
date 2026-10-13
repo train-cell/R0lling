@@ -13,5 +13,6 @@ The helpers below remain outside product surfaces and are not full product featu
 | `PseudoLexicalVectorSearchEngine.swift` | `pseudoVectorSearch` · ready=false | FNV pseudo-embeddings only; no product caller or CLIP model |
 | `TurnTakingGuard.swift` | `turnTaking` · ready=false | no VAD/microphone feed or speech caller |
 | `ObsidianFileWatcher.swift` | `fileWatcher` · ready=false | AppState status-only recursive directory-entry hint · focused lifecycle/tree tests pass 19/19; Darwin dispatch and Files-provider behavior unverified |
+| `SovereignOSDemoCards.swift` | no registry flag | `ChiefOfStaffCardView` and `DailyPodcastPlayerCard` moved unchanged from `UI/SovereignOSComponents.swift` (2026-10-13). No product caller; they contain sample tasks, a no-op debrief button, and fixed playback position/times, so they must not be shown as product UI. The product task card lives in `UI/ExecutiveUtilityViews.swift`; podcast playback starts from `UI/AssistantView.swift` through `AppState.playDailyPodcast()` and `AI/DailyPodcastGenerator.swift` |
 
 **Policy:** frozen helpers stay out of product surfaces until their documented inputs and acceptance gates exist. The watcher stays Experimental and `ready=false` until its Apple filesystem, security-scope, and UI behavior are verified.

@@ -235,7 +235,7 @@ final class SovereignOSFeaturesTests: XCTestCase {
         XCTAssertEqual(pending[0].confidencePercent, 95)
     }
 
-    func testCognitiveReadinessCalculator() async {
+    func testCognitiveReadinessCalculator() async throws {
         let calc = CognitiveReadinessCalculator()
         let score = await calc.computeTelemetry(entriesCount: 5, deepWorkSeconds: 3600, vocalStressFactor: 1.0)
 
@@ -276,12 +276,13 @@ final class SovereignOSFeaturesTests: XCTestCase {
         let measuredAt = Date(timeIntervalSince1970: 1_800_000_000)
         let metadata = HealthKitReadingMetadata(measuredAt: measuredAt, sourceName: "Apple Watch")
         let temperatureMetadata = HealthKitReadingMetadata(measuredAt: measuredAt, sourceName: "Health app")
+        // Labeled arguments follow the initializer's declaration order.
         let snapshot = HealthKitTelemetrySnapshot(
             hrvMs: 42,
-            hrvMetadata: metadata,
-            bodyTemperatureCelsius: 36.7,
-            bodyTemperatureMetadata: temperatureMetadata,
             sleepQueryFailed: true,
+            bodyTemperatureCelsius: 36.7,
+            hrvMetadata: metadata,
+            bodyTemperatureMetadata: temperatureMetadata,
             queriedAt: measuredAt.addingTimeInterval(600)
         )
 

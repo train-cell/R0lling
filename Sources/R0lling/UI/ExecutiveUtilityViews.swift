@@ -256,7 +256,7 @@ public struct SovereignScratchpadView: View {
                     .foregroundColor(R0llingTheme.textPrimary)
                     .r0llingBevelCapsule()
                 }
-                .disabled(isSaving || noteContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(isSaving || isSaved || noteContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(16)

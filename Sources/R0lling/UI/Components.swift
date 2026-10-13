@@ -275,7 +275,7 @@ public struct TimelineEntryCard: View {
         VStack(alignment: .leading, spacing: 12) {
             // 1. Activity Header (Athlete / Hardware source, Time, Favorite)
             HStack(alignment: .center, spacing: 10) {
-                // Device Avatar with live badge
+                // Source avatar. No status dot: a journal card has no live state to report.
                 ZStack(alignment: .bottomTrailing) {
                     Circle()
                         .fill(R0llingTheme.bgElevated)
@@ -283,11 +283,6 @@ public struct TimelineEntryCard: View {
                     Image(systemName: entry.source.iconName)
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(R0llingTheme.accentPurple)
-
-                    Circle()
-                        .fill(R0llingTheme.bevelEmerald)
-                        .frame(width: 10, height: 10)
-                        .overlay(Circle().stroke(R0llingTheme.bgSurface, lineWidth: 2))
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -303,10 +298,6 @@ public struct TimelineEntryCard: View {
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(R0llingTheme.textSecondary)
                     }
-
-                    Text("POV FIRST-PERSON CAPTURE")
-                        .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                        .foregroundColor(R0llingTheme.textMuted)
                 }
 
                 Spacer()
@@ -409,7 +400,7 @@ public struct TimelineEntryCard: View {
                         Image(systemName: entry.isFavorite ? "heart.fill" : "heart")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundColor(entry.isFavorite ? R0llingTheme.accentPurple : R0llingTheme.textMuted)
-                        Text(entry.isFavorite ? "Favorited" : "Kudos")
+                        Text("Αγαπημένο")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(entry.isFavorite ? R0llingTheme.accentPurple : R0llingTheme.textMuted)
                     }
@@ -420,6 +411,8 @@ public struct TimelineEntryCard: View {
                     .clipShape(Capsule())
                     .r0llingBevelCapsule()
                 }
+                .accessibilityLabel("Αγαπημένο")
+                .accessibilityAddTraits(entry.isFavorite ? .isSelected : [])
             }
             .padding(.top, 4)
         }
@@ -507,7 +500,7 @@ public struct MediaPreviewCard: View {
                             Circle()
                                 .fill(Color.white)
                                 .frame(width: 5, height: 5)
-                            Text(String(format: "00:%02d", Int(dur)))
+                            Text(Self.durationBadgeText(dur))
                                 .font(.system(size: 11, weight: .black, design: .monospaced))
                                 .foregroundColor(.white)
                         }
@@ -656,6 +649,12 @@ public struct MediaPreviewCard: View {
         return "NO RESOLVER"
     }
 
+    /// mm:ss badge; the former fixed "00:%02d" format showed a 75 s clip as "00:75".
+    static func durationBadgeText(_ seconds: Double) -> String {
+        let totalSeconds = seconds.isFinite ? Int(min(max(seconds, 0), 359_999)) : 0
+        return String(format: "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
+    }
+
     private func fortoseMedia() async {
         guard let resolveURL else {
             loadError = nil
@@ -729,6 +728,8 @@ public struct FloatingClipBar: View {
     public let bufferDuration: Double
     public let isStreaming: Bool
     public var isSimulation: Bool = true
+    /// Configured rolling window (5 or 10 s); the export is limited to it.
+    public var clipSeconds: Double = 10.0
     public var onClipTapped: () -> Void
 
     public var body: some View {
@@ -757,7 +758,7 @@ public struct FloatingClipBar: View {
                 HStack(spacing: 8) {
                     Image(systemName: "scissors")
                         .font(.system(size: 15, weight: .black))
-                    Text("CAPTURE 10s")
+                    Text("CAPTURE \(Int(clipSeconds.rounded()))s")
                         .font(.subheadline.weight(.semibold))
                 }
                 .foregroundColor(.white)
@@ -842,6 +843,8 @@ public struct LiveViewfinderCard: View {
     public let isStreaming: Bool
     public var isSimulation: Bool = true
     public let bufferDuration: Double
+    /// Configured rolling window (5 or 10 s) shown next to the buffered duration.
+    public var targetSeconds: Double = 10.0
     public var onClipTap: () -> Void
 
     @State private var scanOffset: CGFloat = -60
@@ -850,11 +853,13 @@ public struct LiveViewfinderCard: View {
         isStreaming: Bool,
         isSimulation: Bool = true,
         bufferDuration: Double,
+        targetSeconds: Double = 10.0,
         onClipTap: @escaping () -> Void
     ) {
         self.isStreaming = isStreaming
         self.isSimulation = isSimulation
         self.bufferDuration = bufferDuration
+        self.targetSeconds = targetSeconds
         self.onClipTap = onClipTap
     }
 
@@ -896,7 +901,7 @@ public struct LiveViewfinderCard: View {
                         .font(.system(size: 11, weight: .heavy, design: .monospaced))
                         .foregroundColor(R0llingTheme.textPrimary)
 
-                    Text("Κυκλική αποθήκευση: \(String(format: "%.1fs", bufferDuration)) / 10.0s")
+                    Text("Κυκλική αποθήκευση: \(String(format: "%.1fs", bufferDuration)) / \(String(format: "%.1fs", targetSeconds))")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(R0llingTheme.accentLavender)
                 }
@@ -1149,6 +1154,7 @@ public struct MediaViewerSheet: View {
                         .font(.system(size: 54))
                         .foregroundColor(R0llingTheme.accentPurple)
                 }
+                .accessibilityLabel(isPlayingAudio ? "Παύση ήχου" : "Αναπαραγωγή ήχου")
             } else if let playbackErrorMessage {
                 Text(playbackErrorMessage)
                     .font(.caption)

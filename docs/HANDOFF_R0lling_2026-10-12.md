@@ -6,14 +6,100 @@ last_modified: 2026-10-13
 # R0lling — Current Handoff
 
 Updated: 2026-10-13
-Repository: C:\Users\skyd3\antigarvity\R0lling
-Bevel references: C:\Users\skyd3\antigarvity\ui understanding
-Branch before checkpoint commit: main
-Base HEAD before checkpoint commit: b614db961ad9916d7536d37eb23fd12eb243e2ff (origin/main; 0 ahead / 0 behind)
+Repository: train-cell/R0lling (the user's Windows checkout is `C:\Users\skyd3\antigarvity\R0lling`)
+Bevel references: `C:\Users\skyd3\antigarvity\ui understanding` (external; the screenshots are not in the repository)
+Current base: pushed `main` = `origin/main` = `b29429b6d24051ee2d4f4b52e793f9c5b0748932` ("Continue R0lling UI and platform handoff"), which contains the earlier `93f6833` checkpoint and its follow-ups.
+Latest continuation: cloud session on branch `claude/beautiful-cannon-6bot68`, fast-forwarded to `b29429b`. Its edits are uncommitted until the user asks for a commit (see the next section).
 Git author configured for the requested account: train-cell (email intentionally omitted here).
-No push was requested or made.
 
 This current-state snapshot supersedes stale next-step and no-commit instructions in [HANDOFF_R0lling_2026-10-11.md](HANDOFF_R0lling_2026-10-11.md). That file remains useful as a dated styling history.
+
+## Cloud continuation from pushed main (2026-10-13, latest)
+
+**Environment.** Claude Code cloud container, clone of `train-cell/R0lling`. It started on branch `claude/beautiful-cannon-6bot68` at `b614db9`, which was clean. After `git fetch origin main` the branch was fast-forwarded (`--ff-only`, no reset or commit) to the pushed `main`, `b29429b6d24051ee2d4f4b52e793f9c5b0748932`. The full status was then clean: no modified, untracked, or ignored files, and no stash.
+
+**Uncommitted.** All edits from this continuation are uncommitted in that container's working tree; `git status --short` lists them, and `git diff --check` is clean. A safety patch of the full working-tree diff against `b29429b` was delivered to the user in the session, because the user has not yet authorized a commit. Following the standing instruction, no commit, push, reset, clean, or stash was made. The container is ephemeral, so the work persists only if the user asks for it to be committed and pushed, to this branch or to `main`.
+
+**Evidence read (not re-run).**
+- Hosted run 38415047820 on `b29429b`:
+  - `python-verify` failed on the stale theme-token assertion `0x17181C`;
+  - `build-and-test` failed in the first portable harness (`'Task' is only available in macOS 10.15 or newer`), so `swift build` and `swift test` never ran.
+- Run 38173016590 on `b614db9` failed the same way.
+- The workflow also selected Xcode 16 on the deprecated `macos-14` image, while `Package.swift` now requires swift-tools 6.3.
+
+**Changes.**
+- **`verification/verify_theme_apple_meta_compliance.py`:** checks the `DESIGN.md` token=value pairs and accepts «δεν είναι ακόμη διαθέσιμη».
+- **`verification/verify_ui_source_contracts.py`:** Fitness 44pt cells with a centered scroller, separate wrapping date row, flat category fills without stroke/shadow, 62.5%/14% preview over the checkerboard, and only the monochrome artwork without the raised surface. All markers were checked statically against the source.
+- **19 `verification/run_*.sh` harness manifests:** each now declares `platforms: [.macOS(.v14)]`.
+- **`.github/workflows/swift-ci.yml`:**
+  - new `portable-harnesses` job on `ubuntu-latest` with container `swift:6.1` plus `python3`;
+  - `build-and-test` and `package-ios-app` on `macos-26`, with fail-closed Xcode 26.6/26.5/26.4.1/26.4 selection;
+  - the IPA job needs all three other jobs.
+- **`Sources/R0lling/UI/Components.swift`:** VoiceOver label on the audio attachment play/pause button.
+- **`Sources/R0lling/UI/SovereignOSComponents.swift` → `Sources/R0lling/Experimental/SovereignOSDemoCards.swift`:** the zero-caller `ChiefOfStaffCardView` and `DailyPodcastPlayerCard` were moved byte-identical; `Sources/R0lling/Experimental/README.md` was updated.
+- **Cross-platform design (documentation only):**
+  - `docs/CROSS_PLATFORM_DATA_CONTRACT.md`: exact v1 rules;
+  - `docs/contracts/r0lling-exchange-v1.schema.json`;
+  - `docs/CROSS_PLATFORM_FEATURE_PARITY.md`;
+  - `docs/ADR_0001_ANDROID_WINDOWS_CLIENT_STACK.md` (Proposed);
+  - `docs/ANDROID_CLIENT_DESIGN.md`;
+  - `docs/WINDOWS_CLIENT_DESIGN.md`.
+- **Status and documentation sync:** README.md, Apps/R0llingApp/README.md, verification/README.md, IMPLEMENTATION_STATUS, AUDIT_VERIFICATION, GOAL_100_PROGRESS, GOAL_100_FEATURE_MATRIX, CAPABILITY_MATRIX, DEVICE_TESTS, DECISIONS (§7 and the Light/System note), MULTIPLATFORM_ROADMAP, and this handoff.
+
+**Second pass after the full re-read (uncommitted, not compiled).** The user asked for a full re-read and a status verdict. Review agents covered the documentation, source gaps, and compile risk, and the hosted logs were re-read. Hosted run 37957186872 on `46fe025` was the last run to reach `swift build`; it failed to compile, and those errors were still present because later runs stopped before the build. No commit from `82c4c0e` onward has compiled. Fixed in source, each checked against repository declarations or official sources:
+- **Compile errors:**
+  - `Package.swift`: `.iOS(.v17_2)` does not exist in PackageDescription 6.3 → `.iOS("17.2")`;
+  - `Core/EncryptedDiaryStore.swift`: two missing `return`s;
+  - `UI/DecisionJournalCardView.swift`: undeclared `typeScale`;
+  - macOS-unavailable navigation-bar API in `UI/TodayView.swift` and `UI/TodayShareComposerView.swift`, now under `#if os(iOS)`;
+  - DAT path: actor-isolated mutating iterator call in `Glasses/MetaDATStreamBridge.swift` and the non-existent `kCMBlockBufferBadPointerErr` in `Glasses/MetaDATH264Encoder.swift`;
+  - `UI/TodayShareComposerView.swift`: the non-existent `.accessibilityLiveRegion` (now a VoiceOver announcement) and an invalid `.frame(width:minHeight:)`;
+  - `UI/FitnessView.swift` missing `return`; `Buffer/HighlightReelMuxer.swift` missing `otherRange:` label;
+  - `Tests/R0llingTests/SovereignOSFeaturesTests.swift`: `try` in a non-throwing test and out-of-order labeled arguments;
+  - Linux CI probe `run_glasses_connection_cancellation_probe.sh`: stale DAT bridge stub.
+- **App configuration:**
+  - the XcodeGen `info:` block, which would rewrite `Apps/R0llingApp/Info.plist` on every `xcodegen generate`, was removed;
+  - `AppState` now lives in a root view, because the host's `R0llingApp().body` never installed the `@StateObject`;
+  - `Wearables.configure()` runs once per process;
+  - DAT analytics and crash-reporting opt-outs were added to `Info.plist`.
+- **Behavior and honesty:**
+  - simulation status labels and no simulated battery;
+  - journal card captions;
+  - Obsidian export warnings and sidecar names;
+  - composer and scratchpad saves;
+  - the clip placeholder only for missing SPS/PPS;
+  - deterministic OCR and tag order, with whole-word English entity cues;
+  - podcast stop and summary-coverage disclosure;
+  - selected-day wording and the Canvas date;
+  - denied-microphone error 8002;
+  - Photos display names;
+  - mm:ss duration badge;
+  - clip button and viewfinder labels follow the 5s/10s buffer setting.
+
+Details and remaining recorded items are in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md#second-pass-after-the-full-repository-review-2026-10-13-uncommitted-not-compiled); new device checks are DEV-13, DEV-14, and DEV-UI-09…13 in [DEVICE_TESTS.md](DEVICE_TESTS.md).
+
+**Checks performed (syntax and consistency only, not tests):**
+- `ast.parse` of the two edited guards;
+- `bash -n` of every runner;
+- a check that all 127 runner-referenced source paths exist;
+- workflow YAML parse;
+- schema JSON parse with internal `$ref` resolution;
+- byte comparison of the moved Swift blocks.
+- `plistlib` parse of the edited `Info.plist`;
+- heuristic scans of all Swift sources for unguarded iOS-only SwiftUI/UIKit API and for multi-statement bodies without `return`.
+
+No test, build, Swift compile, or Apple render was run.
+
+**Open and user-owned items:**
+- push/commit decision;
+- first green hosted CI on `macos-26`, and fixing whatever the first real Apple build reports;
+- Apple full XCTest;
+- device and rendered Bevel review;
+- answers to the decision questions: ADR 0001 stack, Dynamic Type pass on Vault/Decision Journal/shared components, two sub-44pt text buttons, `processing` background mode without BGTask identifiers, DECISIONS Light/System versus forced dark, Android OS-backup inclusion, Windows Health/Fitness visibility, porting of prototype cards; DAT analytics/crash-reporting opt-out (set to opt out); the 56pt clip button; video-only clips versus AAC and a visible no-audio indication; the orphan helper/UI types.
+
+## Historical session log (pre-push `93f6833` worktree; superseded)
+
+The sections from here to the end were written in the user's Windows checkout before `93f6833` and its follow-ups were pushed as `b29429b`. Their source-change descriptions remain accurate for `b29429b`. Their HEAD, worktree, uncommitted, and no-push statements are historical. The current state is in the section above and in [AUDIT_VERIFICATION.md](AUDIT_VERIFICATION.md). The **Pending** checklist below is the one exception and is kept current.
 
 ## Fresh-session review and next step (2026-10-13)
 
@@ -91,8 +177,10 @@ Tracked paths changed: README.md; Sources/R0lling/AI/AIHTTPClient.swift; Sources
 
 New handoff artifacts: docs/HANDOFF_R0lling_2026-10-11.md (existing untracked context artifact) and this file.
 
-## Pending
+## Pending (maintained)
 
+- [ ] User: decide whether to commit/push the 2026-10-13 cloud continuation, then observe the first hosted CI run on `macos-26` and the Linux harness job.
+- [ ] User: decide ADR 0001 (Android/Windows stack) or approve its spikes.
 - [ ] User: run the intended functional checks and Apple build.
 - [ ] User: render the affected screens on Apple Simulator/device and compare against the matching Bevel screenshots.
 - [ ] User: inspect Dynamic Type, clipping/layout, touch targets, VoiceOver, and export/share visuals.

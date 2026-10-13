@@ -3,6 +3,7 @@ import SwiftUI
 /// Private 90-day decision journal backed by the encrypted local vault.
 public struct DecisionJournalCardView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @ScaledMetric(relativeTo: .body) private var typeScale: CGFloat = 1
     @State private var isUnlocked = false
     @State private var isAuthenticating = false
     @State private var isWorking = false

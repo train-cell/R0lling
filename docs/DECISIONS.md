@@ -35,6 +35,7 @@
 | **Background capture promise** | `promisesContinuousBackgroundCapture = false` default | Μέχρι εμπειρικό DAT proof στο device. |
 | **Acoustic/IMU product** | Simulation-only sample plumbing · `FeatureReadinessRegistry.*.ready = false` | DAT exposes experimental camera PCM audio and `MWDATMotion`; neither is linked/wired in R0lling. Motion needs Developer Center capability approval and production publication is not currently supported. Before DAT audio permission is requested, revise the current voice-notes-only `NSMicrophoneUsageDescription` to disclose glasses camera-audio processing. Implement source mapping, app flow, and verify real callbacks on a device before changing readiness. |
 | **DAT implementation guide** | `docs/LANE_CLIP_META.md` | Προαπαιτούνται συμβατό toolchain, πραγματικό bridge/feed και device proof· το guide δεν είναι οδηγία ενεργοποίησης flags. |
+| **DAT analytics / crash reporting (2026-10-13)** | `MWDAT > Analytics > OptOut` και `MWDAT > CrashReporting > OptOut` = `true` στο `Apps/R0llingApp/Info.plist` | Το README του DAT 1.0.1 ορίζει ότι και τα δύο είναι ενεργά όταν λείπει το κλειδί· η απενεργοποίηση ευθυγραμμίζεται με την τοπική φύλαξη δεδομένων. Το ίδιο README σημειώνει ότι, με ενεργές τις Meta integrations, η Meta μπορεί να συλλέγει πληροφορίες για την επικοινωνία των συσκευών της με την εφαρμογή· τα δύο κλειδιά είναι ο τεκμηριωμένος τρόπος περιορισμού. Δεν έχει επαληθευτεί σε build· ο χρήστης μπορεί να το αναθεωρήσει. |
 
 ---
 
@@ -42,7 +43,7 @@
 
 | Απόφαση | Τιμή | Αιτιολόγηση |
 |---|---|---|
-| **A10 SW ready** | Adapters + Keychain + SEC-004/007 + empty-key 7004/7104 = **software-complete** | Live HTTPS/LAN credentials = **DEV** proof, όχι SW blocker. |
+| **A10 SW ready** | Adapters + Keychain + SEC-004/007 + empty-key 7004/7104 = **software-complete** (ορισμός DoD, όχι δήλωση επαλήθευσης· XCTest/Apple build και live proof εκκρεμούν, βλ. `GOAL_100_FEATURE_MATRIX.md`) | Live HTTPS/LAN credentials = **DEV** proof, όχι SW blocker. |
 | **A11/A12 SW ready** | Path + OCR/keyword + fail-closed empty = SW · live vision/AI reply = DEV | Honesty: UI δεν ισχυρίζεται live χωρίς key. |
 | **A13 SW ready** | AgentFolderManager + PathAsfaleia + empty templates (CQ-P0-001) | Device Files accept/export = DEV. |
 | **No silent failover** | Provider switch manual only | Plan A10 — χωρίς κρυφή εναλλαγή Direct↔Hermes. |
@@ -81,3 +82,22 @@
 | **Split Journal/Clip/Assistant/Experimental** | **DEFERRED** μέχρι soft-GO (πράσινο `swift test`) | Μεγάλο refactor · regression risk · Karpathy surgical. |
 | **Orphan holds** | **CLOSED** | Spatial/Metal/Watermark δεν κρατιούνται στο AppState. Ο FileWatcher κρατιέται μόνο για status hint στο Settings· παραμένει `ready=false` και δεν κάνει import/sync. |
 | **Gate** | `FeatureReadinessRegistry` | Πηγή αλήθειας για product actions· ένα `ready=false` feature μπορεί να έχει μόνο ρητό diagnostic/status surface. |
+
+---
+
+## 7. Cross-platform clients (2026-10-13)
+
+| Απόφαση | Τιμή | Αιτιολόγηση |
+|---|---|---|
+| **iOS client** | Παραμένει native SwiftUI και πηγή αλήθειας για τη v1 συμπεριφορά | Επιβεβαιωμένη κατεύθυνση χρήστη· βλ. `MULTIPLATFORM_ROADMAP.md`. |
+| **Android / Windows stack** | **Εκκρεμεί απόφαση χρήστη.** Το KMP/Compose είναι πρόταση υπό αξιολόγηση στο `ADR_0001_ANDROID_WINDOWS_CLIENT_STACK.md` (status: Proposed), με spike gates για Windows accessibility (Narrator μέσω Java Access Bridge), διανομή Windows, contract conformance και Android DAT | Ο χρήστης ζήτησε αξιολόγηση, όχι προεγκεκριμένη επιλογή. |
+| **Ανταλλαγή δεδομένων** | Μόνο ρητό backup bundle και Obsidian export· κανένα αυτόματο sync· v1 shapes αμετάβλητα | `CROSS_PLATFORM_DATA_CONTRACT.md` και `contracts/r0lling-exchange-v1.schema.json`. |
+| **Prototype/sample cards** | Εκτός αρχικού scope των νέων clients μέχρι ρητή απόφαση | Δεν φέρουν δεδομένα χρήστη· στο iOS οι prototype/sample κάρτες είναι σημασμένες ως προεπισκοπήσεις, ενώ οι Experimental demo cards δεν εμφανίζονται καθόλου. |
+
+**Σημείωση συνέπειας (2026-10-13):** Η γραμμή «Αισθητική» της §1 αναφέρει επιλογές Light / System, αλλά ο τρέχων κώδικας εφαρμόζει `.preferredColorScheme(.dark)` στη ρίζα της εφαρμογής (`Sources/R0lling/App/R0llingApp.swift`) και δεν υπάρχει ρύθμιση θέματος. Οι επιλογές Light/System δεν είναι υλοποιημένες· οποιαδήποτε υλοποίηση απαιτεί ρητή απόφαση και light-mode tokens. Επίσης στην §1:
+- **Χρώματα:** τα `#16161D` / `#7742DC` έχουν αντικατασταθεί από τα tokens του [DESIGN.md](DESIGN.md) (`bgPrimary` `#1F2023`, `accentPurple` `#7068E8`).
+- **Αποθήκευση δεδομένων:** η κύρια αποθήκευση είναι το JSON v1 `journal_v1.json` ([CROSS_PLATFORM_DATA_CONTRACT.md](CROSS_PLATFORM_DATA_CONTRACT.md)), όχι SQLite/SwiftData.
+- **Αρχικό `.m4a`:** η επιλογή αποθήκευσης του αρχικού ήχου στις φωνητικές σημειώσεις δεν υλοποιείται· το `m4a` υπάρχει μόνο ως τύπος εισαγωγής ήχου.
+- **«100% αξιοπιστία»:** η φράση για το κουμπί `Clip` είναι στόχος σχεδιασμού, όχι μετρημένο αποτέλεσμα.
+- **Ύψος κουμπιού `Clip`:** το κουμπί «CAPTURE 10s» του `FloatingClipBar` (`Sources/R0lling/UI/Components.swift`) έχει κείμενο `subheadline` με 14pt κάθετο padding, δηλαδή περίπου 48pt ύψος (υπολογισμός από τον κώδικα, όχι μέτρηση σε render), και εμφανίζεται μόνο όσο υπάρχει ενεργή ροή στη σημερινή ημέρα. Το ελάχιστο 56pt της §1 δεν επιβάλλεται ρητά· η αλλαγή μεγέθους είναι οπτική απόφαση που εκκρεμεί για τον χρήστη. Από 2026-10-13 το κείμενο του κουμπιού και του viewfinder ακολουθεί τη ρύθμιση buffer (5s/10s).
+- **Ήχος AAC στα clips:** δεν υλοποιείται. Και οι δύο διαδρομές εξαγωγής γράφουν MP4 μόνο με βίντεο και δηλώνουν `hasAudio: false` (`RollingBufferService.triggerClip`)· τα audio samples του buffer δεν γίνονται mux. Η «σαφής ένδειξη» για clip χωρίς ήχο δεν εμφανίζεται ακόμη στο UI.

@@ -74,6 +74,14 @@ The package now pins `meta-wearables-dat-ios` 1.0.1 and conditionally links `MWD
 5. `diavaseEpomenoIMU()` — αν εκτίθεται head tracking / IMU.
 6. kleiseLiveSession() stops the child camera, cancels listener tokens, flushes the encoder, and finishes the frame queue before stopping/releasing the owned DeviceSession; verify teardown ordering and callbacks on device.
 
+**Static review findings (2026-10-13; not compiled, not run).** A review of this path against the DAT 1.0.1 `.swiftinterface` files found two compile errors, now fixed in source: the frame reader called the mutating async `next()` directly on its actor-isolated iterator, and the encoder returned the non-existent `kCMBlockBufferBadPointerErr`. Every other DAT API used matched 1.0.1. Remaining runtime risks, all behind the closed live gate, to settle before enabling it:
+- The encoder fails on any frame size other than 504×896, while Meta's camera guide says the SDK lowers resolution before frame rate under bandwidth pressure; scaling to the fixed size would keep one SPS/PPS per clip.
+- The frame queue holds 2 frames and the encoder allows 2 in flight; a dropped frame is fatal, `kVTCompressionPropertyKey_MaxFrameDelayCount` is not set, and `reconnectAttempts` resets only on connect.
+- Each stream-state callback starts its own task for the start gate, so state delivery order is not guaranteed; an initial `.stopped` processed after `.starting` would fail the start.
+- `stopCameraStream(failureMessage:)` resolves the start gate with `CancellationError`, so a stream error during start (for example a denied permission) reaches the user as a cancellation.
+- A frame queued after `finish()` reports a session-creation error after a normal stop.
+- The encoder file is compiled under `os(iOS) && canImport(VideoToolbox)…`, while the bridge uses it under `canImport(MWDATCore) && canImport(MWDATCamera)`; both hold on iOS, but the conditions differ.
+
 ### Βήμα 3 — Open real mode only after bridge and evidence
 ```swift
 await glassesAdapter.toggleSimulationMode(enabled: false)
@@ -105,7 +113,7 @@ try await glassesAdapter.startStreaming()
 
 **GHA (προτιμητέο):**
 1. GitHub → Actions → `R0lling CI (Cloud macOS)` → Run workflow (ή push `main`).
-2. Πράσινο: `python-verify` + `build-and-test`.
+2. Πράσινο: `python-verify` + `portable-harnesses` + `build-and-test` (και το `package-ios-app` που εξαρτάται από αυτά).
 3. Artifact `swift-build-and-test-logs` → HANDOFF line.
 4. Λεπτομέρειες: `docs/DEVICE_TESTS.md` §3.
 

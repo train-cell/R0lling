@@ -553,7 +553,11 @@ private actor MetaDATVideoFrameReader {
     }
 
     func next() async throws -> BufferedSample? {
-        try await iterator.next()
+        // A mutating async call cannot take actor-isolated storage inout, so advance a local copy.
+        // The iterator only wraps the shared stream storage, and this actor is its single consumer.
+        var currentIterator = iterator
+        defer { iterator = currentIterator }
+        return try await currentIterator.next()
     }
 }
 
@@ -583,7 +587,7 @@ private actor MetaDATStreamStartGate {
         if didStart { return }
         if let failure { throw failure }
         try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 guard waiter == nil else {
                     continuation.resume(throwing: makeFailure("Υπάρχει ήδη αναμονή για εκκίνηση DAT camera stream."))
                     return

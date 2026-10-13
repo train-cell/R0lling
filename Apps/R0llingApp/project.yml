@@ -32,8 +32,7 @@ targets:
       TARGETED_DEVICE_FAMILY: "1,2"
       GENERATE_INFOPLIST_FILE: NO
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-    info:
-      path: Info.plist
-      properties:
-        UILaunchScreen: {}
+    # No `info:` block: XcodeGen would regenerate Info.plist from it on every
+    # `xcodegen generate`, dropping the checked-in usage strings, URL scheme and MWDAT keys.
+    # INFOPLIST_FILE above points the target at the checked-in file instead.
 

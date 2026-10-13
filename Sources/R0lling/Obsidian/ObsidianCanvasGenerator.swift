@@ -33,12 +33,16 @@ public struct ObsidianCanvasGenerator: Sendable {
         var nodes: [CanvasNode] = []
         var edges: [CanvasEdge] = []
 
-        // Κεντρικός κόμβος τίτλου
+        // Κεντρικός κόμβος τίτλου· δηλώνει ρητά όταν εμφανίζεται μόνο μέρος των καταγραφών.
         let centerID = "center-node"
+        let shownEntryCount = min(entries.count, 12)
+        let countText = entries.count > shownEntryCount
+            ? "Σύνολο καταγραφών: \(entries.count) · εμφανίζονται οι πρώτες \(shownEntryCount)"
+            : "Σύνολο καταγραφών: \(entries.count)"
         nodes.append(CanvasNode(
             id: centerID,
             type: "text",
-            text: "# \(title)\n\nΣύνολο καταγραφών: \(entries.count)",
+            text: "# \(title)\n\n\(countText)",
             file: nil,
             x: 0,
             y: 0,

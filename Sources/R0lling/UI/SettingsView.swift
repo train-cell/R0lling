@@ -27,6 +27,14 @@ public struct SettingsView: View {
     @State private var deixeiEpilogiBackup: Bool = false
     @State private var emfaniseEksagogiBackup: Bool = false
 
+    /// A simulated buffer stream must not read as live glasses capture.
+    private var glassesStatusText: String {
+        let status = appState.glassesState.statusDescription
+        let isSimulatedStream = appState.isSimulationMode
+            && (appState.glassesState.isLive || appState.glassesState.isPaused)
+        return isSimulatedStream ? "Προσομοίωση · \(status)" : status
+    }
+
     public var body: some View {
         NavigationView {
             Form {
@@ -35,8 +43,8 @@ public struct SettingsView: View {
                     HStack {
                         Text("Κατάσταση:")
                         Spacer()
-                        Text(appState.glassesState.statusDescription)
-                            .foregroundColor(appState.glassesState.isLive ? R0llingTheme.statusLive : R0llingTheme.accentLavender)
+                        Text(glassesStatusText)
+                            .foregroundColor(appState.glassesState.isLive && !appState.isSimulationMode ? R0llingTheme.statusLive : R0llingTheme.accentLavender)
                             .bold()
                     }
 

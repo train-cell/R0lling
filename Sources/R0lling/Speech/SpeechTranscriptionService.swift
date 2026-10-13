@@ -52,6 +52,7 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
         guard !isListening else { return }
 
         try ensureSpeechAuthorized()
+        try ensureMicrophoneNotDenied()
         try configureAudioSession()
 
         let primary = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier))
@@ -201,6 +202,21 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
                 userInfo: [NSLocalizedDescriptionKey: "Άγνωστη κατάσταση άδειας ομιλίας."]
             )
         }
+    }
+
+    /// A16: with record permission denied the input node only delivers silence, so dictation would
+    /// look active while hearing nothing. An undetermined permission is left to the system prompt
+    /// that iOS shows when the record session first uses the input route.
+    private func ensureMicrophoneNotDenied() throws {
+        #if os(iOS)
+        if AVAudioApplication.shared.recordPermission == .denied {
+            throw AppErrorTaxonomy.makeError(
+                domain: AppErrorTaxonomy.permissionDomain,
+                code: AppErrorTaxonomy.permissionMicrophoneDenied,
+                message: "Δεν υπάρχει άδεια μικροφώνου. Ενεργοποίησέ την στις Ρυθμίσεις."
+            )
+        }
+        #endif
     }
 
     private func configureAudioSession() throws {

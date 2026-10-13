@@ -34,7 +34,7 @@ public actor HighlightReelMuxer {
             throw NSError(
                 domain: "R0lling.HighlightReel",
                 code: 3101,
-                userInfo: [NSLocalizedDescriptionKey: "Δεν βρέθηκαν clips για τη σημερινή ημέρα."]
+                userInfo: [NSLocalizedDescriptionKey: "Δεν βρέθηκαν clips για αυτή την ημέρα."]
             )
         }
 
@@ -85,7 +85,7 @@ public actor HighlightReelMuxer {
             try compositionVideo.insertTimeRange(timeRange, of: sourceVideo, at: cursor)
 
             if let sourceAudio = asset.tracks(withMediaType: .audio).first {
-                let audioRange = CMTimeRangeGetIntersection(timeRange, sourceAudio.timeRange)
+                let audioRange = CMTimeRangeGetIntersection(timeRange, otherRange: sourceAudio.timeRange)
                 guard audioRange.isValid && audioRange.duration.isNumeric && audioRange.duration.seconds > 0 else {
                     throw NSError(domain: "R0lling.HighlightReel", code: 3112, userInfo: [
                         NSLocalizedDescriptionKey: "Το audio track δεν επικαλύπτεται με το video clip: \(att.relativePath)"

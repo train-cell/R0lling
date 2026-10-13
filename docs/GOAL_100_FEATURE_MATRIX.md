@@ -1,21 +1,22 @@
-> Snapshot updated 2026-10-10: this matrix preserves historical assertions and design targets; the rows below are not a verified report of the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md), [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md), and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md) for current evidence. Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+> Snapshot banner from 2026-10-10 (P0, Wave-B/C, and pointer sections were refreshed 2026-10-13): this matrix preserves historical assertions and design targets; the rows below are not a verified report of the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md), [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md), and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md) for current evidence. Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
 
 # R0lling — GOAL 100% Feature Matrix (DoD)
 
 ```yaml
-Last_Modified: 2026-10-10
+Last_Modified: 2026-10-13
 role: integrator-orchestrator
-current_authority: [docs/IMPLEMENTATION_STATUS.md, docs/CAPABILITY_MATRIX.md, docs/FINDINGS_REMEDIATION.md]
+current_authority: [docs/IMPLEMENTATION_STATUS.md, docs/CAPABILITY_MATRIX.md, docs/FINDINGS_REMEDIATION.md, docs/AUDIT_VERIFICATION.md]
 historical_audit_snapshot: docs/AUDIT_FINAL.md
-plan: R0lling-Project-Plan.md §12 A01–A16
+plan: R0lling-Project-Plan.md §12 A01–A16 (external plan document; not in this repository)
 policy: source presence ≠ feature verification · no completion percentage without runtime evidence
-base_HEAD: 46fe0253a981071595fdcf9257791c9536b701e5
-remediation_commit: NONE (local working tree is uncommitted)
+base_HEAD: b29429b6d24051ee2d4f4b52e793f9c5b0748932 (pushed origin/main)
+remediation_commit: b29429b contains the 93f6833 checkpoint; the 2026-10-13 cloud continuation (CI/guard fixes, cross-platform design docs) is uncommitted
+cross_platform_gates: docs/MULTIPLATFORM_ROADMAP.md · docs/ADR_0001_ANDROID_WINDOWS_CLIENT_STACK.md (Proposed) · Android/Windows clients are design-only
 ```
 
 **Σκοπός:** Acceptance checklist και source inventory. A listed implementation path is not a claim that its feature passed tests or works on a device.
 
-**Current UI follow-up (2026-10-10):** Today share is wired to a Bevel-inspired image composer (`TodayShareComposerView`) with ring-based cards, rotating coverage of all available HealthKit readings, customization, and PNG save/copy/share actions. The square preview respects available height; the second default Overview card uses the monochrome treatment in `IMG_0480`, and custom monochrome palette selection remains available. The source contract covers these rules; Apple build, export/share interaction, and rendered `IMG_0479`/`IMG_0480` comparison are still pending. This does not change any A-ID or readiness count.
+**UI follow-up (2026-10-10, historical):** Today share is wired to a Bevel-inspired image composer (`TodayShareComposerView`) with ring-based cards, rotating coverage of all available HealthKit readings, customization, and PNG save/copy/share actions. The square preview respects available height; the second default Overview card uses the monochrome treatment in `IMG_0480`, and custom monochrome palette selection remains available. The source contract covers these rules; Apple build, export/share interaction, and rendered `IMG_0479`/`IMG_0480` comparison are still pending. This does not change any A-ID or readiness count.
 
 **Legend readiness**
 
@@ -45,7 +46,7 @@ remediation_commit: NONE (local working tree is uncommitted)
 
 | ID | DoD «100% ready» | Layer | Owner lane hint | Blocker |
 |---|---|---|---|---|
-| **P0-01** | GHA `swift-ci` green **ή** local `swift test` PASS + log στο HANDOFF | `MAC` | mac-ci | WSL parser passes; Linux build stops at unavailable Apple `ImageIO`; Apple test proof pending |
+| **P0-01** | GHA `swift-ci` green **ή** local `swift test` PASS + log στο HANDOFF | `MAC` | mac-ci | Hosted runs on `b614db9`/`b29429b` failed before the Swift build (stale Python guards; harness manifests without `platforms` on macOS; Xcode 16 on deprecated `macos-14` vs swift-tools 6.3). The last run that reached `swift build` (37957186872 on `46fe025`) failed to compile, and those errors were still present; no commit from `82c4c0e` onward has compiled. Uncommitted, unexecuted fixes exist for the workflow/guards/manifests and for all 13 compile-error sites found by a file-by-file static review (manifest `.v17_2`, missing returns, undeclared `typeScale`, non-existent/unavailable SwiftUI API, an invalid `frame` overload, a missing CoreMedia argument label, DAT reader/encoder, two test errors). Apple build and test proof pending |
 | **P0-02** | `DECISIONS.md` ρητό **v1 simulation-only** **ή** DAT SPM wired + non-sim connect χωρίς fake | `SW`/`DEV` | decisions-dat | DAT 1.0.1 setup, registration/session, explicit camera permission, publisher bridge, and H.264 conversion have source but remain unbuilt/unverified; photo/audio/IMU remain stubs and the usable path stays simulation-only |
 | **P0-05** | Installable app shell: Info.plist permissions + Xcode app target docs/scaffold (SPM library ≠ app) | `SW`/`MAC` | app-scaffold | ✅ `project.yml`, host entry point, Info.plist, privacy manifest, entitlements, and AppIcon asset are present; Apple build remains unverified |
 | **P0-06** | Stage 6 **μόνο** με πραγματικό device failure report | `DEV` | stage6 | no device report |
@@ -265,7 +266,7 @@ remediation_commit: NONE (local working tree is uncommitted)
 
 | Goal | Criteria |
 |---|---|
-| **Software 100% (no Gen2/Mac)** | Όλα τα `SW` DoD items CLOSED · orphans resolved (wire ή Experimental) · SEC-004/007 + TLS-gate CLOSED · DECISIONS sim-only · docs honest · Python verify 4/4 PASS · **χωρίς** fake device claims |
+| **Software 100% (no Gen2/Mac)** | Όλα τα `SW` DoD items CLOSED · orphans resolved (wire ή Experimental) · SEC-004/007 + TLS-gate CLOSED · DECISIONS sim-only · docs honest · CI `python-verify` (five source guards) and `portable-harnesses` (Linux) PASS on the current head; this replaces the earlier "Python verify 4/4", which referred to the archived `diagnose_stage*` scripts · **χωρίς** fake device claims |
 | **Engineering soft-GO** | Software 100% + P0-01 Mac/`swift test` green + app target scaffold |
 | **Product / Gen2 100%** | Όλα A01–A16 `DEV` PASS · DAT live · Stage 6 device report closed · 0 CRITICAL/HIGH SEC open |
 
@@ -275,17 +276,19 @@ remediation_commit: NONE (local working tree is uncommitted)
 
 ## 7. Verification contract (όλα τα lanes)
 
-Μετά κάθε lane merge (όχι mid-edit):
+Τρέχον contract (2026-10-13): τα jobs του `.github/workflows/swift-ci.yml`.
 
 ```text
-python verification/diagnose_stage3_defects.py
-python verification/diagnose_stage4_fixes.py
-python verification/diagnose_stage5_finalize.py
-python verification/verify_all_subsystems.py
+python-verify       verify_all_subsystems.py (10 illustrative sections), verify_theme_apple_meta_compliance.py,
+                    verify_assistant_chat_context.py, verify_transcript_keyword_tagging.py, verify_ui_source_contracts.py
+portable-harnesses  19 isolated production-source XCTest harnesses + focused/source probes (Linux swift:6.1)
+build-and-test      swift build --build-tests + swift test (macos-26, Xcode 26.4+)
+package-ios-app     XcodeGen + generic iOS / Simulator builds + unsigned IPA (needs the three jobs above)
 ```
 
-Πρέπει: EXIT 0 · stage5 includes SEC suite · verify_all 7/7 phases.  
-Νέα DoD checks → πρόσθεσε στο `diagnose_stage5` **μόνο** αν δεν σπάει sibling WIP (integrator owns harness).
+Πρέπει: όλα τα jobs πράσινα στο τρέχον head. Νέοι source guards μπαίνουν στο `python-verify` και νέα harnesses στο `portable-harnesses`, μόνο αν δεν σπάνε sibling WIP (integrator owns harness).
+
+Ιστορικό: το παλιό contract έτρεχε `diagnose_stage3_defects.py`, `diagnose_stage4_fixes.py`, `diagnose_stage5_finalize.py` και `verify_all_subsystems.py` («verify_all 7/7 phases»). Τα `diagnose_stage*` είναι πλέον αρχειοθετημένα διαγνωστικά, όχι CI gates (βλ. `verification/README.md`).
 
 ---
 
@@ -299,7 +302,8 @@ Remediation     docs/FINDINGS_REMEDIATION.md
 Historical audit snapshot  docs/AUDIT_FINAL.md
 Status A-IDs    docs/IMPLEMENTATION_STATUS.md
 Device protocol docs/DEVICE_TESTS.md
-Handoff         docs/HANDOFF_R0lling_2026-10-11.md
+Handoff         docs/HANDOFF_R0lling_2026-10-12.md   (current; 2026-10-11 is styling history)
+Cross-platform  docs/MULTIPLATFORM_ROADMAP.md · docs/CROSS_PLATFORM_DATA_CONTRACT.md · docs/CROSS_PLATFORM_FEATURE_PARITY.md · docs/ADR_0001_ANDROID_WINDOWS_CLIENT_STACK.md
 Progress rollup docs/GOAL_100_PROGRESS.md   (integrator updates after re-scan)
 ```
 
@@ -324,14 +328,14 @@ The rows below identify code paths and outstanding proof. Their labels are not p
 | A05 | Simulation clip path; live DAT capture/remux remains unavailable | XCTest/AVFoundation/device checks not run |
 | A06 | Buffer warm-up and disconnect handling | XCTest/device concurrency check not run |
 | A07 | Background/lock pause policy | Device lifecycle check not run |
-| A08 | Obsidian vault export and scoped access | Obsidian bridge/path harness passes 35/35 Linux-applicable tests; Apple coordination, bookmarks, and Files-provider validation remain open |
-| A09 | Obsidian conflict sidecars | Hash persistence and root-level sidecar reuse pass in the 35/35 isolated harness; Apple coordination and Files-provider behavior remain open |
+| A08 | Obsidian vault export and scoped access | Obsidian bridge/path harness passed 36/36 Linux-applicable tests at the 2026-10-11 baseline; Apple coordination, bookmarks, and Files-provider validation remain open |
+| A09 | Obsidian conflict sidecars | Hash persistence and root-level sidecar reuse pass in the 36/36 isolated harness (2026-10-11 baseline); Apple coordination and Files-provider behavior remain open |
 | A10 | Direct API/Hermes adapters and settings | XCTest/live endpoint check not run |
 | A11 | Photos vision/OCR fallback; DAT multi-frame path unavailable | Local-first OCR orchestration passes 5/5 Linux-applicable tests; native Vision, Apple build, live provider reply, and DAT multi-frame capture remain unverified |
 | A12 | Keyword recall; semantic embeddings unavailable | XCTest/live AI polish not run |
-| A13 | Agent memory folder and preferences | Agent transaction, symlink, and size tests are included in the 35/35 Obsidian harness; Apple Files-provider export remains unverified |
+| A13 | Agent memory folder and preferences | Agent transaction, symlink, and size tests are included in the 36/36 Obsidian harness (2026-10-11 baseline); Apple Files-provider export remains unverified |
 | A14 | Observation game and fail-closed evaluation | XCTest/device flow not run |
-| A15 | Plain JSON backup bundle, Files export/restore | BackupRestoreTests pass 15/15 in isolated Linux SwiftPM harness (iOS protection case excluded); Files-provider export and full Apple target remain unrun |
+| A15 | Plain JSON backup bundle, Files export/restore | BackupRestoreTests passed 16/16 Linux-applicable cases in the isolated harness at the 2026-10-11 baseline (iOS protection case excluded); Files-provider export and full Apple target remain unrun |
 | A16 | Error taxonomy and privacy declarations | XCTest/Apple build not run |
 
 **Device-proven:** ακόμα **0 / 16**.
@@ -342,7 +346,7 @@ The rows below identify code paths and outstanding proof. Their labels are not p
 |---|---|
 | earcon · timeCapsule · highlightReel · podcast · canvas · KG · emotionTags · scavengerStreak · appleSpeech · onDeviceVisionOCR · entityTags · nutritionHeuristic · dataviewFrontmatter | acoustic · headGesture · spatial · metal · watermark · fileWatcher · proximity · watch · pseudoVector · turnTaking · **mirror** · hyperlapse · whisperStub · multiFrameVision · adaptiveBattery |
 
-B08/C01/C02/C05 no-caller helpers now use the Experimental placement permitted by the freeze policy; their readiness flags remain false. Tests/build have not run for these path moves.
+B08/C01/C02/C05/C06 no-caller helpers now use the Experimental placement permitted by the freeze policy; their readiness flags remain false. Tests/build have not run for these path moves.
 `adaptiveBattery` stays disabled until real battery telemetry and DAT are available.
 Mirror remains disabled until its live transport path is implemented and verified.
 
@@ -350,7 +354,7 @@ Mirror remains disabled until its live transport path is implemented and verifie
 
 | ID | Status |
 |---|---|
-| **P0-01** Mac/`swift test` | Apple build/XCTest NOT RUN. WSL Swift parser passes; Linux package build stops at unavailable Apple `ImageIO` |
+| **P0-01** Mac/`swift test` | Apple build/XCTest NOT RUN. WSL Swift parser passes; Linux package build stops at unavailable Apple `ImageIO`. Hosted CI on `b29429b` (run 38415047820) failed before `swift build`; run 37957186872 on `46fe025` was the last to compile and failed. The 2026-10-13 workflow and static compile fixes are uncommitted and unexecuted |
 | P0-02 DAT vs sim | DAT 1.0.1, registration/DeviceSession, explicit camera-permission confirmation, bounded publisher adaptation, and raw-to-H.264 Annex-B conversion have source code but remain unbuilt/unverified with credentials/device. Photo/audio/IMU remain stubs, `einaiLiveYlopoiimeno` stays false, and simulation is the only usable path |
 | P0-05 App target / Info.plist | Project scaffold and privacy plist are present; Apple build not run |
 | P0-06 Stage 6 | NOT VERIFIED — no device failure report |

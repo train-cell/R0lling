@@ -8,13 +8,19 @@ private enum MetaDATApplicationLifecycle {
     private static let logger = Logger(subsystem: "com.personal.r0lling", category: "MetaDAT")
     private static let appLinkScheme = "com.personal.r0lling"
 
-    static func configure() {
+    // A host `App` may construct `R0llingApp` more than once; a second `Wearables.configure()`
+    // only throws `.alreadyConfigured`, so run the SDK setup exactly once per process.
+    private static let configuration: Void = {
         do {
             try Wearables.configure()
         } catch {
             // Keep the app usable in its explicitly labeled simulation mode if SDK setup fails.
-            logger.error("DAT SDK configuration failed: \(String(describing: error), privacy: .private)")
+            MetaDATApplicationLifecycle.logger.error("DAT SDK configuration failed: \(String(describing: error), privacy: .private)")
         }
+    }()
+
+    static func configure() {
+        _ = configuration
     }
 
     static func handleURL(_ url: URL) {
@@ -39,8 +45,6 @@ private enum MetaDATApplicationLifecycle {
 @main
 #endif
 public struct R0llingApp: App {
-    @StateObject private var appState = AppState()
-
     public init() {
         #if canImport(MWDATCore)
         MetaDATApplicationLifecycle.configure()
@@ -49,18 +53,29 @@ public struct R0llingApp: App {
 
     public var body: some Scene {
         WindowGroup {
-            MainTabView()
-                .environmentObject(appState)
-                .preferredColorScheme(.dark)
-                .task {
-                    await appState.loadInitialData()
-                }
-                #if canImport(MWDATCore)
-                .onOpenURL { url in
-                    MetaDATApplicationLifecycle.handleURL(url)
-                }
-                #endif
+            R0llingRootView()
         }
+    }
+}
+
+/// Owns `AppState` inside an installed view. The iOS host returns `R0llingApp().body`, so
+/// SwiftUI never installs `R0llingApp`'s own properties; a `@StateObject` there would create
+/// a new `AppState` on each access and hand the UI and the initial load different instances.
+struct R0llingRootView: View {
+    @StateObject private var appState = AppState()
+
+    var body: some View {
+        MainTabView()
+            .environmentObject(appState)
+            .preferredColorScheme(.dark)
+            .task {
+                await appState.loadInitialData()
+            }
+            #if canImport(MWDATCore)
+            .onOpenURL { url in
+                MetaDATApplicationLifecycle.handleURL(url)
+            }
+            #endif
     }
 }
 
