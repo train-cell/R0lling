@@ -264,8 +264,8 @@ public actor MediaStorageService: MediaStorageProtocol {
             relativePath: relativePath,
             baseDirectory: baseMediaDirectory
         )
-        // Compare canonical paths: a file that does not exist yet (a restore target) resolves to
-        // a different spelling of the same Darwin directory than its existing folder does.
+        // Compare canonical paths: a type folder that does not exist yet resolves without its
+        // trailing slash, so `URL ==` rejected every first restore target or missing clip.
         let expectedDirectory = baseMediaDirectory.appendingPathComponent(mediaType.folderName, isDirectory: true)
         guard PathAsfaleia.canonicalPath(of: url.deletingLastPathComponent())
                 == PathAsfaleia.canonicalPath(of: expectedDirectory),

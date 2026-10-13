@@ -101,9 +101,9 @@ public enum PathAsfaleia {
         return candidate
     }
 
-    /// One spelling per location for containment checks. Darwin's `resolvingSymlinksInPath()`
-    /// returns `/var/...` for an existing item but keeps `/private/var/...` for a missing one,
-    /// and a missing directory's URL loses its trailing slash, so callers compare these paths.
+    /// One spelling per location for containment checks. `resolvingSymlinksInPath()` drops the
+    /// trailing slash of a directory that does not exist yet and, per NSString's documentation,
+    /// strips a leading `/private` only when the stripped path exists; compare these strings.
     public static func canonicalPath(of url: URL) -> String {
         let path = url.resolvingSymlinksInPath().standardizedFileURL.path
 #if canImport(Darwin)

@@ -142,6 +142,11 @@ enum PathAsfaleia {
         guard result.path.hasPrefix(root) else { throw NSError(domain: "Path", code: 1) }
         return result
     }
+
+    /// Production behavior off Darwin (no `/private` alias to normalize).
+    static func canonicalPath(of url: URL) -> String {
+        url.resolvingSymlinksInPath().standardizedFileURL.path
+    }
 }
 
 enum AppErrorTaxonomy {
