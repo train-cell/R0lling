@@ -9,7 +9,7 @@ def main():
         return
 
     with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
-        log = f.read()
+        log = f.read().replace("\r\n", "\n")  # test logs come from a pseudo-terminal
 
     # Find compiler or test failure lines
     errors = re.findall(r"(/[^:\n]+):(\d+):(?:\d+:)?\s*error:\s*(.+)", log)

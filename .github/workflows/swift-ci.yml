@@ -124,7 +124,10 @@ jobs:
       - name: Run Tests (macOS target)
         run: |
           set -o pipefail
-          if ! swift test 2>&1 | tee swift-test.log; then
+          # xctest block-buffers a pipe (16 KB), which once hid the hanging test. The
+          # pseudo-terminal keeps output line-buffered; after 15 minutes the watchdog
+          # names the running test, samples xctest, and stops so the logs still upload.
+          if ! python3 verification/run_with_pty_watchdog.py 900 -- swift test 2>&1 | tee swift-test.log; then
             python3 verification/extract_swift_build_errors.py swift-test.log
             exit 1
           fi
