@@ -187,7 +187,7 @@ public actor EncryptedDiaryStore {
 
     public func entries(using authorization: Authorization) throws -> [Entry] {
         try requireAuthorization(authorization)
-        try readDocument().entries.sorted { $0.createdAt > $1.createdAt }
+        return try readDocument().entries.sorted { $0.createdAt > $1.createdAt }
     }
 
     public func futureLetters(using authorization: Authorization) throws -> [FutureLetterPreview] {
@@ -238,7 +238,7 @@ public actor EncryptedDiaryStore {
 
     public func decisionRecords(using authorization: Authorization) throws -> [DecisionRecord] {
         try requireAuthorization(authorization)
-        try readDocument().decisionRecords.sorted { $0.createdAt > $1.createdAt }
+        return try readDocument().decisionRecords.sorted { $0.createdAt > $1.createdAt }
     }
 
     @discardableResult

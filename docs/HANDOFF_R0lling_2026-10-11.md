@@ -1,3 +1,5 @@
+> **Historical (2026-10-11/12 styling handoff).** Superseded by [HANDOFF_R0lling_2026-10-12.md](HANDOFF_R0lling_2026-10-12.md) and [AUDIT_VERIFICATION.md](AUDIT_VERIFICATION.md). Its HEAD, worktree, "current", uncommitted, and do-not-commit statements describe that time only; the work it describes is now part of pushed `main` `b29429b`. Keep it as a dated styling record.
+
 # Handoff
 
 Project: R0lling — Bevel UI styling

@@ -632,7 +632,10 @@ public actor ObsidianVaultBridge {
                 }
             }
         }
+        #if DEBUG
+        // Vault-relative note names reveal dates/titles; keep them out of release logs.
         print("[ObsidianVaultBridge] Conflict στο \(relativeNotePath) → sidecar \(finalSidecarRelativePath)")
+        #endif
         return ObsidianSingleExportResult(
             noteURL: noteURL,
             hadConflict: true,

@@ -41,7 +41,11 @@ public struct OnDeviceVisionService: Sendable {
                         }
                     }
                 }
-                completion.resume(continuation, returning: Array(Set(extractedKeywords)).prefix(6).map { String($0) })
+                // Deterministic: keep the first six distinct words in reading order. A Set's iteration
+                // order changes between launches, which made the selected words arbitrary.
+                var seenKeywords = Set<String>()
+                let orderedKeywords = extractedKeywords.filter { seenKeywords.insert($0).inserted }
+                completion.resume(continuation, returning: Array(orderedKeywords.prefix(6)))
             }
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = true

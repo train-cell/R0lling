@@ -154,7 +154,8 @@ final class EncryptedDiaryStoreTests: XCTestCase {
             _ = try await store.saveDecision(tooManyAssumptions, using: authorization)
             XCTFail("Too many decision assumptions must be rejected")
         } catch {
-            XCTAssertEqual((error as NSError).code, 10)
+            // 19 is the vault-limit code; 10 is reserved for a missing decision or assumption.
+            XCTAssertEqual((error as NSError).code, 19)
         }
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: storageURL.path))

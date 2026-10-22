@@ -37,7 +37,8 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
         self.simulationEnabled = true
     }
 
-    private static func normalizedBufferTarget(_ seconds: Double) -> Double {
+    /// Shared with the Today clip labels so they show the same 5s/10s window the stream uses.
+    static func normalizedBufferTarget(_ seconds: Double) -> Double {
         guard seconds.isFinite else { return 10.0 }
         return seconds < 7.5 ? 5.0 : 10.0
     }
@@ -77,9 +78,9 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
         case .connected(_, let bat):
             return bat
         case .streaming:
-            return simulationEnabled ? 92 : nil
+            return nil
         case .paused:
-            return simulationEnabled ? 90 : nil
+            return nil
         default:
             return nil
         }
@@ -113,10 +114,10 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
             }
 
             if simulationEnabled {
-                // ΡΗΤΑ labeled simulation — όχι ψευδής hardware σύνδεση.
+                // ΡΗΤΑ labeled simulation — όχι ψευδής hardware σύνδεση ούτε επινοημένη μπαταρία.
                 state = .connected(
                     deviceName: "Meta Ray-Ban Gen 2 (SIMULATION — όχι φυσική συσκευή)",
-                    batteryPercent: 94
+                    batteryPercent: nil
                 )
                 reconnectAttempts = 0
                 return
@@ -249,12 +250,12 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
             let onoma = simulationEnabled
                 ? "Meta Ray-Ban Gen 2 (SIMULATION — όχι φυσική συσκευή)"
                 : "Meta Ray-Ban Gen 2"
-            state = .connected(deviceName: onoma, batteryPercent: simulationEnabled ? 92 : nil)
+            state = .connected(deviceName: onoma, batteryPercent: nil)
         } else if case .paused = state {
             let onoma = simulationEnabled
                 ? "Meta Ray-Ban Gen 2 (SIMULATION — όχι φυσική συσκευή)"
                 : "Meta Ray-Ban Gen 2"
-            state = .connected(deviceName: onoma, batteryPercent: simulationEnabled ? 90 : nil)
+            state = .connected(deviceName: onoma, batteryPercent: nil)
         }
     }
 
@@ -304,7 +305,7 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
                 if simulationEnabled {
                     state = .connected(
                         deviceName: "Meta Ray-Ban Gen 2 (SIMULATION — όχι φυσική συσκευή)",
-                        batteryPercent: 90
+                        batteryPercent: nil
                     )
                 } else {
                     guard policy.autoResumeStreamOnForeground && itanStreamingPrinPause else {

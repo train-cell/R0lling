@@ -62,6 +62,10 @@ public struct CalendarView: View {
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(R0llingTheme.textSecondary)
+                            // 44pt hit area (DESIGN.md) without growing the padded search bar.
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                            .padding(.vertical, -12)
                     }
                     .accessibilityLabel("Καθαρισμός αναζήτησης")
                 }

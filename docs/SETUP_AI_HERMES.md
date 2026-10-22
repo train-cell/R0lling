@@ -1,4 +1,4 @@
-> Current status (2026-10-09): This document contains historical assertions or design targets. It is not evidence for the current checkout. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [FINDINGS_REMEDIATION.md](FINDINGS_REMEDIATION.md). Earlier “100%”, module counts, CI/head references and security/readiness claims are superseded.
+> Current setup guide (reviewed 2026-10-13 against `HermesEndpointAsfaleia.swift`, `AIHTTPClient.swift` and the `AISettings` defaults). It describes the configurable source paths; it is not evidence that a live provider request, the full XCTest suite, or an Apple build has passed. See [AUDIT_VERIFICATION.md](AUDIT_VERIFICATION.md).
 
 # R0lling — Οδηγός Ρύθμισης AI & Hermes Agent (SETUP_AI_HERMES)
 

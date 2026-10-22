@@ -130,7 +130,7 @@ public struct PhotosMediaPickerButton: View {
                     continue
                 }
                 defer { try? FileManager.default.removeItem(at: importedFile.url) }
-                let filename = syntheshOnomatos(apo: importedFile.url, mediaType: mediaType)
+                let filename = syntheshOnomatos(apo: importedFile, mediaType: mediaType)
                 await onImport(importedFile.url, filename, mediaType)
             } catch {
                 onError("Photos import: \(error.localizedDescription)")
@@ -147,14 +147,21 @@ public struct PhotosMediaPickerButton: View {
         throw MediaApothikeusiError.agnostosTypos(onomaArxeiou: item.itemIdentifier ?? "photos_item")
     }
 
-    private func syntheshOnomatos(apo fileURL: URL, mediaType: MediaType) -> String {
-        let pathExtension = fileURL.pathExtension.lowercased()
+    private func syntheshOnomatos(apo importedFile: ImportedPhotosFile, mediaType: MediaType) -> String {
+        // Keep the basename Photos handed over (for example IMG_1234.HEIC) for display, as the Files
+        // importer does; MediaStorageService bounds it and still stores the copy under a UUID name.
+        let sourceName = importedFile.sourceFilename.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !sourceName.isEmpty, !(sourceName as NSString).pathExtension.isEmpty {
+            return sourceName
+        }
+        let pathExtension = importedFile.url.pathExtension.lowercased()
         let extensionToUse = pathExtension.isEmpty ? proepiloghmeniEpektasi(mediaType) : pathExtension
         return "\(UUID().uuidString).\(extensionToUse)"
     }
 
     private struct ImportedPhotosFile: Transferable {
         let url: URL
+        let sourceFilename: String
 
         static var transferRepresentation: some TransferRepresentation {
             FileRepresentation(importedContentType: .image) { received in
@@ -187,7 +194,7 @@ public struct PhotosMediaPickerButton: View {
                 try? FileManager.default.removeItem(at: destinationURL)
                 throw error
             }
-            return ImportedPhotosFile(url: destinationURL)
+            return ImportedPhotosFile(url: destinationURL, sourceFilename: sourceURL.lastPathComponent)
         }
     }
 #endif

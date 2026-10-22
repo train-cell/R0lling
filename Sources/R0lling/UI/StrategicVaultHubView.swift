@@ -161,9 +161,15 @@ public struct EncryptedDiaryCardView: View {
 
                 HStack {
                     if editingEntryID != nil {
-                        Button("Ακύρωση", action: clearDraft)
-                            .font(.system(size: 11 * typeScale, weight: .medium))
-                            .foregroundColor(R0llingTheme.textSecondary)
+                        Button(action: clearDraft) {
+                            Text("Ακύρωση")
+                                .font(.system(size: 11 * typeScale, weight: .medium))
+                                .foregroundColor(R0llingTheme.textSecondary)
+                                // 44pt hit area for the plain text action (DESIGN.md).
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
                     Spacer()
                     Button(action: saveDraft) {

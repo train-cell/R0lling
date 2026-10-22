@@ -16,6 +16,7 @@ import PackageDescription
 
 let package = Package(
     name: "R0llingHyperlapseTests",
+    platforms: [.macOS(.v14)],
     targets: [
         .target(name: "CoreLocation"),
         .target(name: "R0lling", dependencies: ["CoreLocation"]),

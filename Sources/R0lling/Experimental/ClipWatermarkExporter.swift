@@ -166,7 +166,8 @@ public struct ClipWatermarkExporter: Sendable {
 
         let verticalMargin = max(14, size.height * 0.045)
         let horizontalMargin = max(14, size.width * 0.045)
-        let bannerHeight = min(max(size.height * 0.14, 48), 84)
+        // Margin plus banner stay inside the bottom quarter, so small clips keep their center visible.
+        let bannerHeight = max(1, min(max(size.height * 0.14, 48), 84, size.height * 0.25 - verticalMargin))
         let banner = CALayer()
         banner.frame = CGRect(
             x: horizontalMargin,

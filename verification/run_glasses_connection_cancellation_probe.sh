@@ -36,17 +36,29 @@ public protocol RollingBufferServiceProtocol: AnyObject, Sendable {
     func triggerClip(requestedSeconds: Double) async throws -> ClipExportResult
     func clearBuffer() async
 }
+// Mirrors the non-DAT (no MWDATCore) surface of Sources/R0lling/Glasses/MetaDATStreamBridge.swift
+// that MetaGlassesAdapter uses outside its `#if canImport(MWDATCore)` blocks.
 public enum MetaDATStreamBridge {
     public static let einaiSDKDiathesimo = false
     public static let einaiLiveYlopoiimeno = false
-    public static let errorDomain = "R0lling.Glasses.Meta"
+    public static let errorDomain = "R0lling.Glasses.DAT"
+    public static let kodikosSDKMiDiathesimo = 4010
     public static let kodikosSessionApotyxia = 4011
-    public struct VideoFrame: Sendable { public let timestampSeconds: Double; public let isKeyframe: Bool; public let data: Data }
-    public struct AudioSample: Sendable { public let timestampSeconds: Double; public let data: Data }
+    public struct LiveSessionHandle: Sendable {
+        public let deviceName: String
+        public let batteryPercent: Int?
+    }
+    private static func unavailable() -> NSError {
+        NSError(domain: errorDomain, code: kodikosSDKMiDiathesimo, userInfo: [NSLocalizedDescriptionKey: "DAT unavailable in probe"])
+    }
+    public static func anoixeLiveSession() async throws -> LiveSessionHandle { throw unavailable() }
     public static func kleiseLiveSession() async {}
-    public static func diavaseEpomenoVideoFrame() async throws -> VideoFrame? { nil }
-    public static func diavaseEpomenoAudioSample() async throws -> AudioSample? { nil }
-    public static func diavaseEpomenoIMU() async throws -> HeadGestureDetector.IMUSample? { nil }
+    public static func zitaCameraPermissionMetaAIHandoff() async throws { throw unavailable() }
+    public static func arxiseLiveCameraStream() async throws { throw unavailable() }
+    public static func stamataLiveCameraStream() async {}
+    public static func diavaseEpomenoVideoFrame() async throws -> BufferedSample? { throw unavailable() }
+    public static func diavaseEpomenoAudioSample() async throws -> BufferedSample? { throw unavailable() }
+    public static func diavaseEpomenoIMU() async throws -> HeadGestureDetector.IMUSample? { throw unavailable() }
 }
 SWIFT
 

@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 public struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @AppStorage("r0lling.buffer.targetSeconds") private var bufferDurationSelection: Double = 10.0
+    @AppStorage(AppState.voiceNoteAudioSettingKey) private var keepsVoiceNoteAudio = false
     @State private var simulationMode: Bool = true
     @State private var selectedAIProvider: AIProviderType = .directAPI
     @State private var directEndpointURL: String = "https://api.openai.com/v1"
@@ -27,6 +28,14 @@ public struct SettingsView: View {
     @State private var deixeiEpilogiBackup: Bool = false
     @State private var emfaniseEksagogiBackup: Bool = false
 
+    /// A simulated buffer stream must not read as live glasses capture.
+    private var glassesStatusText: String {
+        let status = appState.glassesState.statusDescription
+        let isSimulatedStream = appState.isSimulationMode
+            && (appState.glassesState.isLive || appState.glassesState.isPaused)
+        return isSimulatedStream ? "Προσομοίωση · \(status)" : status
+    }
+
     public var body: some View {
         NavigationView {
             Form {
@@ -35,8 +44,8 @@ public struct SettingsView: View {
                     HStack {
                         Text("Κατάσταση:")
                         Spacer()
-                        Text(appState.glassesState.statusDescription)
-                            .foregroundColor(appState.glassesState.isLive ? R0llingTheme.statusLive : R0llingTheme.accentLavender)
+                        Text(glassesStatusText)
+                            .foregroundColor(appState.glassesState.isLive && !appState.isSimulationMode ? R0llingTheme.statusLive : R0llingTheme.accentLavender)
                             .bold()
                     }
 
@@ -94,6 +103,15 @@ public struct SettingsView: View {
                         Text(String(format: "%.1fs διαθέσιμα", appState.bufferDuration))
                             .foregroundColor(R0llingTheme.bevelCyan)
                     }
+                }
+
+                // Voice notes (DECISIONS §1: text is the primary record; original audio is optional)
+                Section(header: Text("Φωνητικές σημειώσεις")) {
+                    Toggle("Αποθήκευση αρχικού ήχου (.m4a)", isOn: $keepsVoiceNoteAudio)
+                        .tint(R0llingTheme.accentPurple)
+                    Text("Το κείμενο της υπαγόρευσης παραμένει η κύρια εγγραφή. Όταν είναι ενεργό, ο ήχος της υπαγόρευσης αποθηκεύεται τοπικά ως συνημμένο της ίδιας σημείωσης· ισχύει από την επόμενη υπαγόρευση.")
+                        .font(.caption)
+                        .foregroundColor(R0llingTheme.textSecondary)
                 }
 
                 // Section 3: AI Configuration

@@ -147,6 +147,7 @@ import PackageDescription
 
 let package = Package(
     name: "R0llingObsidianBridgeTests",
+    platforms: [.macOS(.v14)],
     products: [.library(name: "R0lling", targets: ["R0lling"])],
     targets: [
         .target(name: "R0lling"),

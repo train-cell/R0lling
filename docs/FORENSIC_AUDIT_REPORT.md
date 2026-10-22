@@ -10,7 +10,7 @@
 
 ## 🏛️ 1. Επανεξέταση Αρχικού Σχεδίου (Plan & Requirements)
 
-Με βάση το [R0lling-Project-Plan.md](docs/R0lling-Project-Plan.md) και το [R0lling-Model-Assignments.md](docs/R0lling-Model-Assignments.md):
+Με βάση το `R0lling-Project-Plan.md` και το `R0lling-Model-Assignments.md` (εξωτερικά έγγραφα σχεδιασμού· δεν βρίσκονται στο repository):
 
 1. **Σκοπός Έργου:** Το `R0lling` είναι μια αυτόνομη, **local-first** εφαρμογή iPhone για ημερολόγιο, καταγραφή rolling video clips (5–10 δευτερόλεπτα) από Meta Glasses Gen 2, εξαγωγή σε Obsidian Vault, και διπλή διασύνδεση AI (Direct API + Hermes στο Home PC).
 2. **Απαρέγκλιτος Κανόνας (Section 0):**

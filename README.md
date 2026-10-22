@@ -6,7 +6,7 @@ R0lling is a personal journal implemented as a Swift package with an iOS app hos
 
 On iOS, journal writes, media imports, restored media, and temporary backup staging files use Apple's file protection until the first unlock after a device restart; existing journal/media files are migrated when loaded or accessed. This is OS-managed protection, not app-level encryption. Backup contents remain plaintext at the application level, and exported copies follow the selected Files provider's protection policy.
 
-The package uses Swift tools 5.10 and Swift 5 language mode with StrictConcurrency checking. The iOS host targets iOS 17.2. These settings do not establish Swift 6 concurrency compliance.
+The package uses Swift tools 6.3 (Xcode 26.4+, required by the declared Meta DAT 1.0.1 package) and Swift 5 language mode with the StrictConcurrency upcoming feature. The iOS host targets iOS 17.2. These settings do not establish Swift 6 concurrency compliance.
 
 ## Current implementation
 
@@ -40,15 +40,15 @@ AI actions send data to a provider. Hermes is a configurable gateway, not an enf
 
 See [implementation status](docs/IMPLEMENTATION_STATUS.md), [capability map](docs/CAPABILITY_MATRIX.md), and [findings remediation](docs/FINDINGS_REMEDIATION.md).
 
-The Python scripts contain independent model examples and source/config checks. Passing them does not prove Swift behavior, visual fidelity, platform compliance, or hardware support. Current local evidence and remaining gaps are recorded in [the audit verification matrix](docs/AUDIT_VERIFICATION.md). The GitHub Actions workflow contains separate macOS Swift build/tests and iOS host builds; it has not run for this checkout.
+The Python scripts contain independent model examples and source/config checks. Passing them does not prove Swift behavior, visual fidelity, platform compliance, or hardware support. Current local evidence and remaining gaps are recorded in [the audit verification matrix](docs/AUDIT_VERIFICATION.md). The GitHub Actions workflow contains Python source checks, Linux portable-harness runs, a macOS Swift build/test job, and an iOS host build. Its last hosted run, on pushed `main` `b29429b`, failed before the Swift build; the cause and the uncommitted workflow update are recorded in the audit matrix. No green Apple build is claimed.
 
 The UI direction follows the Bevel screens in the external `ui understanding` folder: a charcoal canvas, flat slate cards with quiet outlines and restrained shadows, a deeper blue sleep-detail surface, clear system typography, and floating capsule navigation. The primary destinations are Today, Journal, Fitness, and Health. Fitness has a 30-day HealthKit workout calendar and duration comparison; Today keeps the summary prominent and collapses secondary tools by default. Styling source changes were made across existing screens; rendered iPhone/Simulator comparison remains pending.
 
-The confirmed long-term release target also includes Android and Windows clients while preserving the native SwiftUI iOS app and local-first data model. There is no Android or Windows app in this checkout yet. See the [cross-platform release roadmap](docs/MULTIPLATFORM_ROADMAP.md); this target is not a claim that those clients are implemented or released.
+The confirmed long-term release target also includes Android and Windows clients while preserving the native SwiftUI iOS app and local-first data model. There is no Android or Windows app in this checkout yet. See the [cross-platform release roadmap](docs/MULTIPLATFORM_ROADMAP.md), the proposed [client stack decision record](docs/ADR_0001_ANDROID_WINDOWS_CLIENT_STACK.md), the [feature parity map](docs/CROSS_PLATFORM_FEATURE_PARITY.md), and the [Android](docs/ANDROID_CLIENT_DESIGN.md) and [Windows](docs/WINDOWS_CLIENT_DESIGN.md) designs; this target is not a claim that those clients are implemented or released.
 
 ## Build
 
-On a Mac with Xcode:
+On a Mac with Xcode 26.4 or newer (Swift 6.3, required by the Meta DAT 1.0.1 package):
 
 ```sh
 swift build

@@ -169,12 +169,14 @@ final class ClipWatermarkExporterTests: XCTestCase {
         var brightCenter = 0
         var darkCenter = 0
         for y in 0..<height {
+            // CGBitmapContext memory starts with the top row of the drawn image.
+            let rowFromBottom = height - 1 - y
             for x in 0..<width {
                 let index = (y * width + x) * 4
                 let luminance = (Int(pixels[index]) + Int(pixels[index + 1]) + Int(pixels[index + 2])) / 3
-                if y < height / 4 {
+                if rowFromBottom < height / 4 {
                     if luminance < 200 { darkBottom += 1 }
-                } else if y >= height * 3 / 4 {
+                } else if rowFromBottom >= height * 3 / 4 {
                     if luminance < 200 { darkTop += 1 }
                 } else if luminance >= 200 {
                     brightCenter += 1

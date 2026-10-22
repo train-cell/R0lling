@@ -175,23 +175,6 @@ public struct JournalEntry: Identifiable, Codable, Sendable, Equatable {
     }
 }
 
-/// Ρυθμίσεις για τον κυκλικό buffer
-public struct BufferConfig: Codable, Sendable, Equatable {
-    public var targetDurationSeconds: Double
-    public var enableAudio: Bool
-    public var maxMemoryMegabytes: Int
-
-    public init(
-        targetDurationSeconds: Double = 10.0,
-        enableAudio: Bool = true,
-        maxMemoryMegabytes: Int = 30
-    ) {
-        self.targetDurationSeconds = targetDurationSeconds
-        self.enableAudio = enableAudio
-        self.maxMemoryMegabytes = maxMemoryMegabytes
-    }
-}
-
 /// Ρυθμίσεις παρόχου τεχνητής νοημοσύνης
 public enum AIProviderType: String, Codable, Sendable, CaseIterable {
     case directAPI = "direct_api"
