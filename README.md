@@ -8,6 +8,12 @@ On iOS, journal writes, media imports, restored media, and temporary backup stag
 
 The package uses Swift tools 6.3 (Xcode 26.4+, required by the declared Meta DAT 1.0.1 package) and Swift 5 language mode with the StrictConcurrency upcoming feature. The iOS host targets iOS 17.2. These settings do not establish Swift 6 concurrency compliance.
 
+## Documentation & Release Notes
+
+* **[Changelog](CHANGELOG.md):** Full SemVer v1.1.0 release notes covering all 10 Strategic Cognitive Innovations, Telemetry, and Zero-PII instrumentation.
+* **[Agent Engineering Handoff Report](docs/AGENT_HANDOFF_REPORT.md):** Detailed architectural structure breakdown, subsystem invariants, and multi-agent lane handoffs.
+* **[Master Smoke Test Runner](verification/run_all_smoke_tests.py):** Unified 6-gate zero-trust quality gate runner (`python verification/run_all_smoke_tests.py`).
+
 ## Current implementation
 
 The table describes source paths in this checkout. It does not mean the Apple runtime, network providers, hardware, or visual layout have passed end-to-end validation; see [implementation status](docs/IMPLEMENTATION_STATUS.md).
