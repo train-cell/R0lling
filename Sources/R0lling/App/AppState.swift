@@ -158,6 +158,7 @@ public final class AppState: ObservableObject {
     }
 
     public func loadInitialData() async {
+        R0llingTelemetry.shared.log(.ui, stathmi: .info, "Εκκίνηση φόρτωσης αρχικών δεδομένων AppState")
         await refreshEntries()
         // A14: idle → πρώτη αποστολή για session lifecycle.
         if await gameEngine.getCurrentMission() == nil {
@@ -544,11 +545,13 @@ public final class AppState: ObservableObject {
                 "✅ Η σημείωση αποθηκεύτηκε.",
                 obsidianWarning: warnings.isEmpty ? nil : warnings.joined(separator: "\n")
             )
+            R0llingTelemetry.shared.log(.journal, stathmi: .info, "Επιτυχής αποθήκευση σημείωσης ID=\(entry.id.uuidString)")
             return true
         } catch {
             if let attachment = attachments.first {
                 await removeUnreferencedMediaAfterFailedJournalCommit(attachment)
             }
+            R0llingTelemetry.shared.log(.journal, stathmi: .error, "Αποτυχία αποθήκευσης σημείωσης: \(error.localizedDescription)")
             showToast("Σφάλμα αποθήκευσης: \(error.localizedDescription)")
             return false
         }

@@ -56,6 +56,7 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
     }
 
     private func createBackupBundleUnlocked() async throws -> URL {
+        R0llingTelemetry.shared.log(.backup, stathmi: .info, "Έναρξη δημιουργίας backup bundle")
         let entries = try await storage.getAllEntries()
         try Self.validateManifestBounds(entries: entries)
         let agentMemory = try await agentManager?.loadAgentMemory()
