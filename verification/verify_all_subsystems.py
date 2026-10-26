@@ -24,10 +24,11 @@ FAIL = "[ERR] FAIL"
 
 def test_data_model_and_json():
     print("[1] Testing JournalEntry & Schema Versioning v1...")
-    entry_id = str(uuid.uuid4())
+    entry_id = str(uuid.uuid4()).upper()
+    now_iso = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     entry = {
         "id": entry_id,
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": now_iso,
         "timeZoneIdentifier": "Europe/Athens",
         "title": "Δοκιμή R0lling",
         "content": "Σημείωση για το ταξίδι στη Ρώμη με τη Μαρία.",
@@ -35,16 +36,17 @@ def test_data_model_and_json():
         "tags": ["ταξίδι", "σημαντικό"],
         "attachments": [
             {
-                "id": str(uuid.uuid4()),
+                "id": str(uuid.uuid4()).upper(),
                 "relativePath": "Clips/clip_test.mp4",
                 "mediaType": "clip",
                 "byteSize": 1048576,
                 "durationSeconds": 10.0,
+                "captureTimestamp": now_iso,
                 "hasAudio": True
             }
         ],
         "isFavorite": False,
-        "lastModified": datetime.utcnow().isoformat() + "Z"
+        "lastModified": now_iso
     }
 
     container = {

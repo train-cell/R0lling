@@ -63,12 +63,21 @@ public struct R0llingApp: App {
 /// a new `AppState` on each access and hand the UI and the initial load different instances.
 struct R0llingRootView: View {
     @StateObject private var appState = AppState()
+    @AppStorage("exeiOkloklirotheiOnboarding") private var exeiOkloklirotheiOnboarding: Bool = false
+    @State private var emfanisiOnboarding: Bool = false
 
     var body: some View {
         MainTabView()
             .environmentObject(appState)
             .preferredColorScheme(.dark)
+            .sheet(isPresented: $emfanisiOnboarding) {
+                OnboardingWelcomeView(einaiAnoikto: $emfanisiOnboarding)
+            }
             .task {
+                if !exeiOkloklirotheiOnboarding {
+                    emfanisiOnboarding = true
+                    exeiOkloklirotheiOnboarding = true
+                }
                 await appState.loadInitialData()
             }
             #if canImport(MWDATCore)

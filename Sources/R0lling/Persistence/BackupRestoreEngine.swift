@@ -143,7 +143,34 @@ public actor BackupRestoreEngine: BackupRestoreProtocol {
         try R0llingFileProtection.apply(to: manifestURL)
 
         completed = true
+        await self.ekkatharisiPalaionBackups()
         return tempDir
+    }
+
+    /// Εκκαθάριση παλαιών προσωρινών αντιγράφων ασφαλείας, διατηρώντας μόνο τα N πιο πρόσφατα.
+    /// Αποτρέπει disk space exhaustion από επαναλαμβανόμενες εξαγωγές backup bundles.
+    public func ekkatharisiPalaionBackups(retainingCount: Int = 3) async {
+        let tempDir = FileManager.default.temporaryDirectory
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: tempDir,
+            includingPropertiesForKeys: [.creationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+
+        let backupBundles = contents
+            .filter { $0.lastPathComponent.hasPrefix("R0lling_Backup_") && $0.pathExtension == "r0backup" }
+            .compactMap { url -> (url: URL, date: Date)? in
+                guard let values = try? url.resourceValues(forKeys: [.creationDateKey]),
+                      let date = values.creationDate else { return nil }
+                return (url, date)
+            }
+            .sorted { $0.date > $1.date }
+
+        if backupBundles.count > retainingCount {
+            for item in backupBundles.dropFirst(retainingCount) {
+                try? FileManager.default.removeItem(at: item.url)
+            }
+        }
     }
 
     /// Επαναφορά σε καθαρό ή υπάρχον sandbox χωρίς διπλότυπα IDs.
