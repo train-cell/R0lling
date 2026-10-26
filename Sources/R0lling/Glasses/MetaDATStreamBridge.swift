@@ -172,6 +172,25 @@ public enum MetaDATStreamBridge {
         )
         #endif
     }
+
+    /// Λήψη μεμονωμένης φωτογραφίας υψηλής ανάλυσης από τα έξυπνα γυαλιά (on-demand capture).
+    /// - Throws: `4010` χωρίς SDK, `4011` όταν δεν υπάρχει live session/camera hook.
+    public static func travaFotografia() async throws -> Data {
+        #if canImport(MWDATCore) && canImport(MWDATCamera)
+        throw NSError(
+            domain: errorDomain,
+            code: kodikosSessionApotyxia,
+            userInfo: [NSLocalizedDescriptionKey:
+                "DAT photo capture δεν έχει γίνει wire. Το SDK module υπάρχει, αλλά δεν παρέχεται live capture hook."]
+        )
+        #else
+        throw NSError(
+            domain: errorDomain,
+            code: kodikosSDKMiDiathesimo,
+            userInfo: [NSLocalizedDescriptionKey: "DAT photo capture αδύνατο χωρίς τα MWDATCore/MWDATCamera modules."]
+        )
+        #endif
+    }
 }
 
 #if canImport(MWDATCore) && canImport(MWDATCamera)
