@@ -154,6 +154,7 @@ public actor JSONFileStorageService: JournalStorageProtocol {
         updated[entry.id] = entry
         try flushToDisk(entries: updated)
         entriesCache = updated
+        R0llingTelemetry.shared.log(.storage, stathmi: .debug, "Επιτυχής αποθήκευση entry \(entry.id.uuidString)")
     }
 
     public func updateEntryIfPresent(_ entry: JournalEntry) async throws -> Bool {

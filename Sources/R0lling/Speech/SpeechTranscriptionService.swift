@@ -114,6 +114,7 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
         utteranceResolver.beginUtterance()
         accumulatedTranscript = ""
         listening = true
+        R0llingTelemetry.shared.log(.media, stathmi: .info, "Έναρξη αναγνώρισης ομιλίας (locale: \(localeIdentifier))")
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -190,6 +191,7 @@ public final class SpeechTranscriptionService: SpeechTranscriptionServiceProtoco
         guard wasListening || !transcript.isEmpty else { return .empty }
 
         tearDownEnginePreservingTranscript()
+        R0llingTelemetry.shared.log(.media, stathmi: .info, "Τερματισμός αναγνώρισης ομιλίας - χαρακτήρες: \(transcript.count)")
         let resolution = utteranceResolver.stop(transcript: transcript)
         if let command = resolution.commandToDispatch {
             commandHandler?(command)

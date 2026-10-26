@@ -291,7 +291,15 @@ public struct SettingsView: View {
                     .foregroundColor(R0llingTheme.bevelCyan)
                 }
 
-                // Section 6: App Info
+                // Section 6: Diagnostics & Telemetry
+                Section(header: Text("Διαγνωστικά & Τηλεμετρία")) {
+                    NavigationLink(destination: TelemetryDashboardView()) {
+                        Label("Πίνακας Τηλεμετρίας & Logs", systemImage: "waveform.path.ecg")
+                            .foregroundColor(R0llingTheme.accentPurple)
+                    }
+                }
+
+                // Section 7: App Info
                 Section(header: Text("Πληροφορίες")) {
                     HStack {
                         Text("Έκδοση:")

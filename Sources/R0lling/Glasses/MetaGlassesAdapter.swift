@@ -102,6 +102,7 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
     }
 
     public func connectDevice() async throws {
+        R0llingTelemetry.shared.log(.glasses, stathmi: .info, "Έναρξη διαδικασίας σύνδεσης Meta Glasses (simulation=\(simulationEnabled))")
         connectionAttemptGeneration &+= 1
         let attemptGeneration = connectionAttemptGeneration
         state = .connecting
@@ -158,6 +159,7 @@ public actor MetaGlassesAdapter: MetaGlassesAdapterProtocol {
     }
 
     public func disconnectDevice() async {
+        R0llingTelemetry.shared.log(.glasses, stathmi: .info, "Αποσύνδεση Meta Glasses")
         connectionAttemptGeneration &+= 1
         await stopStreaming()
         if policy.clearBufferOnDisconnect {

@@ -258,6 +258,8 @@ public enum AIHTTPClient {
         for attempt in 0...maxRetryCount {
             try Task.checkCancellation()
 
+            R0llingTelemetry.shared.log(.ai, stathmi: .info, "AI HTTP POST αίτημα προς \(config.url.host ?? "endpoint") (\(config.body.count) bytes, attempt \(attempt + 1))")
+
             var request = URLRequest(url: config.url)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -281,6 +283,7 @@ public enum AIHTTPClient {
                 }
 
                 if (200...299).contains(httpResponse.statusCode) {
+                    R0llingTelemetry.shared.log(.ai, stathmi: .info, "AI HTTP επιτυχία HTTP \(httpResponse.statusCode) (\(data.count) bytes)")
                     return data
                 }
 
@@ -290,6 +293,7 @@ public enum AIHTTPClient {
                     code: config.httpRejectedCode,
                     message: "\(config.httpRejectedMessagePrefix) (HTTP \(httpResponse.statusCode))."
                 )
+                R0llingTelemetry.shared.log(.ai, stathmi: .error, "AI HTTP απόρριψη: HTTP \(httpResponse.statusCode)")
 
                 if retryableStatusCodes.contains(httpResponse.statusCode), attempt < maxRetryCount {
                     lastError = rejected
