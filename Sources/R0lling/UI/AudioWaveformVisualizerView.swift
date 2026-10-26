@@ -44,12 +44,14 @@ public struct AudioWaveformVisualizerView: View {
 
     /// Ypologizei to dynamiko ypsos kathe mparas me bash tin entasi kai ti thesi.
     private func ypologismosYpsous(gia deiktis: Int) -> CGFloat {
-        guard einaiEnergo else { return 0.15 }
+        guard einaiEnergo, stathmiEntasis.isFinite, arithmosMparon > 0 else { return 0.15 }
         let kentro = Double(arithmosMparon) / 2.0
+        guard kentro > 0 else { return 0.15 }
         let apostasiApoKentro = abs(Double(deiktis) - kentro) / kentro
         let kampyli = cos(apostasiApoKentro * Double.pi / 2.0)
         let normalizedEntasi = CGFloat(stathmiEntasis)
         let basikoYpsos = CGFloat(kampyli) * (0.3 + 0.7 * normalizedEntasi)
+        guard basikoYpsos.isFinite else { return 0.15 }
         return min(max(basikoYpsos, 0.15), 1.0)
     }
 }
