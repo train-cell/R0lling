@@ -67,6 +67,16 @@ class MasterSmokeRunner:
                 "onoma": "Stage 5 Finalize & Hardware Security",
                 "perigrafi": "Epalithefsi Meta DAT fail-closed gates (4002/4010), PTS monotonicity, MP4 container integrity",
                 "arxeio": "diagnose_stage5_finalize.py"
+            },
+            {
+                "onoma": "Telemetry & Cognitive Innovations",
+                "perigrafi": "Epalithefsi R0llingTelemetry, Dashboard UI, Subsystems Wiring kai Cognitive Engines (Macros, Vision, CRDT)",
+                "arxeio": "verify_telemetry_contracts.py"
+            },
+            {
+                "onoma": "Cognitive Behavioral Unit Tests",
+                "perigrafi": "Epalithefsi SmartActionMacroParser, LocalVisionTagger, VectorClockConflictResolver kai Ring Buffer algebra",
+                "arxeio": "test_cognitive_engines.py"
             }
         ]
 

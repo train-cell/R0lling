@@ -306,6 +306,7 @@ public actor ObsidianVaultBridge {
                 }
             }
 
+            R0llingTelemetry.shared.log(.obsidian, stathmi: .info, "Obsidian export batch ολοκληρώθηκε: \(exportedPaths.count) αρχεία, \(conflictsList.count) conflicts")
             return ObsidianExportResult(
                 exportedFilesCount: exportedPaths.count,
                 modifiedFiles: modifiedList,

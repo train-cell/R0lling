@@ -17,7 +17,7 @@ public final class R0llingTelemetry: @unchecked Sendable {
     public static let subsystem = "com.personal.r0lling"
 
     // MARK: - Katigories Loggers
-    public enum Katigoria: String, Sendable, CaseIterable {
+    public enum Katigoria: String, Sendable, CaseIterable, Codable {
         case ui = "UI"
         case journal = "Journal"
         case storage = "Storage"
@@ -30,7 +30,7 @@ public final class R0llingTelemetry: @unchecked Sendable {
         case security = "Security"
     }
 
-    public enum StathmiLog: String, Sendable {
+    public enum StathmiLog: String, Sendable, CaseIterable, Codable {
         case debug = "DEBUG"
         case info = "INFO"
         case notice = "NOTICE"
@@ -43,16 +43,16 @@ public final class R0llingTelemetry: @unchecked Sendable {
     public struct TelemetrySimvan: Identifiable, Sendable, Codable {
         public let id: UUID
         public let xronosigmh: Date
-        public let katigoria: String
-        public let stathmi: String
+        public let katigoria: Katigoria
+        public let stathmi: StathmiLog
         public let minima: String
         public let diarkeiaMs: Double?
 
         public init(katigoria: Katigoria, stathmi: StathmiLog, minima: String, diarkeiaMs: Double? = nil) {
             self.id = UUID()
             self.xronosigmh = Date()
-            self.katigoria = katigoria.rawValue
-            self.stathmi = stathmi.rawValue
+            self.katigoria = katigoria
+            self.stathmi = stathmi
             self.minima = minima
             self.diarkeiaMs = diarkeiaMs
         }
@@ -167,6 +167,26 @@ public final class R0llingTelemetry: @unchecked Sendable {
         kleidaria.lock()
         defer { kleidaria.unlock() }
         return bufferSimvantwn
+    }
+
+    /// Filtrarei ta simvanta me vasi katigoria kai stathmi.
+    public func laveFiltraSimvanta(katigoria: Katigoria? = nil, stathmi: StathmiLog? = nil) -> [TelemetrySimvan] {
+        kleidaria.lock()
+        defer { kleidaria.unlock() }
+        return bufferSimvantwn.filter { simvan in
+            if let katigoria, simvan.katigoria != katigoria { return false }
+            if let stathmi, simvan.stathmi != stathmi { return false }
+            return true
+        }
+    }
+
+    /// Eksagei to plires diagnwstiko bundle se morfopoihmeno JSON me ISO-8601 timestamps.
+    public func paragogiDiagnwstikouJSON() -> Data? {
+        let simvanta = eksagwgiDiagnwstikwn()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return try? encoder.encode(simvanta)
     }
 
     /// Katharismos tou in-memory ring buffer.
