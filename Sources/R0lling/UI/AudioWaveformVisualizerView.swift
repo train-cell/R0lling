@@ -14,8 +14,10 @@ public struct AudioWaveformVisualizerView: View {
 
     public init(einaiEnergo: Binding<Bool>, stathmiEntasis: Float = 0.5, arithmosMparon: Int = 24) {
         self._einaiEnergo = einaiEnergo
-        self.stathmiEntasis = min(max(stathmiEntasis, 0.0), 1.0)
-        self.arithmosMparon = arithmosMparon
+        // Defensive edge-case guard: Apopfygi NaN/Infinity layout crash
+        self.stathmiEntasis = stathmiEntasis.isFinite ? min(max(stathmiEntasis, 0.0), 1.0) : 0.0
+        // Defensive edge-case guard: Apopfygi fatal crash ean arithmosMparon <= 0
+        self.arithmosMparon = max(1, min(arithmosMparon, 128))
     }
 
     public var body: some View {

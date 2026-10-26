@@ -395,7 +395,87 @@ def ektelesi_dokimon() -> int:
         print("[ERR] FAIL: To attachment xoris captureTimestamp egine lanthasmena apodekto!")
         return 1
 
-    print("ALL EXCHANGE SCHEMA TESTS PASSED")
+    # 3.5 Path traversal attempt rejection (Photos/../Photos/evil.jpg)
+    akyro_traversal = json.loads(json.dumps(egkyro_journal))
+    akyro_traversal["entries"][0]["attachments"][0]["relativePath"] = "Photos/../Photos/evil.jpg"
+    ep, sf = elegktis.elegxos_document(akyro_traversal)
+    if not ep:
+        print("[OK] PASS: Aporrifthike epituxws to path traversal attempt (../)")
+    else:
+        print("[ERR] FAIL: To path traversal egine lanthasmena apodekto!")
+        return 1
+
+    # 3.6 Hidden file attempt rejection (Photos/.hidden.jpg)
+    akyro_hidden = json.loads(json.dumps(egkyro_journal))
+    akyro_hidden["entries"][0]["attachments"][0]["relativePath"] = "Photos/.hidden.jpg"
+    ep, sf = elegktis.elegxos_document(akyro_hidden)
+    if not ep:
+        print("[OK] PASS: Aporrifthike epituxws to hidden file attempt (Photos/.)")
+    else:
+        print("[ERR] FAIL: To hidden file attempt egine lanthasmena apodekto!")
+        return 1
+
+    # 3.7 Space in relative path rejection (Photos/my file.jpg)
+    akyro_space = json.loads(json.dumps(egkyro_journal))
+    akyro_space["entries"][0]["attachments"][0]["relativePath"] = "Photos/my file.jpg"
+    ep, sf = elegktis.elegxos_document(akyro_space)
+    if not ep:
+        print("[OK] PASS: Aporrifthike epituxws to keno sto relativePath")
+    else:
+        print("[ERR] FAIL: To relativePath me keno egine lanthasmena apodekto!")
+        return 1
+
+    # 3.8 Non-Z Timezone Offset rejection (+02:00)
+    akyro_offset = json.loads(json.dumps(egkyro_journal))
+    akyro_offset["entries"][0]["timestamp"] = "2026-10-26T09:30:00+02:00"
+    ep, sf = elegktis.elegxos_document(akyro_offset)
+    if not ep:
+        print("[OK] PASS: Aporrifthike epituxws to non-Z timezone offset (+02:00)")
+    else:
+        print("[ERR] FAIL: To non-Z timezone offset egine lanthasmena apodekto!")
+        return 1
+
+    # 3.9 Non-hex character 'G' in UUID rejection
+    akyro_hex = json.loads(json.dumps(egkyro_journal))
+    akyro_hex["entries"][0]["id"] = "G1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D"
+    ep, sf = elegktis.elegxos_document(akyro_hex)
+    if not ep:
+        print("[OK] PASS: Aporrifthike epituxws to non-hex char sto UUID ('G')")
+    else:
+        print("[ERR] FAIL: To UUID me 'G' egine lanthasmena apodekto!")
+        return 1
+
+    # 3.10 Schema Version Mismatch rejection (schemaVersion: 2)
+    akyro_version = json.loads(json.dumps(egkyro_journal))
+    akyro_version["schemaVersion"] = 2
+    ep, sf = elegktis.elegxos_document(akyro_version)
+    if not ep:
+        print("[OK] PASS: Aporrifthike epituxws to akyro schemaVersion (2)")
+    else:
+        print("[ERR] FAIL: To schemaVersion 2 egine lanthasmena apodekto!")
+        return 1
+
+    # 3.11 Negative byteSize rejection (byteSize: -50)
+    akyro_bytes = json.loads(json.dumps(egkyro_journal))
+    akyro_bytes["entries"][0]["attachments"][0]["byteSize"] = -50
+    ep, sf = elegktis.elegxos_document(akyro_bytes)
+    if not ep:
+        print("[OK] PASS: Aporrifthike epituxws to arnitiko byteSize (-50)")
+    else:
+        print("[ERR] FAIL: To arnitiko byteSize egine lanthasmena apodekto!")
+        return 1
+
+    # 3.12 Exceeded entriesCount boundary in backup manifest (entriesCount: 50001)
+    akyro_count = json.loads(json.dumps(egkyro_backup))
+    akyro_count["entriesCount"] = 50001
+    ep, sf = elegktis.elegxos_document(akyro_count)
+    if not ep:
+        print("[OK] PASS: Aporrifthike epituxws to entriesCount boundary violation (50001)")
+    else:
+        print("[ERR] FAIL: To entriesCount 50001 egine lanthasmena apodekto!")
+        return 1
+
+    print("ALL EXCHANGE SCHEMA TESTS (12/12 EDGE CASES) PASSED")
     return 0
 
 
