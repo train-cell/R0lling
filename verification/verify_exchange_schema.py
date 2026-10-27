@@ -22,10 +22,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 # Windows console encoding fix
 if sys.platform == "win32":
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT_DIR / "docs" / "contracts" / "r0lling-exchange-v1.schema.json"

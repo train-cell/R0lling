@@ -26,10 +26,8 @@ from pathlib import Path
 
 # Windows console encoding fix
 if sys.platform == "win32":
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
 
 
 def test_idea_1_semantic_search():

@@ -22,10 +22,8 @@ from typing import List, Dict, Any, Tuple
 
 # Windows console encoding fix
 if sys.platform == "win32":
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 VERIFICATION_DIR = ROOT_DIR / "verification"
@@ -102,6 +100,11 @@ class MasterSmokeRunner:
                 "onoma": "Axis 1: Hardened Security and Cryptography",
                 "perigrafi": "Epalithefsi SecureEnclave, MidenistisMnimis, DecoyVault, BiometricTTL, VoiceGuard",
                 "arxeio": "test_axis1_security_cryptography.py"
+            },
+            {
+                "onoma": "Full Codebase Integrity Audit",
+                "perigrafi": "Epalithefsi 216 arxeiwn (48,029 LOC), zero-byte check, no secret leaks, no duplicate ViewBuilders",
+                "arxeio": "verify_entire_codebase_integrity.py"
             }
         ]
 
