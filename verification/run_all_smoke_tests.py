@@ -77,6 +77,31 @@ class MasterSmokeRunner:
                 "onoma": "Cognitive Behavioral Unit Tests",
                 "perigrafi": "Epalithefsi SmartActionMacroParser, LocalVisionTagger, VectorClockConflictResolver kai Ring Buffer algebra",
                 "arxeio": "test_cognitive_engines.py"
+            },
+            {
+                "onoma": "Axis 3: Self-Healing and Diagnostics",
+                "perigrafi": "Epalithefsi AsfalesLeitourgiaDetector, MayroKoutiKatagrafis, AnixneftisAnwmaliwnYgeias, ProfilerEnergeias",
+                "arxeio": "test_axis3_observability_self_healing.py"
+            },
+            {
+                "onoma": "Automated Property-Based Fuzzer",
+                "perigrafi": "Epalithefsi 4000 permutations: Tukey anomaly detection, corrupt JSON fail-closed, blackbox ring-buffer bounds",
+                "arxeio": "fuzz_test_contracts.py"
+            },
+            {
+                "onoma": "Axis 4: Architecture, Sync and UI",
+                "perigrafi": "Epalithefsi TopikosMetagrapheasIxou, SyntonistisP2PZeygariou, SympiknwthsTombstones, WCAG, ThumbnailStore",
+                "arxeio": "test_axis4_architecture_sync_ui.py"
+            },
+            {
+                "onoma": "Axis 2: Edge Cases and Fault Tolerance",
+                "perigrafi": "Epalithefsi MonotonikoRoloi, WALJournalStore, DiorthwthsPTS, DiaxeiristisAudio, DiaxeiristisXwrou",
+                "arxeio": "test_axis2_edge_cases_fault_tolerance.py"
+            },
+            {
+                "onoma": "Axis 1: Hardened Security and Cryptography",
+                "perigrafi": "Epalithefsi SecureEnclave, MidenistisMnimis, DecoyVault, BiometricTTL, VoiceGuard",
+                "arxeio": "test_axis1_security_cryptography.py"
             }
         ]
 
