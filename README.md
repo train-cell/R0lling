@@ -12,6 +12,7 @@ The package uses Swift tools 6.3 (Xcode 26.4+, required by the declared Meta DAT
 
 * **[Changelog](CHANGELOG.md):** Full SemVer v1.1.0 release notes covering all 10 Strategic Cognitive Innovations, Telemetry, and Zero-PII instrumentation.
 * **[Agent Engineering Handoff Report](docs/AGENT_HANDOFF_REPORT.md):** Detailed architectural structure breakdown, subsystem invariants, and multi-agent lane handoffs.
+* **[Grand Security & Local-Only Audit Report](docs/GRAND_SECURITY_AND_LOCAL_AUDIT_REPORT.md):** Formal Zero-Trust verification of 100% Local-First / Air-Gap compliance, Zero-PII observability, hardware crypto vault, and edge-case fuzzing defense.
 * **[Master Smoke Test Runner](verification/run_all_smoke_tests.py):** Unified 6-gate zero-trust quality gate runner (`python verification/run_all_smoke_tests.py`).
 
 ## Current implementation

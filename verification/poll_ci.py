@@ -17,7 +17,7 @@ def get_auth_token():
         for line in out.splitlines():
             if line.startswith("password="):
                 return line.split("=", 1)[1].strip()
-    except Exception:
+    except (subprocess.SubprocessError, OSError):
         pass
     return None
 

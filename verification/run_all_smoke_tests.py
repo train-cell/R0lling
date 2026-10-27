@@ -22,10 +22,8 @@ from typing import List, Dict, Any, Tuple
 
 # Windows console encoding fix
 if sys.platform == "win32":
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 VERIFICATION_DIR = ROOT_DIR / "verification"
@@ -77,6 +75,36 @@ class MasterSmokeRunner:
                 "onoma": "Cognitive Behavioral Unit Tests",
                 "perigrafi": "Epalithefsi SmartActionMacroParser, LocalVisionTagger, VectorClockConflictResolver kai Ring Buffer algebra",
                 "arxeio": "test_cognitive_engines.py"
+            },
+            {
+                "onoma": "Axis 3: Self-Healing and Diagnostics",
+                "perigrafi": "Epalithefsi AsfalesLeitourgiaDetector, MayroKoutiKatagrafis, AnixneftisAnwmaliwnYgeias, ProfilerEnergeias",
+                "arxeio": "test_axis3_observability_self_healing.py"
+            },
+            {
+                "onoma": "Automated Property-Based Fuzzer",
+                "perigrafi": "Epalithefsi 4000 permutations: Tukey anomaly detection, corrupt JSON fail-closed, blackbox ring-buffer bounds",
+                "arxeio": "fuzz_test_contracts.py"
+            },
+            {
+                "onoma": "Axis 4: Architecture, Sync and UI",
+                "perigrafi": "Epalithefsi TopikosMetagrapheasIxou, SyntonistisP2PZeygariou, SympiknwthsTombstones, WCAG, ThumbnailStore",
+                "arxeio": "test_axis4_architecture_sync_ui.py"
+            },
+            {
+                "onoma": "Axis 2: Edge Cases and Fault Tolerance",
+                "perigrafi": "Epalithefsi MonotonikoRoloi, WALJournalStore, DiorthwthsPTS, DiaxeiristisAudio, DiaxeiristisXwrou",
+                "arxeio": "test_axis2_edge_cases_fault_tolerance.py"
+            },
+            {
+                "onoma": "Axis 1: Hardened Security and Cryptography",
+                "perigrafi": "Epalithefsi SecureEnclave, MidenistisMnimis, DecoyVault, BiometricTTL, VoiceGuard",
+                "arxeio": "test_axis1_security_cryptography.py"
+            },
+            {
+                "onoma": "Full Codebase Integrity Audit",
+                "perigrafi": "Epalithefsi 216 arxeiwn (48,029 LOC), zero-byte check, no secret leaks, no duplicate ViewBuilders",
+                "arxeio": "verify_entire_codebase_integrity.py"
             }
         ]
 
